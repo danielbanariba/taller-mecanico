@@ -46,6 +46,7 @@ def inventario():
         'segment' : 'Categoria',
         }, inplace=True)
     
+    #Crea las tablas del inventario
     return rx.data_table(
         data = nba_data[[
             'ID',  # Usa el nuevo nombre de la columna aquí
@@ -60,7 +61,7 @@ def inventario():
             'Categoria'
         ]],
         pagination= True,
-        #TODO agregar un icono de busqueda
+        #TODO agregar un icono de busqueda o poder personalizar mejor la busqueda, https://reflex.dev/docs/library/forms/input/
         search= True,
         sort= True,
     )
