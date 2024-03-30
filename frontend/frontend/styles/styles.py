@@ -33,3 +33,11 @@ BASE_STYLE = {
     "color": TextColor.PRIMARY.value,
     "background_color": Color.NARVAR.value,
 }
+
+CENTRAR_INICIO_DE_SESION = {
+    "display": "flex",
+    "justifyContent": "center",
+    "alignItems": "center",
+    "height": "100vh",
+    "width": "100%",
+}

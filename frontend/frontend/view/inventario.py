@@ -65,3 +65,9 @@ def inventario():
         search= True,
         sort= True,
     )
+    
+def inventario_page():
+    return rx.container(
+        inventario(),
+        id="#Inventario"
+    )

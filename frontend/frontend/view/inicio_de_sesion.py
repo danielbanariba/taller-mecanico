@@ -1,4 +1,5 @@
 import reflex as rx
+from frontend.styles.styles import CENTRAR_INICIO_DE_SESION
 
 # para mas informacion de como hacer la pagina de inicio de sesion
 # https://reflex.dev/docs/library/forms/form/
@@ -10,29 +11,31 @@ class FormState(rx.State):
         """Handle the form submit."""
         self.form_data = form_data
 
-
-def form_example():
-    return rx.vstack(
-        rx.form(
-            rx.vstack(
-                rx.input(
-                    placeholder="First Name",
-                    name="first_name",
+def inicio_de_sesion():
+    return rx.box(
+        rx.vstack(
+            rx.form(
+                rx.vstack(
+                    rx.input(
+                        placeholder="Correo Electronico",
+                        name="email",
+                    ),
+                    rx.input(
+                        placeholder="Contraseña",
+                        name="password",
+                    ),
+                    rx.hstack(
+                        rx.checkbox("Checked", name="check"),
+                        rx.switch("Switched", name="switch"),
+                    ),
+                    rx.button("Submit", type="submit"),
                 ),
-                rx.input(
-                    placeholder="Last Name",
-                    name="last_name",
-                ),
-                rx.hstack(
-                    rx.checkbox("Checked", name="check"),
-                    rx.switch("Switched", name="switch"),
-                ),
-                rx.button("Submit", type="submit"),
+                on_submit=FormState.handle_submit,
+                reset_on_submit=True,
             ),
-            on_submit=FormState.handle_submit,
-            reset_on_submit=True,
+            rx.divider(),
+            rx.heading("Results"),
+            rx.text(FormState.form_data.to_string()),
         ),
-        rx.divider(),
-        rx.heading("Results"),
-        rx.text(FormState.form_data.to_string()),
+        style=CENTRAR_INICIO_DE_SESION
     )
