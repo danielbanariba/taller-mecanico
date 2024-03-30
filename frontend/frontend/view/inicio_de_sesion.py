@@ -13,29 +13,32 @@ class FormState(rx.State):
 
 def inicio_de_sesion():
     return rx.box(
-        rx.vstack(
-            rx.form(
-                rx.vstack(
-                    rx.input(
-                        placeholder="Correo Electronico",
-                        name="email",
+        rx.card(
+            rx.vstack(
+                rx.form(
+                    rx.vstack(
+                        rx.input(
+                            placeholder="Correo Electronico",
+                            name="email",
+                        ),
+                        rx.input(
+                            placeholder="Contraseña",
+                            name="password",
+                            type="password",
+                        ),
+                        rx.hstack(
+                            rx.checkbox("Checked", name="check"),
+                            rx.switch("Switched", name="switch"),
+                        ),
+                        rx.button("Submit", type="submit"),
                     ),
-                    rx.input(
-                        placeholder="Contraseña",
-                        name="password",
-                    ),
-                    rx.hstack(
-                        rx.checkbox("Checked", name="check"),
-                        rx.switch("Switched", name="switch"),
-                    ),
-                    rx.button("Submit", type="submit"),
+                    on_submit=FormState.handle_submit,
+                    reset_on_submit=True,
                 ),
-                on_submit=FormState.handle_submit,
-                reset_on_submit=True,
-            ),
-            rx.divider(),
-            rx.heading("Results"),
-            rx.text(FormState.form_data.to_string()),
+                rx.divider(),
+                rx.heading("Results"),
+                rx.text(FormState.form_data.to_string()),
+            ),    
         ),
         style=CENTRAR_INICIO_DE_SESION
     )
