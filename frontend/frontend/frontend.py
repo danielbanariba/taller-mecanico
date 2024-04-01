@@ -7,10 +7,12 @@ from frontend.view.inicio_de_sesion import inicio_de_sesion
 
 def index() -> rx.Component:
     return rx.vstack(
-        inicio_de_sesion(),
-        #inventario(),#TODO: esto solo es una prueba, se debe cambiar por la pagina de inicio
+        navbar(),
+        #inicio_de_sesion(),
+        rx.hstack(
+            inicio(),
+            inventario(),#TODO: esto solo es una prueba, se debe cambiar por la pagina de inicio    
+        ),
     )
-
-
 app = rx.App()
 app.add_page(index)

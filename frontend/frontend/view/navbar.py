@@ -4,12 +4,13 @@ from frontend.styles.styles import Size, MAX_WIDTH
 
 def navbar() -> rx.Component:
     return rx.hstack(
-        rx.container(
-            #TODO: Aqui tiene que ir el logo de la empresa
-            rx.box(
-                rx.avatar(fallback="RX", size="6"),
-                max_width=MAX_WIDTH,
-            ),
+        rx.image(
+            src="/img/logo/logo-5.png",
+            width="auto",
+            height="80px",
+            margin_top=Size.SMALL.value,
+            margin_bottom=Size.ZERO.value,
+            margin_left=Size.MEDIUM.value,
         ),
         bg=Color.NARVAR.value,
         padding_x=Size.BIG.value, # Espacio que hay entre el borde y el texto
