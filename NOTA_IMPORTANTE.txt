@@ -1,0 +1,28 @@
+Interfaz
+
+
+
+Funcionamiento
+    Tiene que poder generar facturas
+
+
+
+Informes
+
+
+
+
+Comentarios
+    Dejar bien documentado el codigo 
+
+
+Vallidacion
+    Tiene que aceptar solo un tipo especificio de datos
+    Expresiones regulares
+    
+
+Contrasenna este cifrada (que no es pueda ver en texto plano)
+
+
+
+Realizar manual tecnico y manual de usuario

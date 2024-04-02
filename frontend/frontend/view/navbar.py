@@ -2,10 +2,11 @@ import reflex as rx
 from frontend.styles.colors import Color
 from frontend.styles.styles import Size, MAX_WIDTH
 
+#Esto es de la parte superiro de la pagina
 def navbar() -> rx.Component:
     return rx.hstack(
         rx.image(
-            src="/img/logo/logo-5.png",
+            src="/img/logo/logo-5.png", # Logo de la pagina
             width="auto",
             height="80px",
             margin_top=Size.SMALL.value,
