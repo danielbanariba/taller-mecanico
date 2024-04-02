@@ -11,8 +11,11 @@ def index() -> rx.Component:
         #inicio_de_sesion(),
         rx.hstack(
             inicio(),
-            inventario(),#TODO: esto solo es una prueba, se debe cambiar por la pagina de inicio    
+            #inventario(),#TODO: esto solo es una prueba, se debe cambiar por la pagina de inicio    
         ),
     )
 app = rx.App()
+#--------------------------------------------Ivento mio xd------------------------------
+app.add_page(inventario, route="/iventario")
+#--------------------------------------------Ivento mio xd------------------------------
 app.add_page(index)
