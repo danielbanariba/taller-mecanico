@@ -1,0 +1,7 @@
+Pasos para conectarse en la baes de datos:
+
+1) instalar SQLite en en visual studio code
+
+2) Crear una nueva conexcion con la base de datos que tenemos 
+
+3) se va crear un archivo jSON con toda la configuacion necesaria para conectarse a la base de datos
