@@ -19,6 +19,6 @@ def boton(icon: str, url: str, name: str):
                 },
                 },
             ),
-            url=url,#va a recibir el link correspondiente del directorio de la pagina
+            href=url,#va a recibir el link correspondiente del directorio de la pagina
         )
     )
