@@ -1,21 +1,33 @@
 import reflex as rx
 from frontend.view.navbar import navbar
-from frontend.view.inventario import inventario
+from frontend.view.inventario import Inventario
 from frontend.view.inicio import inicio
 from frontend.view.inicio_de_sesion import inicio_de_sesion
 
+#Ejmplo para seguir haciendo mas directorios o direcciones. https://reflex.dev/docs/pages/routes/#getting-the-current-page-link
 
-def index() -> rx.Component:
-    return rx.vstack(
+#Página de inicio 
+def index():
+    return inicio_de_sesion()
+
+#Página de ejemplo
+def about():
+    return rx.text("About Page")
+
+#Página de inventario
+def inventario_page():
+    return rx.vstack(#Combina los elementos en una columna vertical
         navbar(),
-        #inicio_de_sesion(),
         rx.hstack(
             inicio(),
-            #inventario(),#TODO: esto solo es una prueba, se debe cambiar por la pagina de inicio    
+            Inventario(),   
         ),
     )
+    
+
 app = rx.App()
-#--------------------------------------------Ivento mio xd------------------------------
-app.add_page(inventario, route="/iventario")
-#--------------------------------------------Ivento mio xd------------------------------
+
+#Genera las url o los directorios de la paginas correspondientes
 app.add_page(index)
+app.add_page(about)
+app.add_page(inventario_page, route="/inventario-route")

@@ -31,7 +31,7 @@ nba_data = pd.read_csv(csv_file)
 #     )
 
 
-def inventario():
+def Inventario():
     # Cambia el nombre de la columna 
     nba_data.rename(columns={
         'product.partNumber': 'ID', 
@@ -68,6 +68,5 @@ def inventario():
     
 def inventario_page():
     return rx.container(
-        inventario(),
-        id="#Inventario"
+        Inventario(),
     )

@@ -4,6 +4,9 @@ from frontend.styles.styles import CENTRAR_INICIO_DE_SESION
 # para mas informacion de como hacer la pagina de inicio de sesion
 # https://reflex.dev/docs/library/forms/form/
 
+# para poder hacer el diseño de la pagina de inicio de sesion
+# https://fireship.io/lessons/wavy-backgrounds/
+
 class FormState(rx.State):
     form_data: dict = {}
 
