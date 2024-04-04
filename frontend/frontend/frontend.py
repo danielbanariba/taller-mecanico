@@ -33,5 +33,5 @@ app = rx.App()
 #Genera las url o los directorios de la paginas correspondientes
 app.add_page(index)
 app.add_page(about)
-app.add_page(inventario_page, route="/inventario-route")
+app.add_page(inventario_page, route="/inventario")
 app.add_page(inicio_page, route="/inicio")
