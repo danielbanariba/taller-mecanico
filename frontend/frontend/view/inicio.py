@@ -7,7 +7,7 @@ def Inicio():
         boton("users-round", "/Clientes", "Clientes"),
         boton("notebook-text", "/Cotizacion/Factura", "Cotizacion/Factura"),
         boton("notebook-pen", "/Orden de servicio", "Orden de servicio"),
-        boton("package-search", "/inventario-route", "Inventario"), #TODO investigar porque no abre la pagina
+        boton("package-search", "/inventario", "Inventario"), #TODO investigar porque no abre la pagina
         boton("user-round-search", "/Empleados", "Empleados"),
         boton("scroll-text", "/Agenda", "Agenda"),
         boton("text-search", "/Informes", "Informes"),
