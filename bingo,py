@@ -1,0 +1,32 @@
+import random
+
+# Definir la variable ganadora
+ganador = set("595")
+
+# Crear una matriz 3x3 con números aleatorios
+matriz = [[str(random.randint(1, 9)) for _ in range(3)] for _ in range(3)]
+
+# Imprimir la matriz
+for fila in matriz:
+    print(fila)
+
+# Función para verificar si la secuencia ganadora está en la matriz
+def verificar_bingo(matriz, ganador):
+    # Verificar filas
+    for fila in matriz:
+        if set(fila) == ganador:
+            return True
+    # Verificar columnas
+    for columna in zip(*matriz):
+        if set(columna) == ganador:
+            return True
+    # Verificar diagonales
+    if set(matriz[i][i] for i in range(3)) == ganador or set(matriz[i][2-i] for i in range(3)) == ganador:
+        return True
+    return False
+
+# Verificar si ganaste o perdiste
+if verificar_bingo(matriz, ganador):
+    print("Ganaste")
+else:
+    print("Perdiste")

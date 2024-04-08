@@ -44,7 +44,7 @@ def inventario_page():
         ),
     )
     
-
+# Crea la aplicación
 app = rx.App()
 
 #Genera las url o los directorios de la paginas correspondientes
