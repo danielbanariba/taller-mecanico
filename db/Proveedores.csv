@@ -1,0 +1,6 @@
+id,nombre_proveedor,dni,rtn,correo,telefono,nombre_vendedor,telefono_vendedor
+1,Proveedor Adgydgsdgucguhcuigsudgcuisdgu,12345678901234,RTN123,proveedora@example.com,504+0000-1234,Vendedor A,504+0000-5678
+2,Proveedor B,98765432109876,RTN456,proveedorb@example.com,504+0000-4321,Vendedor B,504+0000-8765
+3,Proveedor C,24680135792468,RTN789,proveedorc@example.com,504+0000-9876,Vendedor C,504+0000-1357
+4,Proveedor D,13579246801357,RTN246,proveedord@example.com,504+0000-6789,Vendedor D,504+0000-2468
+5,Proveedor E,80246813579248,RTN579,proveedore@example.com,504+0000-5432,Vendedor E,504+0000-9246
