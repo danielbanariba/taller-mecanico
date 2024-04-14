@@ -4,7 +4,7 @@ from .colors import TextColor, Color
 from .fonts import Font, FontWeight
 
 # Ancho maximo de la pagina web
-MAX_WIDTH = "1000px"
+MAX_WIDTH = "1000px" # "1000px"
 
 
 class Size(Enum): # Tamanno de las imagenes
