@@ -51,7 +51,7 @@ def inventario_page():
 
 # Página de proveedor
 def proveedores_page():
-    return rx.container(
+    return rx.vstack(
         navbar(),
         rx.hstack(  # Mantenemos los elementos en una fila
             Inicio(),
@@ -69,7 +69,7 @@ def proveedores_page():
                     Proveedores(),
                     style={
                         "overflow-x": "auto",  # Agrega desplazamiento horizontal si es necesario
-                        "width": "730px",  # Establece el ancho en 1098px
+                        "width": "1098px",  # Establece el ancho en 1098px
                     }
                 ),
             ),
