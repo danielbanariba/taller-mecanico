@@ -1,67 +1,151 @@
+import re
 import reflex as rx
-from frontend.styles.styles import CENTRAR_LOGIN
-from frontend.styles.styles import fondo_bg_inicio_seccion
+import reflex.components.radix.primitives as rdxp
+import frontend.styles.styles as styles
 
-# para mas informacion de como hacer la pagina de inicio de sesion
-# https://reflex.dev/docs/library/forms/form/
+class RadixFormState(rx.State):
+    # These track the user input real time for validation
+    user_entered_password: str
+    user_entered_email: str
 
-# para poder hacer el diseño de la pagina de inicio de sesion
-# https://fireship.io/lessons/wavy-backgrounds/
-# https://plantillashtmlgratis.com/categoria/efectos-css/fondos-animados-css/
+    # These are the submitted data
+    password: str
+    email: str
 
-class FormState(rx.State):
-    form_data: dict = {}
+    mock_password_db: list[str] = ["reflex", "admin"]
+
+    @rx.var
+    def invalid_email(self) -> bool:
+        return not re.match(
+            r"[^@]+@[^@]+.[^@]+", self.user_entered_email
+        )
+
+    @rx.var
+    def password_empty(self) -> bool:
+        return not self.user_entered_password.strip()
+
+    @rx.var
+    def password_is_taken(self) -> bool:
+        return (
+            self.user_entered_password
+            in self.mock_password_db
+        )
+
+    @rx.var
+    def input_invalid(self) -> bool:
+        return (
+            self.invalid_email
+            or self.password_is_taken
+            or self.password_empty
+        )
 
     def handle_submit(self, form_data: dict):
         """Handle the form submit."""
-        self.form_data = form_data
+        self.password = form_data.get("password")
+        self.email = form_data.get("email")
+
 
 def Login():
     return rx.box(
-        rx.card(
-            rx.vstack(
-                rx.text("Inicio de sesión", size="3", align="center"),  # Añade un tamaño de texto de 2
-                rx.form(
-                    rx.vstack(
-                        rx.text("Inicio de sesión", size="3"),  # Añade un tamaño de texto de 2
-                        rx.input(
-                            placeholder="Correo Electronico",
-                            name="email",
-                            style={"width": "30em", "height": "4em"}  # Añade un estilo de ancho y altura al elemento de entrada
+    rx.flex(
+        rx.form.root(
+            rx.flex(
+                rx.form.field(
+                    rx.flex(
+                        rx.form.label("Email"),
+                        rx.form.control(
+                            rx.input.input(
+                                placeholder="Correo electrónico",
+                                on_change=RadixFormState.set_user_entered_email,
+                                name="email",
+                            ),
+                            as_child=True,
                         ),
-                        rx.text("Contraseña", size="3"),  # Añade un tamaño de texto de 1
-                        rx.input(
-                            placeholder="Contraseña",
-                            name="password",
-                            type="password",
-                            style={"width": "30em", "height": "4em"}  # Añade un estilo de ancho y altura al elemento de entrada
+                        rx.form.message(
+                            "Ingresa un correo válido",
+                            match="valueMissing",
+                            force_match=RadixFormState.invalid_email,
+                            color="var(--red-11)",
                         ),
-                        rx.hstack(
-                            rx.checkbox("Checked", name="check"),
-                            rx.switch("Switched", name="switch"),
-                        ),
-                        rx.button(
-                            "Iniciar sesión",
-                            type="submit",
-                            width= "20em",
-                            height= "4em",
-                        ),  # Añade un estilo de ancho y altura al botón
+                        direction="column",
+                        spacing="2",
+                        align="stretch",
                     ),
-                    on_submit=FormState.handle_submit,
-                    reset_on_submit=True,
+                    name="email",
+                    server_invalid=RadixFormState.invalid_email,
                 ),
-                #TODO aqui es donde se lo tendremos que ensennar al ingeniero, para que mire que los datos fluyen de manera incriptada
-                # descomentar para que se pueda ver
-                # rx.divider(),
-                # rx.heading("Lo que se manda a la base de datos"),
-                # rx.text(FormState.form_data.to_string()),
+                rx.form.field(
+                    rx.flex(
+                        rx.form.label("password"),
+                        rx.form.control(
+                            rx.input.input(
+                                placeholder="password",
+                                # workaround: `name` seems to be required when on_change is set
+                                on_change=RadixFormState.set_user_entered_password,
+                                name="password",
+                            ),
+                            as_child=True,
+                        ),
+                        # server side validation message can be displayed inside a rx.cond
+                        rx.cond(
+                            RadixFormState.password_empty,
+                            rx.form.message(
+                                "password cannot be empty",
+                                color="var(--red-11)",
+                            ),
+                        ),
+                        # server side validation message can be displayed by `force_match` prop
+                        rx.form.message(
+                            "password already taken",
+                            # this is a workaround:
+                            # `force_match` does not work without `match`
+                            # This case does not want client side validation
+                            # and intentionally not set `required` on the input
+                            # so "valueMissing" is always false
+                            match="valueMissing",
+                            force_match=RadixFormState.password_is_taken,
+                            color="var(--red-11)",
+                        ),
+                        direction="column",
+                        spacing="2",
+                        align="stretch",
+                    ),
+                    name="password",
+                    server_invalid=RadixFormState.password_is_taken,
+                ),
+                rx.form.submit(
+                    rx.button(
+                        "Submit",
+                        disabled=RadixFormState.input_invalid,
+                    ),
+                    as_child=True,
+                ),
+                direction="column",
+                spacing="4",
+                width="25em",
             ),
-            #Estilo de los bordes del incio de seccion
-            #TODO pero este fragmento de codigo se tiene que llevar al archivo de estilos 
-            border = "10px solid rebeccapurple",
-            border_radius = "1em",
-            # Añade un estilo de ancho y altura a la tarjeta
-            #style={"width": "800px", "height": "600px"}
+            on_submit=RadixFormState.handle_submit,
+            reset_on_submit=True,
         ),
-        style=CENTRAR_LOGIN
+        rx.divider(size="4"),
+        rx.text(
+            "password submitted: ",
+            rx.text(
+                RadixFormState.password,
+                weight="bold",
+                color="var(--accent-11)",
+            ),
+        ),
+        rx.text(
+            "Email submitted: ",
+            rx.text(
+                RadixFormState.email,
+                weight="bold",
+                color="var(--accent-11)",
+            ),
+        ),
+        direction="column",
+        spacing="4",
+    ),
+    style=styles.CENTRAR_LOGIN,
     )
