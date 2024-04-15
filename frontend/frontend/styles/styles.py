@@ -34,7 +34,7 @@ BASE_STYLE = {
     "background_color": Color.NARVAR.value,
 }
 
-CENTRAR_INICIO_DE_SESION = {
+CENTRAR_LOGIN = {
     "display": "flex",
     "justifyContent": "center",
     "alignItems": "center",

@@ -1,5 +1,5 @@
 import reflex as rx
-from frontend.styles.styles import CENTRAR_INICIO_DE_SESION
+from frontend.styles.styles import CENTRAR_LOGIN
 from frontend.styles.styles import fondo_bg_inicio_seccion
 
 # para mas informacion de como hacer la pagina de inicio de sesion
@@ -16,7 +16,7 @@ class FormState(rx.State):
         """Handle the form submit."""
         self.form_data = form_data
 
-def inicio_de_sesion():
+def Login():
     return rx.box(
         rx.card(
             rx.vstack(
@@ -63,5 +63,5 @@ def inicio_de_sesion():
             # Añade un estilo de ancho y altura a la tarjeta
             #style={"width": "800px", "height": "600px"}
         ),
-        style=CENTRAR_INICIO_DE_SESION
+        style=CENTRAR_LOGIN
     )
