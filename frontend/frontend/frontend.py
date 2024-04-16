@@ -2,9 +2,9 @@ import reflex as rx
 from frontend.view.navbar import navbar
 from frontend.view.inventario import Inventario
 from frontend.view.inicio import Inicio
-from frontend.view.inicio_de_sesion import inicio_de_sesion
 from frontend.view.pantalla_dashboard import grafica_de_barras, grafica_lineal
 from frontend.view.proveedores import Proveedores
+from frontend.view.login import Login
 #from frontend.view.agregar_proveedor_page import formulario_agregar_proveedor
 #from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
 
@@ -13,7 +13,7 @@ from frontend.view.proveedores import Proveedores
 
 #Página de inicio 
 def index():
-    return inicio_de_sesion()
+    return Login()
 
 
 def estadisticas():
@@ -51,7 +51,7 @@ def inventario_page():
 
 # Página de proveedor
 def proveedores_page():
-    return rx.container(
+    return rx.vstack(
         navbar(),
         rx.hstack(  # Mantenemos los elementos en una fila
             Inicio(),
@@ -69,7 +69,7 @@ def proveedores_page():
                     Proveedores(),
                     style={
                         "overflow-x": "auto",  # Agrega desplazamiento horizontal si es necesario
-                        "width": "730px",  # Establece el ancho en 1098px
+                        "width": "1098px",  # Establece el ancho en 1098px
                     }
                 ),
             ),

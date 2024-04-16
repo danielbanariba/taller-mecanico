@@ -4,7 +4,7 @@ from .colors import TextColor, Color
 from .fonts import Font, FontWeight
 
 # Ancho maximo de la pagina web
-MAX_WIDTH = "1000px" # "1000px"
+MAX_WIDTH = "1500px" # "1000px"
 
 
 class Size(Enum): # Tamanno de las imagenes
@@ -34,7 +34,7 @@ BASE_STYLE = {
     "background_color": Color.NARVAR.value,
 }
 
-CENTRAR_INICIO_DE_SESION = {
+CENTRAR_LOGIN = {
     "display": "flex",
     "justifyContent": "center",
     "alignItems": "center",
@@ -42,6 +42,20 @@ CENTRAR_INICIO_DE_SESION = {
     "width": "100%",
 }
 
+STYLE_BUTTON={
+    'width': '400px', 
+    'height': '60px',
+    'backgroundColor': '#b39eff',
+    'cursor': 'pointer',  # Cambia el cursor a una mano
+    'margin': '0',
+    'fontSize': '20px',  # Ajusta el tamaño del texto aquí
+    ':hover': {
+        'backgroundColor': '#9f87de',  # Cambia el color de fondo cuando se pasa el cursor por encima
+        'transition': '0.3s',
+    },
+},
+
+#TODO chacar esto para que de el estilo que esta en el figma si no, cambiarlo por otro
 def fondo_bg_inicio_seccion():
     return rx.html(
     """
