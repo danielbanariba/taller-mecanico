@@ -76,10 +76,10 @@ def Login():
                 ),
                 rx.form.field(
                     rx.flex(
-                        rx.form.label("password"),
+                        rx.form.label("Password"),
                         rx.form.control(
                             rx.input.input(
-                                placeholder="password",
+                                placeholder="Password",
                                 # workaround: `name` seems to be required when on_change is set
                                 on_change=RadixFormState.set_user_entered_password,
                                 name="password",
