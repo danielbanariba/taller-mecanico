@@ -4,7 +4,7 @@ from frontend.view.inventario import Inventario
 from frontend.view.inicio import Inicio
 from frontend.view.pantalla_dashboard import grafica_de_barras, grafica_lineal
 from frontend.view.proveedores import Proveedores
-from frontend.view.login import Login
+from frontend.login import Login
 #from frontend.view.agregar_proveedor_page import formulario_agregar_proveedor
 #from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
 
@@ -12,7 +12,7 @@ from frontend.view.login import Login
 #Ejmplo para seguir haciendo mas directorios o direcciones. https://reflex.dev/docs/pages/routes/#getting-the-current-page-link
 
 #Página de inicio 
-def index():
+def login():
     return Login()
 
 
@@ -35,8 +35,11 @@ def about():
 
 
 def inicio_page():
-    return Inicio()
-
+    return rx.vstack(
+        navbar(),
+        Inicio(),   
+    )
+    
 
 #Página de inventario
 def inventario_page():
@@ -82,7 +85,7 @@ def proveedores_page():
 app = rx.App()
 
 #Genera las url o los directorios de la paginas correspondientes
-app.add_page(index)
+app.add_page(login, route="/")
 app.add_page(estadisticas, route="/estadisticas")
 app.add_page(about)
 app.add_page(inventario_page, route="/inventario")
