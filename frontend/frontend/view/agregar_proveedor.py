@@ -13,10 +13,10 @@ def formulario_agregar_proveedor():
 
         # Departamento (lista de selección)
         rx.select(
-            options=[
-                {"label": "Departamento 1", "value": "departamento1"},
-                {"label": "Departamento 2", "value": "departamento2"},
-                {"label": "Departamento 3", "value": "departamento3"},
+            items=[
+                "Departamento 1",
+                "Departamento 2",
+                "Departamento 3",
             ],
             name="departamento",
             placeholder="Selecciona un departamento",
@@ -24,10 +24,12 @@ def formulario_agregar_proveedor():
         ),
 
         # Dirección
-        rx.textarea(
+        rx.input(
+            type="text",
             placeholder="Dirección",
             name="direccion",
-            rows="3",
+            multiline=True,  # Esto crea un área de texto multilínea
+            rows=3,
             margin_bottom="20px"
         ),
 
@@ -64,8 +66,7 @@ def formulario_agregar_proveedor():
         ),
 
         rx.text("Información del Vendedor", margin_top="30px", margin_bottom="20px"),  # Título para la sección de información del vendedor
-
-         # Primer nombre del vendedor
+# Primer nombre del vendedor
         rx.input(
             type="text",
             placeholder="Primer nombre del vendedor",
@@ -125,8 +126,9 @@ def formulario_agregar_proveedor():
         rx.button("Enviar", type="submit", margin_top="20px"),
     )
 
+
+
 def agregar_proveedor_page():
     return rx.container(
         formulario_agregar_proveedor(),
     )
-    

@@ -4,7 +4,10 @@ from frontend.view.inventario import Inventario
 from frontend.view.inicio import Inicio
 from frontend.view.pantalla_dashboard import grafica_de_barras, grafica_lineal
 from frontend.view.proveedores import Proveedores
+from frontend.view.agregar_proveedor import formulario_agregar_proveedor
 from frontend.view.login import Login
+from frontend.components.botones import boton_dos
+import frontend.URL as URL
 #from frontend.view.agregar_proveedor_page import formulario_agregar_proveedor
 #from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
 
@@ -58,9 +61,9 @@ def proveedores_page():
             rx.vstack(  # Los botones y la tabla se colocan verticalmente uno encima del otro
                 # Botones para agregar, modificar y listar proveedores
                 rx.hstack(
-                    rx.button("Agregar proveedor", type="submit", margin_top="20px"),
-                    rx.button("Modificar proveedor", type="submit", margin_top="20px"),
-                    rx.button("Listado proveedores", type="submit", margin_top="20px")
+                    boton_dos("plus", "/agregar_proveedor", "Agregar proveedor"),
+                    boton_dos("plus", "/agregar_proveedor","Modificar proveedor"),
+                    boton_dos("plus", "/agregar_proveedor","Listado proveedores")
                 ),
                 # Separador entre los botones y la tabla
                 rx.divider(),
@@ -69,14 +72,22 @@ def proveedores_page():
                     Proveedores(),
                     style={
                         "overflow-x": "auto",  # Agrega desplazamiento horizontal si es necesario
-                        "width": "1098px",  # Establece el ancho en 1098px
+                        "width": "900px",  # Establece el ancho en 830px
                     }
                 ),
             ),
         ),
     )
 
-
+#Página de agregar proveedores
+def agregar_proveedor_page():
+    return rx.vstack(#Combina los elementos en una columna vertical
+        navbar(),
+        rx.hstack(
+            Inicio(),
+            formulario_agregar_proveedor(),   
+        ),
+    )
 
 # Crea la aplicación
 app = rx.App()
@@ -88,4 +99,4 @@ app.add_page(about)
 app.add_page(inventario_page, route="/inventario")
 app.add_page(inicio_page, route="/inicio")
 app.add_page(proveedores_page, route="/proveedores")
-#app.add_page(agregar_proveedor_page, route="/agregar_proveedor")
+app.add_page(agregar_proveedor_page, route="/agregar_proveedor")

@@ -41,7 +41,7 @@ CENTRAR_LOGIN = {
     "height": "100vh",
     "width": "100%",
 }
-
+#BOTONES del menú lateral izquierdo (INICIO)
 STYLE_BUTTON={
     'width': '400px', 
     'height': '60px',
@@ -54,6 +54,23 @@ STYLE_BUTTON={
         'transition': '0.3s',
     },
 },
+
+#BOTONES para agregar, modificar...
+STYLE_BUTTON_TWO={
+    'width': '150px', 
+    'height': '40px',
+    'backgroundColor': '#b39eff',
+    'cursor': 'pointer',  # Cambia el cursor a una mano
+    'margin': '0',
+    'fontSize': '20px',  # Ajusta el tamaño del texto aquí
+    ':hover': {
+        'backgroundColor': '#9f87de',  # Cambia el color de fondo cuando se pasa el cursor por encima
+        'transition': '0.3s',
+    },
+},
+
+
+
 
 #TODO chacar esto para que de el estilo que esta en el figma si no, cambiarlo por otro
 def fondo_bg_inicio_seccion():
