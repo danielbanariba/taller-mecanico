@@ -6,7 +6,6 @@ from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
 from passlib.context import CryptContext
-import os
 
 # Configuración de la base de datos
 engine = create_engine('sqlite:///./users.db')
@@ -89,8 +88,19 @@ async def login(user: UserIn, db: Session = Depends(get_db)):
 async def create_user(user: UserIn, db: Session = Depends(get_db)):
     hashed_password = pwd_context.hash(user.password)
     db_user = User(username=user.username, password=hashed_password)
+    
+    # Chequea si el usuario ya existe
+    existing_user = db.query(User).filter(User.username == user.username).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="El usuario ya existe")
+
     db.add(db_user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="El usuario ya existe")
+
     return {"status": "User created"}
 
 @app.get("/estadisticas/")

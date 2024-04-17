@@ -2,3 +2,8 @@
 # https://reflex.dev/docs/library/typography/link/
 
 INVENTARIO = "#Inventario"
+
+PROVEEDORES = "#Proveedores"
+
+AGREGAR_PROVEEDORES = "#formulario_agregar_proveedor"
+AGREGAR_DOCUMENTOS = "#Subir_DOC"

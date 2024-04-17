@@ -10,7 +10,7 @@ import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Construye la ruta al archivo csv
-csv_file = os.path.join(current_dir, '../../../db/Inventory_v2.csv')
+csv_file = os.path.join(current_dir, '../../../backend/db/Inventory_v2.csv')
 
 # lee el archivo csv y lo guarda en la variable nba_data
 nba_data = pd.read_csv(csv_file)

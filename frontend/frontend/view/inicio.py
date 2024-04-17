@@ -11,7 +11,7 @@ def Inicio():
         boton("user-round-search", "/Empleados", "Empleados"),
         boton("scroll-text", "/Agenda", "Agenda"),
         boton("text-search", "/Informes", "Informes"),
-        boton("factory", "/Proveedores", "Proveedores"),
+        boton("factory", "/proveedores", "Proveedores"),
         boton("settings", "/Configuracion", "Configuracion"),
         margin="20px"# Le da un espacio de 20px a todos los botones
     )
