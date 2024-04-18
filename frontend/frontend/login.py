@@ -4,6 +4,7 @@ import re
 from frontend.components.form_password import form_password
 from frontend.components.form_user import form_user
 
+# TODO Quiero poner esta clase en la parte del backend
 class LoginState(rx.State):
     loader: bool = False
     username: str = "exampl@mail.com"
@@ -47,8 +48,6 @@ class LoginState(rx.State):
             or self.password_empty
         )
 
-
-#@rx.route('/login', title='Login')
 def Login() -> rx.Component:
     return rx.section(
         rx.flex(
@@ -56,51 +55,65 @@ def Login() -> rx.Component:
             rx.heading('Inicio de sesion'),
             rx.form.root(
                 rx.flex(
-                    form_user("Usuario", "Ingrese su correo", "Ingrese un correo valido", "username", LoginState.set_username, LoginState.user_invalid),
-                    
-                    form_password("Contraseña", "Ingrese su contraseña", "password", LoginState.set_password, "password"),
-                    
-                    rx.form.submit(
-                            rx.cond(
-                                LoginState.loader,
-                                rx.chakra.spinner(color="red", size="xs"),
-                                rx.button(
-                                    "Iniciar sesion",
-                                    disabled=LoginState.validate_fields,
-                                    width="30vw",
-                                ),     
-                            ),
-                            as_child=True,
-                        ),
-                        direction="column",
-                        justify="center",
-                        align="center",
-                        spacing="2",
-                ),
-                    rx.cond(
-                        LoginState.error,
-                        rx.callout(
-                            "Credenciasles Incorrectas",
-                            icon="alert_triangle",
-                            color_scheme="red",
-                            role="alert",
-                            style={"margin-top": "10px"}
-                        ),
+                    # Campo de usuario
+                    form_user(
+                        "Usuario", 
+                        "Ingrese su correo", 
+                        "Ingrese un correo valido", 
+                        "username", 
+                        LoginState.set_username, 
+                        LoginState.user_invalid
                     ),
-                    on_submit=LoginState.loginService,
-                    reset_on_submit=True,
-                    width="80%",
+                    # Campo de contraseña
+                    form_password(
+                        "Contraseña", 
+                        "Ingrese su contraseña", 
+                        "password", 
+                        LoginState.set_password, 
+                        "password"
+                    ),
+                    #Boton de inicio de sesion
+                    rx.form.submit(
+                        rx.cond(
+                            LoginState.loader,
+                            rx.chakra.spinner(color="red", size="xs"),
+                            rx.button(
+                                "Iniciar sesion",
+                                disabled=LoginState.validate_fields,
+                                width="30vw",
+                            ),     
+                        ),
+                        as_child=True,
+                    ),
+                    direction="column",
+                    justify="center",
+                    align="center",
+                    spacing="2",
                 ),
-                width="100%",
-                direction="column",
-                align="center",
-                justify="center",
+                rx.cond(
+                    LoginState.error,
+                    rx.callout(
+                        "Credenciasles Incorrectas",
+                        icon="alert_triangle",
+                        color_scheme="red",
+                        role="alert",
+                        style={"margin-top": "10px"}
+                    ),
+                ),
+                on_submit=LoginState.loginService,
+                reset_on_submit=True,
+                width="80%",
             ),
-            style=style_section,
-            justify="center",
             width="100%",
-        )
-    
+            direction="column",
+            align="center",
+            justify="center",
+        ),
+        style=style_section,
+        justify="center",
+        width="100%",
+    )
+
 style_section = {
     "height": "90vh",
     "width": "80%",
