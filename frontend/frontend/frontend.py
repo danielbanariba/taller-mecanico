@@ -4,9 +4,12 @@ from frontend.view.inventario import Inventario
 from frontend.view.inicio import Inicio
 from frontend.view.pantalla_dashboard import grafica_de_barras, grafica_lineal
 from frontend.view.proveedores import Proveedores
-from frontend.view.login import Login
-#from frontend.view.agregar_proveedor_page import formulario_agregar_proveedor
-#from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
+from frontend.login import Login
+from frontend.view.agregar_proveedor import formulario_agregar_proveedor
+from frontend.view.subir_doc import Subir_DOC
+from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
+from frontend.components.botones import boton_dos
+import frontend.URL as URL
 
 
 #Ejmplo para seguir haciendo mas directorios o direcciones. https://reflex.dev/docs/pages/routes/#getting-the-current-page-link
