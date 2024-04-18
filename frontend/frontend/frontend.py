@@ -10,9 +10,6 @@ from frontend.view.agregar_proveedor import formulario_agregar_proveedor
 from frontend.view.subir_doc import Subir_DOC
 #from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
 
-
-#Ejmplo para seguir haciendo mas directorios o direcciones. https://reflex.dev/docs/pages/routes/#getting-the-current-page-link
-
 #Página de inicio 
 def login():
     return Login()
@@ -41,7 +38,7 @@ def inicio_page():
         navbar(),
         Inicio(),   
     )
-    
+
 
 #Página de inventario
 def inventario_page():
@@ -52,7 +49,7 @@ def inventario_page():
             Inventario(),   
         ),
     )
-    
+
 
 # Página de proveedor
 def proveedores_page():
@@ -100,6 +97,7 @@ def agregar_doc_page():
             Subir_DOC(),   
         ),
     )
+
 # Crea la aplicación
 app = rx.App()
 
@@ -113,8 +111,8 @@ app.add_page(proveedores_page, route="/proveedores")
 app.add_page(agregar_proveedor_page, route="/proveedores/agregar_proveedor") #Redirige al formulario para agregar un proveedor
 app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc")
 
-#404 error personalizado
 
+#404 error personalizado
 # Define tu componente personalizado para la página 404
 def custom_404_component():
     return rx.text("Lo sentimos, la página que estás buscando no se pudo encontrar.")
