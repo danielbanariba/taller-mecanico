@@ -1,6 +1,8 @@
 import reflex as rx
 import requests as rq
 import re
+from frontend.components.form_password import form_password
+from frontend.components.form_user import form_user
 
 class LoginState(rx.State):
     loader: bool = False
@@ -54,11 +56,9 @@ def Login() -> rx.Component:
             rx.heading('Inicio de sesion'),
             rx.form.root(
                 rx.flex(
-                    fiel_form_component_general("Usuario", "Ingrese su correo", "Ingrese un correo valido", "username",
-                                                     LoginState.set_username, LoginState.user_invalid),
+                    form_user("Usuario", "Ingrese su correo", "Ingrese un correo valido", "username", LoginState.set_username, LoginState.user_invalid),
                     
-                    field_form_component("Contraseña", "Ingrese su contraseña", "password", 
-                                         LoginState.set_password, "password"),
+                    form_password("Contraseña", "Ingrese su contraseña", "password", LoginState.set_password, "password"),
                     
                     rx.form.submit(
                             rx.cond(
@@ -100,61 +100,6 @@ def Login() -> rx.Component:
             justify="center",
             width="100%",
         )
-    
-def field_form_component(label: str, placeholder: str, name_var: str, on_change_function, type_field: str) -> rx.Component:
-    return rx.form.field(
-                rx.flex(
-                    rx.form.label(label),
-                    rx.form.control(
-                        rx.input.input(
-                            placeholder=placeholder, 
-                            on_change=on_change_function, 
-                            name=name_var, 
-                            type=type_field,
-                            required=True
-                        ),
-                        as_child=True,
-                ),
-                rx.form.message(
-                        "El campo no puede ser nulo",
-                        match="valueMissing",
-                        color="red",
-                ),
-                direction="column",
-                spacing="2",
-                align="stretch",
-                ),
-                name=name_var,
-                width="30vw",
-            )
-    
-def fiel_form_component_general(label: str, placeholder: str, messege_validate: str, name: str, on_change_function, show) -> rx.Component:
-    return rx.form.field(
-                rx.flex(
-                    rx.form.label(label),
-                    rx.form.control(
-                        rx.input.input(
-                            placeholder=placeholder, 
-                            on_change=on_change_function, 
-                            name=name, 
-                            required=True,
-                        ),
-                        as_child=True,
-                        ),
-                        rx.form.message(
-                            messege_validate,
-                            name=name,
-                            match="valueMissing",
-                            force_match=show,
-                            color="red",
-                        ),
-                    direction="column",
-                    spacing="2",
-                    align="stretch",
-                    ),
-                    name=name,
-                    width="30vw",
-                )
     
 style_section = {
     "height": "90vh",
