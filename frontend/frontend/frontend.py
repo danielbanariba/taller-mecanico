@@ -111,5 +111,18 @@ app.add_page(inventario_page, route="/inventario")
 app.add_page(inicio_page, route="/inicio")
 app.add_page(proveedores_page, route="/proveedores")
 app.add_page(agregar_proveedor_page, route="/proveedores/agregar_proveedor") #Redirige al formulario para agregar un proveedor
-
 app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc")
+
+#404 error personalizado
+
+# Define tu componente personalizado para la página 404
+def custom_404_component():
+    return rx.text("Lo sentimos, la página que estás buscando no se pudo encontrar.")
+
+# Ahora, puedes llamar al método para definir tu página 404 personalizada
+app.add_custom_404_page(
+    component=custom_404_component, 
+    title='404 - Página no encontrada', 
+    image='mi_imagen_404.ico', 
+    description='La página que estás buscando no existe.'
+)
