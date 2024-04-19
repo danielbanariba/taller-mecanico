@@ -111,5 +111,4 @@ app.add_page(inventario_page, route="/inventario")
 app.add_page(inicio_page, route="/inicio")
 app.add_page(proveedores_page, route="/proveedores")
 app.add_page(agregar_proveedor_page, route="/proveedores/agregar_proveedor") #Redirige al formulario para agregar un proveedor
-
 app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc")

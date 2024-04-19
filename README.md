@@ -1,9 +1,9 @@
 <div align="center">
-  <h1 align="center">Soundcloud</a></h1>
+  <h1 align="center">TallerMecanico</a></h1>
 </div>
 
 <div align="center">
-  <img align="center" src="frontend/assets/logo2.jpg" alt="soundcloud" width="50%">
+  <img align="center" src="frontend/assets/logo2.jpg" alt="TallerMecanico" width="50%">
 </div>
 <br>
 
