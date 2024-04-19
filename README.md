@@ -97,6 +97,10 @@ Abrimos dos terminamles una para levantar Reflex(frontend) y la otra para FastAP
 
 #### Paso 2:
 Nos vamos a la terminal del backend y ponemos:
+> [!CAUTION] 
+> Recuerda que tienes que activar el entorno virtual
+>
+
 ```sh
 cd backend
 ```
@@ -122,7 +126,15 @@ cd reflex run
 >
 
 Nos vamos a la herramienta Thunder Client, Postman o cualquier otra, y hacemos una nueva peticion de tipo POST para poder crear un nuevo usuario
-Ponemos la direccion "localhost:8000/create_user/" 
+Ponemos la direccion "localhost:8000/create_user/"
+
+
+
+
+
+
+
+
 
 <!-- Run Locally -->
 ## :running: Correr el servidor
@@ -137,6 +149,11 @@ Si va a levatar el servidor desde visual studio code
 ```sh
 uvicorn main:app
 ```
+Ha
+
+
+
+
 <!-- TechStack -->
 ## 👀 Ir a la documentación
 

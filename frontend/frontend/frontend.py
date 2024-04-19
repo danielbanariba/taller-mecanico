@@ -8,6 +8,7 @@ from frontend.login import Login
 from frontend.components.botones import boton_dos
 from frontend.view.agregar_proveedor import formulario_agregar_proveedor
 from frontend.view.subir_doc import Subir_DOC
+from frontend.view.error_404 import error_404
 #from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
 
 #Página de inicio 
@@ -119,7 +120,7 @@ def custom_404_component():
 
 # Ahora, puedes llamar al método para definir tu página 404 personalizada
 app.add_custom_404_page(
-    component=custom_404_component, 
+    component=error_404, 
     title='404 - Página no encontrada', 
     image='mi_imagen_404.ico', 
     description='La página que estás buscando no existe.'
