@@ -1,5 +1,5 @@
 <div align="center">
-  <h1 align="center">TallerMecanico</a></h1>
+  <h1 align="center">Soundcloud</a></h1>
 </div>
 
 <div align="center">
@@ -60,6 +60,9 @@ pip install requests
 ```
 ```sh
 pip install bcrypt
+```
+```sh
+pip install pyjwt
 ```
 
 ## Aqui esta la estructura de carpetas del TallerMecanico
