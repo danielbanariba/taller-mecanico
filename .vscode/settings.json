@@ -1,0 +1,16 @@
+{
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "driver": "SQLite",
+            "database": "${workspaceFolder:Taller_Mecanico}/backend/sql/BD_TALLER_MECANICO.sql",
+            "name": "TALLER_MECANICO"
+        },
+        {
+            "previewLimit": 50,
+            "driver": "SQLite",
+            "database": "${workspaceFolder:Taller_Mecanico}/backend/db/reflex.db",
+            "name": "REFLEX"
+        }
+    ]
+}

@@ -16,6 +16,7 @@ def login():
     return Login()
 
 
+#Pagina de estadisticas
 def estadisticas():
     return rx.vstack(
         navbar(),
@@ -34,6 +35,7 @@ def about():
     return rx.text("About Page")
 
 
+#Página de inicio
 def inicio_page():
     return rx.vstack(
         navbar(),
@@ -117,6 +119,7 @@ app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc")
 # Define tu componente personalizado para la página 404
 def custom_404_component():
     return rx.text("Lo sentimos, la página que estás buscando no se pudo encontrar.")
+
 
 # Ahora, puedes llamar al método para definir tu página 404 personalizada
 app.add_custom_404_page(
