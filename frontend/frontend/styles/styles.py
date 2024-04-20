@@ -1,4 +1,4 @@
-ffrom enum import Enum
+from enum import Enum
 import reflex as rx
 from .colors import TextColor, Color
 from .fonts import Font, FontWeight

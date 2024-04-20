@@ -6,26 +6,14 @@ from frontend.view.pantalla_dashboard import grafica_de_barras, grafica_lineal
 from frontend.view.proveedores import Empleados
 from frontend.view.proveedores import Proveedores
 from frontend.login import Login
-<<<<<<< Updated upstream
-=======
 from frontend.view.agregar_proveedor import formulario_agregar_empleado
 from frontend.view.modificar_proveedor import detalles_empleado
->>>>>>> Stashed changes
 from frontend.view.agregar_proveedor import formulario_agregar_proveedor
 from frontend.view.modificar_proveedor import detalles_proveedor
 from frontend.view.subir_doc import Subir_DOC
 from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
-<<<<<<< Updated upstream
 from frontend.components.botones import boton_dos
 import frontend.URL as URL
-=======
->>>>>>> Stashed changes
-from frontend.components.botones import boton_dos
-import frontend.URL as URL
-from frontend.components.botones import boton_dos
-from frontend.view.agregar_proveedor import formulario_agregar_empleado
-from frontend.view.agregar_proveedor import formulario_agregar_proveedor
-from frontend.view.subir_doc import Subir_DOC
 from frontend.view.error_404 import error_404
 #from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
 
