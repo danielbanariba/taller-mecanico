@@ -10,7 +10,7 @@ import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Construye la ruta al archivo csv de proveedores
-csv_file = os.path.join(current_dir, '../../../db/Proveedores.csv')
+csv_file = os.path.join(current_dir, '../../../backend/db/Proveedores.csv')
 
 # lee el archivo csv y lo guarda en la variable proveedores_data
 proveedores_data = pd.read_csv(csv_file)

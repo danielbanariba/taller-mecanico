@@ -11,9 +11,10 @@ from frontend.view.subir_doc import Subir_DOC
 from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
 from frontend.components.botones import boton_dos
 import frontend.URL as URL
-
-
-#Ejmplo para seguir haciendo mas directorios o direcciones. https://reflex.dev/docs/pages/routes/#getting-the-current-page-link
+from frontend.components.botones import boton_dos
+from frontend.view.agregar_proveedor import formulario_agregar_proveedor
+from frontend.view.subir_doc import Subir_DOC
+#from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
 
 #Página de inicio 
 def login():
@@ -43,7 +44,7 @@ def inicio_page():
         navbar(),
         Inicio(),   
     )
-    
+
 
 #Página de inventario
 def inventario_page():
@@ -54,7 +55,7 @@ def inventario_page():
             Inventario(),   
         ),
     )
-    
+
 
 # Página de proveedor
 def proveedores_page():
@@ -119,6 +120,7 @@ def listado_proveedor_page():
             Proveedores(),   
         ),
     )
+  
 # Crea la aplicación
 app = rx.App()
 
@@ -133,3 +135,18 @@ app.add_page(agregar_proveedor_page, route="/proveedores/agregar_proveedor") #Re
 app.add_page(modificar_proveedor_page, route="/proveedores/modificar_proveedor") 
 app.add_page(listado_proveedor_page, route="/proveedores/listado_proveedor") 
 app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc")
+app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc")
+
+
+#404 error personalizado
+# Define tu componente personalizado para la página 404
+def custom_404_component():
+    return rx.text("Lo sentimos, la página que estás buscando no se pudo encontrar.")
+
+# Ahora, puedes llamar al método para definir tu página 404 personalizada
+app.add_custom_404_page(
+    component=custom_404_component, 
+    title='404 - Página no encontrada', 
+    image='mi_imagen_404.ico', 
+    description='La página que estás buscando no existe.'
+)
