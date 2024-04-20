@@ -6,4 +6,9 @@ INVENTARIO = "#Inventario"
 PROVEEDORES = "#Proveedores"
 
 AGREGAR_PROVEEDORES = "#formulario_agregar_proveedor"
+
+MODIFICAR_PROVEEDORES = "#detalles_proveedor"
+
 AGREGAR_DOCUMENTOS = "#Subir_DOC"
+
+LISTADO_PROVEEDOR = "#Proveedores"

@@ -5,6 +5,12 @@ from frontend.view.inicio import Inicio
 from frontend.view.pantalla_dashboard import grafica_de_barras, grafica_lineal
 from frontend.view.proveedores import Proveedores
 from frontend.login import Login
+from frontend.view.agregar_proveedor import formulario_agregar_proveedor
+from frontend.view.modificar_proveedor import detalles_proveedor
+from frontend.view.subir_doc import Subir_DOC
+from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
+from frontend.components.botones import boton_dos
+import frontend.URL as URL
 from frontend.components.botones import boton_dos
 from frontend.view.agregar_proveedor import formulario_agregar_proveedor
 from frontend.view.subir_doc import Subir_DOC
@@ -61,8 +67,8 @@ def proveedores_page():
                 # Botones para agregar, modificar y listar proveedores
                 rx.hstack(
                     boton_dos("plus", "/proveedores/agregar_proveedor", "Agregar proveedor"),
-                    boton_dos("plus", "/agregar_proveedor","Modificar proveedor"),
-                    boton_dos("plus", "/agregar_proveedor","Listado proveedores")
+                    boton_dos("plus", "/proveedores/modificar_proveedor","Modificar proveedor"),
+                    boton_dos("plus", "/proveedores/listado_proveedor","Listado proveedores")
                 ),
                 # Separador entre los botones y la tabla
                 rx.divider(),
@@ -87,7 +93,15 @@ def agregar_proveedor_page():
             formulario_agregar_proveedor(),   
         ),
     )
-
+#Página de modificar proveedor
+def modificar_proveedor_page():
+    return rx.vstack(#Combina los elementos en una columna vertical
+        navbar(),
+        rx.hstack(
+            Inicio(),
+            detalles_proveedor(),   
+        ),
+    )
 #Página de agregar o subir socumentación 
 def agregar_doc_page():
     return rx.vstack(#Combina los elementos en una columna vertical
@@ -98,6 +112,15 @@ def agregar_doc_page():
         ),
     )
 
+def listado_proveedor_page():
+    return rx.vstack(#Combina los elementos en una columna vertical
+        navbar(),
+        rx.hstack(
+            #Inicio(),
+            Proveedores(),   
+        ),
+    )
+  
 # Crea la aplicación
 app = rx.App()
 
@@ -109,6 +132,9 @@ app.add_page(inventario_page, route="/inventario")
 app.add_page(inicio_page, route="/inicio")
 app.add_page(proveedores_page, route="/proveedores")
 app.add_page(agregar_proveedor_page, route="/proveedores/agregar_proveedor") #Redirige al formulario para agregar un proveedor
+app.add_page(modificar_proveedor_page, route="/proveedores/modificar_proveedor") 
+app.add_page(listado_proveedor_page, route="/proveedores/listado_proveedor") 
+app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc")
 app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc")
 
 
