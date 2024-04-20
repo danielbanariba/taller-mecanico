@@ -3,4 +3,4 @@ Set-Location env/Scripts
 Set-Location ..
 Set-Location ..
 Set-Location .\backend
-uvicorn auth_controller:app --reload
+uvicorn main:app --reload

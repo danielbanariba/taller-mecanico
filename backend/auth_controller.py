@@ -1,11 +1,14 @@
 import jwt
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.ext.declarative import declarative_base
 from passlib.context import CryptContext
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.exc import IntegrityError
+from pydantic import BaseModel, EmailStr
 
 # Configuración de la base de datos
 engine = create_engine('sqlite:///./users.db')
@@ -15,16 +18,12 @@ Base = declarative_base()
 # Modelo de usuario
 class User(Base):
     __tablename__ = "users"
-
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     password = Column(String)
 
 # Crear la tabla de usuarios en la base de datos
 Base.metadata.create_all(bind=engine)
-
-# Inicializar FastAPI
-app = FastAPI()
 
 # Inicializar CryptContext, esto es para hashear y verificar las contraseñas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -39,7 +38,7 @@ def get_db():
 
 # Modelo de Pydantic para el usuario
 class UserIn(BaseModel):
-    username: str
+    username: EmailStr
     password: str
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
@@ -74,7 +73,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         )
     return user
 
-@app.post("/login/")
+router = APIRouter()
+
+@router.post("/login/")
 async def login(user: UserIn, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.username == user.username).first()
     if not db_user or not pwd_context.verify(user.password, db_user.password):
@@ -84,7 +85,7 @@ async def login(user: UserIn, db: Session = Depends(get_db)):
     token = jwt.encode({"username": db_user.username}, SECRET_KEY, algorithm="HS256")
     return {"access_token": token, "token_type": "bearer"}
 
-@app.post("/create_user/")
+@router.post("/create_user/")
 async def create_user(user: UserIn, db: Session = Depends(get_db)):
     hashed_password = pwd_context.hash(user.password)
     db_user = User(username=user.username, password=hashed_password)
@@ -103,6 +104,6 @@ async def create_user(user: UserIn, db: Session = Depends(get_db)):
 
     return {"status": "User created"}
 
-@app.get("/estadisticas/")
+@router.get("/estadisticas/")
 async def estadisticas(current_user: User = Depends(get_current_user)):
     return {"message": "Estadísticas"}
