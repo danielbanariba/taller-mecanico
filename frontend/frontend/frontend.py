@@ -3,11 +3,11 @@ from frontend.view.navbar import navbar
 from frontend.view.inventario import Inventario
 from frontend.view.inicio import Inicio
 from frontend.view.pantalla_dashboard import grafica_de_barras, grafica_lineal
-from frontend.view.proveedores import Empleados
+#from frontend.view.proveedores import Empleados
 from frontend.view.proveedores import Proveedores
 from frontend.login import Login
-from frontend.view.agregar_proveedor import formulario_agregar_empleado
-from frontend.view.modificar_proveedor import detalles_empleado
+#from frontend.view.agregar_proveedor import formulario_agregar_empleado
+#from frontend.view.modificar_proveedor import detalles_empleado
 from frontend.view.agregar_proveedor import formulario_agregar_proveedor
 from frontend.view.modificar_proveedor import detalles_proveedor
 from frontend.view.subir_doc import Subir_DOC
@@ -15,7 +15,6 @@ from frontend.components.botones import boton #para los botones de cada inicio d
 from frontend.components.botones import boton_dos
 import frontend.URL as URL
 from frontend.view.error_404 import error_404
-#from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
 
 #Página de inicio 
 def login():

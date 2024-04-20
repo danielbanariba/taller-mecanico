@@ -1,1 +1,0 @@
-from .proveedor_model import Provedor
