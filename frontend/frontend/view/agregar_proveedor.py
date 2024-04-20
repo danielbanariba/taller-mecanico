@@ -8,8 +8,6 @@ from frontend.components.botones import boton_dos
 from frontend.components.botones import boton_tres
 from frontend.view.modificar_proveedor import detalles_proveedor
 
-import os
-
 def formulario_agregar_proveedor():
     return rx.container(
         rx.text("Agregar Proveedor", size="3", margin_bottom="35px"),  # Título del formulario

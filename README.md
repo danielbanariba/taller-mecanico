@@ -1,5 +1,5 @@
 <div align="center">
-  <h1 align="center">Soundcloud</a></h1>
+  <h1 align="center">Taller Mecanico</a></h1>
 </div>
 
 <div align="center">
@@ -64,6 +64,10 @@ pip install bcrypt
 ```sh
 pip install pyjwt
 ```
+```sh
+pip install pydantic[email]
+```
+
 
 ## Aqui esta la estructura de carpetas del TallerMecanico
 ```bash
@@ -97,6 +101,10 @@ Abrimos dos terminamles una para levantar Reflex(frontend) y la otra para FastAP
 
 #### Paso 2:
 Nos vamos a la terminal del backend y ponemos:
+> [!CAUTION] 
+> Recuerda que tienes que activar el entorno virtual
+>
+
 ```sh
 cd backend
 ```
@@ -122,7 +130,15 @@ cd reflex run
 >
 
 Nos vamos a la herramienta Thunder Client, Postman o cualquier otra, y hacemos una nueva peticion de tipo POST para poder crear un nuevo usuario
-Ponemos la direccion "localhost:8000/create_user/" 
+Ponemos la direccion "localhost:8000/create_user/"
+
+
+
+
+
+
+
+
 
 <!-- Run Locally -->
 ## :running: Correr el servidor
@@ -137,6 +153,14 @@ Si va a levatar el servidor desde visual studio code
 ```sh
 uvicorn main:app
 ```
+Ha
+
+#### Paso 4: Conectarse a la base de datos
+Conecatar a la base de datos, lo primero que necesitamos es instalar la extencion en visual estudio code SQLToos, tenemos que darle, "Add New Connection" nos va a salir un meno, ponemos en el primer campo "Connetion name: TALLER_MECANICO" y despues selecionamos el archivo en el directorio "Taller_Mecanico/backend/db/DB_TALLER_MECANICO.sql" probamos que se conecte en "Test Connection" y por ultimo le damos en "Save Connection"
+
+
+
+
 <!-- TechStack -->
 ## 👀 Ir a la documentación
 
