@@ -2,11 +2,8 @@ from sqlalchemy import create_engine, text
 from client import conectar_SQLite
 
 # Crea un motor SQLAlchemy
-conn, config = conectar_SQLite()
-
-engine = create_engine(config.db_url)
-conn = engine.raw_connection()
-cursor = conn.cursor()
+engine = create_engine(conectar_SQLite().db_url)
+connection = engine.connect()
 
 # Define tus scripts SQL
 sql_script_cliente_natural = """
