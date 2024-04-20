@@ -28,7 +28,9 @@ def Proveedores():
         'nombre_vendedor': 'Nombre vendedor', 
         'telefono_vendedor': 'Telefono vendedor'
         }, inplace=True)
-    #
+
+
+
     #Crea la tabla de proveedores
     return rx.data_table(
         data = proveedores_data[[
@@ -45,8 +47,7 @@ def Proveedores():
         search= True,
         sort= True,
     )
-    
-  
+
 def proveedores_page():
     return rx.container(
         Proveedores(),
