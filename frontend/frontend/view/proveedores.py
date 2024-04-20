@@ -3,6 +3,8 @@ import pandas as pd
 import reflex as rx
 from frontend.view.navbar import navbar
 from frontend.styles.styles import Size, MAX_WIDTH
+from frontend.components.botones import boton_tres
+from frontend.view.modificar_proveedor import detalles_proveedor
 
 import os
 
@@ -15,7 +17,6 @@ csv_file = os.path.join(current_dir, '../../../backend/db/Proveedores.csv')
 # lee el archivo csv y lo guarda en la variable proveedores_data
 proveedores_data = pd.read_csv(csv_file)
 
-
 def Proveedores():
     # Cambia el nombre de las columnas según sea necesario
     proveedores_data.rename(columns={
@@ -26,7 +27,8 @@ def Proveedores():
         'correo': 'Correo', 
         'telefono': 'Telefono', 
         'nombre_vendedor': 'Nombre vendedor', 
-        'telefono_vendedor': 'Telefono vendedor'
+        'telefono_vendedor': 'Telefono vendedor',
+        '---': '---'
         }, inplace=True)
 
 
@@ -41,12 +43,18 @@ def Proveedores():
             'Correo', 
             'Telefono', 
             'Nombre vendedor', 
-            'Telefono vendedor'
+            'Telefono vendedor',
+        
         ]],
         pagination= True,
         search= True,
         sort= True,
     )
+"""
+ rx.hstack(
+                boton_tres("star", "/alert", "Ver ")
+            ),
+"""
 
 def proveedores_page():
     return rx.container(

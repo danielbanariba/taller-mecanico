@@ -15,7 +15,7 @@ def detalles_proveedor():
                 *[
                     rx.flex(
                         rx.image(
-                            src="frontend/assets/img/user/user-1.png",
+                            src="/taller-mecanico/frontend/assets/img/user/user-1.png", #se agrega la imagen del usuario
                             width="200px",  # Ancho de la imagen
                             high="200px",
                             margin_right="10px",  # Margen derecho para separarla del badge
