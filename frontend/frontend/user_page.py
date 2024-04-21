@@ -12,7 +12,7 @@ class UserState(rx.State):
             self.users = select_all()
 
 
-@rx.page(route='/user', title='Proovedor', on_load=UserState.get_all_user)
+@rx.page(route='/user', title='user', on_load=UserState.get_all_user)
 def user_page() -> rx.Component:
     return rx.flex(
         rx.heading('Usuarios', align='center'),
