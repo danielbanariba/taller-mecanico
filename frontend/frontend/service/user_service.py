@@ -1,4 +1,4 @@
-from ..repository.user_repository import select_all, select_user_by_email, create_user
+from ..repository.user_repository import select_all, select_user_by_email, create_user, delete_user
 from ..model.user_model import User
 import cx_Oracle  # Importamos el módulo cx_Oracle para manejar errores de Oracle
 
@@ -31,3 +31,6 @@ def create_user_service(username: str, password: str, phone: str, name: str):
     else:  # Si ya existe un usuario con ese email
         print("A user with this email already exists.")  # Imprimimos un mensaje de error
         raise BaseException("A user with this email already exists.")  # Lanzamos una excepción
+    
+def delete_user_service(email: str):
+    return delete_user(email=email)  # Eliminamos el usuario con ese email

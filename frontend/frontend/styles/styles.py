@@ -132,3 +132,11 @@ def fondo_bg_inicio_seccion():
     
     """
     )
+    
+    
+STYLE_NOTIFY = {
+    'position': 'fixed',
+    'top': '0',
+    'right': '0',
+    'margin': '10px 10px',
+}

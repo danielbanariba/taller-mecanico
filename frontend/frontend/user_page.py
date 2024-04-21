@@ -1,8 +1,9 @@
 import reflex as rx
 from .model.user_model import User
-from .service.user_service import select_all_user_serice, selec_user_by_email_service, create_user_service
+from .service.user_service import select_all_user_serice, selec_user_by_email_service, create_user_service, delete_user_service
 from .components.notify import notify_component
 import asyncio
+from .styles.styles import STYLE_NOTIFY
 
 class UserState(rx.State):
     #states
@@ -37,7 +38,11 @@ class UserState(rx.State):
 
     def buscar_on_change(self, value: str):
         self.user_buscar = value
-        #self.get_user_by_email()
+        
+    @rx.background
+    async def delete_user_by_email(self, email):
+        async with self:
+            self.users = delete_user_service(email)
 
 @rx.page(route='/user', title='user', on_load=UserState.get_all_user)
 def user_page() -> rx.Component:
@@ -57,6 +62,7 @@ def user_page() -> rx.Component:
                 icon="alert_triangle",
                 color_scheme="red",
                 role="alert",
+                style = STYLE_NOTIFY,
             ),
         ),
         #TODO cambiar el estilo, para que sincronice con el estilo de cada componente
@@ -88,7 +94,7 @@ def row_table(user: User) -> rx.Component:
         rx.table.cell(user.phone),
         rx.table.cell(
             rx.hstack(
-                rx.button('Eliminar'),
+                delete_user_dialogo_comoponent(user.username),
             ),
         ),
     )
@@ -150,5 +156,32 @@ def create_user_dialogo_component() -> rx.Component:
                 justify="end",
             ),
             style={"width": "300px"}
+        ),
+    )
+    
+def delete_user_dialogo_comoponent(username: str) -> rx.Component:
+    return rx.dialog.root(
+        rx.dialog.trigger(rx.button(rx.icon("trash-2"))),
+        rx.dialog.content(
+            rx.dialog.title("Eliminar usuario"),
+            rx.dialog.description("¿Estas seguro de que quieres eliminar el usuario" + username + "?"),
+            rx.flex(
+                rx.dialog.close(
+                    rx.button(
+                        'Cancelar', 
+                        color_scheme='gray',
+                        variant='soft'
+                    ),
+                ),
+                rx.dialog.close(
+                    rx.button(
+                        'Confirmar', 
+                        on_click=UserState.delete_user_by_email(username),
+                    ),
+                ),
+                spacing="3",
+                margin_top="16px",
+                justify="end",
+            ),
         ),
     )

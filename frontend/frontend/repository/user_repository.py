@@ -27,3 +27,14 @@ def create_user(user: User):
         session.commit()
         query = select(User)
         return session.exec(query).all()
+    
+# Elimina un usuario de la base de datos
+def delete_user(email: str):
+    engine = connect()
+    with Session(engine) as session:
+        query = select(User).where(User.username == email)
+        user_delete = session.exec(query).one()
+        session.delete(user_delete)
+        session.commit()
+        query = select(User)
+        return session.exec(query).all() 
