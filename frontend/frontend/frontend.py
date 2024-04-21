@@ -9,7 +9,8 @@ from frontend.components.botones import boton_dos
 from frontend.view.agregar_proveedor import formulario_agregar_proveedor
 from frontend.view.subir_doc import Subir_DOC
 from frontend.view.agregar_cliente_n import formulario_agregar_clientes_n
-from frontend.view.cliente_n import Cliente_N
+from frontend.view.clientes import ClientesJuridicos, ClientesNaturales
+from frontend.components.botones import boton_clientes
 
 #from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
 
@@ -111,15 +112,18 @@ def clientes_page():
             rx.vstack(  # Los botones y la tabla se colocan verticalmente uno encima del otro
                 # Botones para agregar, modificar y listar clientes
                 rx.hstack(
+
                     boton_dos("plus", "/cliente_n/agregar_cliente_n", "Agregar Cliente"),
                     boton_dos("plus", "/agregar_cliente_n","Modificar Cliente"),
-                    boton_dos("plus", "/agregar_cliente_n","Listado Cliente")
+                    boton_dos("plus", "/agregar_cliente_n","Listado Cliente"),
+
                 ),
                 # Separador entre los botones y la tabla
                 rx.divider(),
                 # Contenedor flexible para la tabla
                 rx.container(
-                    Cliente_N(),
+                    ClientesJuridicos(),
+                    ClientesNaturales(),
                     style={
                         "overflow-x": "auto",  # Agrega desplazamiento horizontal si es necesario
                         "width": "900px",  # Establece el ancho en 830px

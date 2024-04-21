@@ -8,6 +8,8 @@ PROVEEDORES = "#Proveedores"
 AGREGAR_PROVEEDORES = "#formulario_agregar_proveedor"
 AGREGAR_DOCUMENTOS = "#Subir_DOC"
 
-CLIENTE_N = '#Cliente_N'
+CLIENTE_N = '#ClientesNaturales'
+AGREGAR_CLIENTES_N ='#formulario_agregar_cliente_natural'
 
-AGREGAR_CLIENTES_N ='#formulario_agregar_clientes_n'
+EMPRESA = '#ClientesJuridicos'
+AGREGAR_EMPRESA = '#formulario_agregar_empresa'

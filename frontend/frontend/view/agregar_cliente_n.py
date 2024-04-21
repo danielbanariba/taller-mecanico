@@ -1,132 +1,115 @@
-# agregar_proveedor_page.py
+# agregar_clientes_page.py
 from typing import List
 import pandas as pd
 import reflex as rx
 from frontend.view.navbar import navbar
 from frontend.styles.styles import Size, MAX_WIDTH
-from frontend.components.botones import boton_dos
+from frontend.components.botones import boton_tres
 
 import os
 
-def formulario_agregar_clientes_n():
+def formulario_agregar_cliente_natural():
     return rx.container(
-        rx.text("Agregar Proveedor", size="3", margin_bottom="20px"),  # Título del formulario
-        #Subir documentación
-        rx.hstack(
-            boton_dos("plus", "/proveedores/agregar_proveedor/subir_doc", "Agregar documento"),
-        ),
-        # Departamento (lista de selección)
+        rx.text("Agregar Cliente Natural", size="3", margin_bottom="35px"),  # Título del formulario
+
+        # Lista desplegable para seleccionar la naturaleza del cliente
         rx.select(
             [
-                "Departamento 1",
-                "Departamento 2",
-                "Departamento 3",
+                "Persona Natural",
+            ],
+            name="naturaleza_cliente",
+            placeholder="Selecciona la naturaleza del cliente",
+            margin_bottom="35px"
+        ),
+
+        # Departamento (lista desplegable)
+        rx.select(
+            [
+                "Francisco Morazán",
+                "Comayagua",
+                "Choluteca",
+                "Gracias a Dios",
+                "La Paz",
+                "El Paraíso",
+                "Copan",
             ],
             name="departamento",
             placeholder="Selecciona un departamento",
-            margin_bottom="20px"
+            margin_bottom="35px"
         ),
 
-        # Dirección
+        # Dirección del cliente
         rx.input(
             type="text",
-            placeholder="Dirección",
-            name="direccion",
-            multiline=True,  # Esto crea un área de texto multilínea
-            rows=3,
-            margin_bottom="20px"
+            placeholder="Dirección del cliente",
+            name="direccion_cliente",
+            margin_bottom="35px",
+            style={"width": "400px"}  # Ancho de 400px
         ),
 
-        # Nombre del cliente
-        rx.input(
-            type="text",
-            placeholder="Nombre del Cliente",
-            name="nombre_cliente",
-            margin_bottom="20px"
+        # Nombre del cliente: Primer nombre y Segundo nombre en la misma fila
+        rx.hstack(
+            rx.input(
+                type="text",
+                placeholder="Primer nombre del cliente",
+                name="primer_nombre_cliente",
+                margin_bottom="35px",
+                style={"width": "400px"}  # Ancho de 400px
+            ),
+            rx.input(
+                type="text",
+                placeholder="Segundo nombre del cliente",
+                name="segundo_nombre_cliente",
+                margin_bottom="35px",
+                style={"width": "400px"}  # Ancho de 400px
+            ),
         ),
 
-        # RTN (campo numérico)
+        # Apellidos del cliente: Primer apellido y Segundo apellido en la misma fila
+        rx.hstack(
+            rx.input(
+                type="text",
+                placeholder="Primer apellido del cliente",
+                name="primer_apellido_cliente",
+                margin_bottom="35px",
+                style={"width": "400px"}  # Ancho de 400px
+            ),
+            rx.input(
+                type="text",
+                placeholder="Segundo apellido del cliente",
+                name="segundo_apellido_cliente",
+                margin_bottom="35px",
+                style={"width": "400px"}  # Ancho de 400px
+            ),
+        ),
+
+        # Correo electrónico del cliente
         rx.input(
-            type="number",
-            placeholder="RTN",
-            name="rtn",
-            margin_bottom="20px"
+            type="email",
+            placeholder="Correo electrónico del cliente",
+            name="correo_cliente",
+            margin_bottom="35px",
+            style={"width": "400px"}  # Ancho de 400px
         ),
 
         # Teléfono del cliente
         rx.input(
-            type="text",
-            placeholder="Teléfono del proveedor",
-            name="telefono_proveedor",
-            margin_bottom="20px"
-        ),
-
-        # Correo del cliente (con validación de correo electrónico)
-        rx.input(
-            type="email",
-            placeholder="Correo del Cliente",
-            name="correo_cliente",
-            margin_bottom="20px"
-        ),
-
-        rx.text("Información del Cliente", margin_top="30px", margin_bottom="20px"),  # Título para la sección de información del vendedor
-# Primer nombre del cliente
-        rx.input(
-            type="text",
-            placeholder="Primer nombre del Cliente",
-            name="primer_nombre_cliente",
-            margin_bottom="20px"
-        ),
-
-        # Segundo nombre del Cliente
-        rx.input(
-            type="text",
-            placeholder="Segundo nombre del Cliente",
-            name="segundo_nombre_cliente",
-            margin_bottom="20px"
-        ),
-
-        # Primer apellido del Cliente
-        rx.input(
-            type="text",
-            placeholder="Primer apellido del Cliente",
-            name="primer_apellido_cliente",
-            margin_bottom="20px"
-        ),
-
-        # Segundo apellido del Cliente
-        rx.input(
-            type="text",
-            placeholder="Segundo apellido del Cliente",
-            name="segundo_apellido_cliente",
-            margin_bottom="20px"
-        ),
-
-        # DNI del Cliente
-        rx.input(
-            type="text",
-            placeholder="DNI del Cliente",
-            name="dni_cliente",
-            margin_bottom="20px"
-        ),
-
-        # Teléfono del Cliente (con área del país predefinida)
-        rx.input(
-            type="text",
-            placeholder="Teléfono del Cliente (504+)",
+            type="number",
+            placeholder="Teléfono del cliente",
             name="telefono_cliente",
-            margin_bottom="20px"
+            margin_bottom="35px",
+            style={"width": "400px"}  # Ancho de 400px
         ),
 
-        # Correo del vendedor (con validación de correo electrónico)
-        rx.input(
-            type="email",
-            placeholder="Correo del Cliente",
-            name="correo_Cliente",
-            margin_bottom="20px"
+        # Botón de guardar y cancelar
+        rx.hstack(
+            boton_tres("save", "/alert", "Guardar"),
+            boton_tres("x", "/alert", "Cancelar"),
         ),
-
-        # Botón de enviar
-        rx.button("Enviar", type="submit", margin_top="20px"),
     )
 
+
+def agregar_cliente_natural_page():
+    return rx.container(
+        formulario_agregar_cliente_natural(),
+    )
