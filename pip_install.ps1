@@ -23,3 +23,4 @@ pip install requests
 pip install bcrypt
 pip install pyjwt
 pip install pydantic[email]
+pip install cx_Oracle

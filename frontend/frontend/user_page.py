@@ -1,11 +1,14 @@
 import reflex as rx
 from .model.user_model import User
 from .service.user_service import select_all_user_serice, selec_user_by_email_service, create_user_service
+from .components.notify import notify_component
+import asyncio
 
 class UserState(rx.State):
     #states
     users:list[User]
     user_buscar: str
+    error: str = ''
     
     @rx.background
     async def get_all_user(self):
@@ -17,6 +20,11 @@ class UserState(rx.State):
         async with self:
             self.users = selec_user_by_email_service(self.user_buscar) 
 
+    async def handleNotify(self):
+        async with self:
+            await asyncio.sleep(4)
+            self.error = ''
+
     @rx.background
     async def create_user(self, data: dict):
         async with self:
@@ -24,6 +32,8 @@ class UserState(rx.State):
                 self.users = create_user_service(username=data['username'], password=data['password'], phone=data['phone'], name=data['name'])
             except BaseException as be:
                 print(be.args)
+                self.error = be.args
+        await self.handleNotify()
 
     def buscar_on_change(self, value: str):
         self.user_buscar = value
@@ -40,6 +50,15 @@ def user_page() -> rx.Component:
             style={"margin-top": "30px"}
         ),
         table_user(UserState.users),
+        rx.cond(
+            UserState.error != '',
+            rx.callout(
+                "No puedes crear un usuario que ya existe",
+                icon="alert_triangle",
+                color_scheme="red",
+                role="alert",
+            ),
+        ),
         #TODO cambiar el estilo, para que sincronice con el estilo de cada componente
         direction='column',
         style={"width": "60vw", "margin": "auto"}
