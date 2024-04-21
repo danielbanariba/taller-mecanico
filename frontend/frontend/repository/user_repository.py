@@ -18,3 +18,12 @@ def select_user_by_email(email):
         # Esto lo que esta haciendo por debajo es un select * from user where username = email
         query = select(User).where(User.username == email)
         return session.exec(query).all() 
+    
+# crea usuarios nuevos en la base de datos
+def create_user(user: User):
+    engine = connect()
+    with Session(engine) as session:
+        session.add(user)
+        session.commit()
+        query = select(User)
+        return session.exec(query).all()
