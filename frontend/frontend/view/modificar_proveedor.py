@@ -14,7 +14,7 @@ def detalles_proveedor():
             rx.flex(
                 *[
                     rx.flex(
-                        search= True,
+                        
                         rx.image(
                             src="/img/user/user-1.png", #se agrega la imagen del usuario
                             width="200px",  # Ancho de la imagen
