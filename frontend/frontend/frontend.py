@@ -15,7 +15,6 @@ from frontend.components.botones import boton #para los botones de cada inicio d
 from frontend.components.botones import boton_dos
 import frontend.URL as URL
 from frontend.view.error_404 import error_404
-#from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
 
 #Página de inicio 
 def login():
