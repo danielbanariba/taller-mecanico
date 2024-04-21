@@ -3,7 +3,7 @@ from frontend.view.navbar import navbar
 from frontend.view.inventario import Inventario
 from frontend.view.inicio import Inicio
 from frontend.view.pantalla_dashboard import grafica_de_barras, grafica_lineal
-from frontend.view.proveedores import Empleados
+from frontend.view.empleados import Empleados
 from frontend.view.proveedores import Proveedores
 from frontend.login import Login
 from frontend.view.agregar_proveedor import formulario_agregar_empleado
