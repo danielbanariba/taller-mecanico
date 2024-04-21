@@ -8,6 +8,9 @@ from frontend.login import Login
 from frontend.components.botones import boton_dos
 from frontend.view.agregar_proveedor import formulario_agregar_proveedor
 from frontend.view.subir_doc import Subir_DOC
+from frontend.view.agregar_cliente_n import formulario_agregar_clientes_n
+from frontend.view.cliente_n import Cliente_N
+
 #from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
 
 #Página de inicio 
@@ -98,6 +101,44 @@ def agregar_doc_page():
         ),
     )
 
+
+#pagina de los clientes naturales
+def clientes_page():
+    return rx.vstack(
+        navbar(),
+        rx.hstack(  # Mantenemos los elementos en una fila
+            Inicio(),
+            rx.vstack(  # Los botones y la tabla se colocan verticalmente uno encima del otro
+                # Botones para agregar, modificar y listar clientes
+                rx.hstack(
+                    boton_dos("plus", "/cliente_n/agregar_cliente_n", "Agregar Cliente"),
+                    boton_dos("plus", "/agregar_cliente_n","Modificar Cliente"),
+                    boton_dos("plus", "/agregar_cliente_n","Listado Cliente")
+                ),
+                # Separador entre los botones y la tabla
+                rx.divider(),
+                # Contenedor flexible para la tabla
+                rx.container(
+                    Cliente_N(),
+                    style={
+                        "overflow-x": "auto",  # Agrega desplazamiento horizontal si es necesario
+                        "width": "900px",  # Establece el ancho en 830px
+                    }
+                ),
+            ),
+        ),
+    )
+
+#Página de agregar Clientes
+def agregar_cliente_page():
+    return rx.vstack(#Combina los elementos en una columna vertical
+        navbar(),
+        rx.hstack(
+            Inicio(),
+            formulario_agregar_clientes_n(),   
+        ),
+    )
+
 # Crea la aplicación
 app = rx.App()
 
@@ -110,6 +151,8 @@ app.add_page(inicio_page, route="/inicio")
 app.add_page(proveedores_page, route="/proveedores")
 app.add_page(agregar_proveedor_page, route="/proveedores/agregar_proveedor") #Redirige al formulario para agregar un proveedor
 app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc")
+app.add_page(clientes_page, route="/cliente_n")
+app.add_page(agregar_cliente_page, route="/cliente_n/agregar_cliente_n")
 
 
 #404 error personalizado
