@@ -3,8 +3,8 @@
         {
             "previewLimit": 50,
             "driver": "SQLite",
-            "database": "${workspaceFolder:Taller_Mecanico}/backend/db/reflex.db",
-            "name": "REFLEX"
+            "name": "REFLEX",
+            "database": "${workspaceFolder:Taller_Mecanico}/frontend/frontend/repository/reflex.db"
         }
     ]
 }
