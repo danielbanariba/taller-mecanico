@@ -8,9 +8,10 @@ from frontend.login import Login
 from frontend.components.botones import boton_dos
 from frontend.view.agregar_proveedor import formulario_agregar_proveedor
 from frontend.view.subir_doc import Subir_DOC
-from frontend.view.agregar_cliente_n import formulario_agregar_clientes_n
+from frontend.view.agregar_cliente_n import formulario_agregar_cliente_natural
 from frontend.view.clientes import ClientesJuridicos, ClientesNaturales
 from frontend.components.botones import boton_clientes
+from frontend.view.agregar_empresa import formulario_agregar_empresa
 
 #from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
 
@@ -113,7 +114,7 @@ def clientes_page():
                 # Botones para agregar, modificar y listar clientes
                 rx.hstack(
 
-                    boton_dos("plus", "/cliente_n/agregar_cliente_n", "Agregar Cliente"),
+                    boton_dos("plus", "/clientes/agregar_cliente_n", "Agregar Cliente"),
                     boton_dos("plus", "/agregar_cliente_n","Modificar Cliente"),
                     boton_dos("plus", "/agregar_cliente_n","Listado Cliente"),
 
@@ -139,9 +140,19 @@ def agregar_cliente_page():
         navbar(),
         rx.hstack(
             Inicio(),
-            formulario_agregar_clientes_n(),   
+            formulario_agregar_cliente_natural(),   
         ),
     )
+
+def agregar_cliente_empresa_page():
+    return rx.vstack(#Combina los elementos en una columna vertical
+        navbar(),
+        rx.hstack(
+            Inicio(),
+            formulario_agregar_empresa(),   
+        ),
+    )
+
 
 # Crea la aplicación
 app = rx.App()
@@ -155,8 +166,9 @@ app.add_page(inicio_page, route="/inicio")
 app.add_page(proveedores_page, route="/proveedores")
 app.add_page(agregar_proveedor_page, route="/proveedores/agregar_proveedor") #Redirige al formulario para agregar un proveedor
 app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc")
-app.add_page(clientes_page, route="/cliente_n")
-app.add_page(agregar_cliente_page, route="/cliente_n/agregar_cliente_n")
+app.add_page(clientes_page, route="/clientes")
+app.add_page(agregar_cliente_page, route="/clientes/agregar_cliente_n")
+app.add_page(agregar_cliente_empresa_page, route="/clientes/agregar_empresa")
 
 
 #404 error personalizado

@@ -137,7 +137,6 @@ def formulario_agregar_empresa():
         ),
     )
 
-
 def agregar_empresa_page():
     return rx.container(
         formulario_agregar_empresa(),

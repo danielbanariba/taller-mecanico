@@ -5,6 +5,7 @@ import reflex as rx
 from frontend.view.navbar import navbar
 from frontend.styles.styles import Size, MAX_WIDTH
 from frontend.components.botones import boton_tres
+from frontend.frontend.view.agregar_empresa import formulario_agregar_empresa
 
 import os
 
@@ -108,8 +109,25 @@ def formulario_agregar_cliente_natural():
         ),
     )
 
-
 def agregar_cliente_natural_page():
     return rx.container(
         formulario_agregar_cliente_natural(),
+    )
+
+def agregar_clientes_page():
+    return rx.container(
+        rx.tabs.root(
+            rx.tabs.list(
+                rx.tabs.trigger("Clientes Naturales", value="naturales"),
+                rx.tabs.trigger("Clientes Jurídicos", value="juridicos"),
+            ),
+            rx.tabs.content(
+                formulario_agregar_cliente_natural(),
+                value="naturales",
+            ),
+            rx.tabs.content(
+                formulario_agregar_empresa(),
+                value="juridicos",
+            ),
+        )
     )
