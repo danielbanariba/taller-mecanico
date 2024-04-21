@@ -3,7 +3,7 @@ from frontend.view.navbar import navbar
 from frontend.view.inventario import Inventario
 from frontend.view.inicio import Inicio
 from frontend.view.pantalla_dashboard import grafica_de_barras, grafica_lineal
-#from frontend.view.proveedores import Empleados
+#from frontend.view.empleados import Empleados
 from frontend.view.proveedores import Proveedores
 from frontend.login import Login
 #from frontend.view.agregar_proveedor import formulario_agregar_empleado
@@ -86,41 +86,41 @@ def proveedores_page():
     )
 
 #Página de agregar proveedores
-def agregar_empleado_page():
+"""def agregar_empleado_page():
     return rx.vstack(#Combina los elementos en una columna vertical
         navbar(),
         rx.hstack(
             Inicio(),
             formulario_agregar_empleado(),   
         ),
-    )
+    )"""
 #Página de modificar proveedor
-def modificar_empleado_page():
+"""def modificar_empleado_page():
     return rx.vstack(#Combina los elementos en una columna vertical
         navbar(),
         rx.hstack(
             Inicio(),
             detalles_empleado(),   
         ),
-    )
+    )"""
 #Página de agregar o subir socumentación 
-def agregar_doc_page():
+"""def agregar_doc_page():
     return rx.vstack(#Combina los elementos en una columna vertical
         navbar(),
         rx.hstack(
             Inicio(),
             Subir_DOC(),   
         ),
-    )
+    )"""
 
-def listado_empleado_page():
+"""def listado_empleado_page():
     return rx.vstack(#Combina los elementos en una columna vertical
         navbar(),
         rx.hstack(
             #Inicio(),
             Empleados(),   
         ),
-    )
+    )"""
 
 
 
@@ -197,12 +197,12 @@ app.add_page(estadisticas, route="/estadisticas")
 app.add_page(about)
 app.add_page(inventario_page, route="/inventario")
 app.add_page(inicio_page, route="/inicio")
-app.add_page(proveedores_page, route="/empleados")
+"""app.add_page(proveedores_page, route="/empleados")
 app.add_page(agregar_proveedor_page, route="/empleados/agregar_empleado") 
 app.add_page(modificar_proveedor_page, route="/empleados/modificar_empleado") 
 app.add_page(listado_proveedor_page, route="/empleados/listado_empleado") 
 app.add_page(agregar_doc_page, route="/empleados/agregar_empleado/subir_doc")
-app.add_page(agregar_doc_page, route="/empleados/agregar_empleado/subir_doc")
+app.add_page(agregar_doc_page, route="/empleados/agregar_empleado/subir_doc")"""
 app.add_page(proveedores_page, route="/proveedores")
 app.add_page(agregar_proveedor_page, route="/proveedores/agregar_proveedor") #Redirige al formulario para agregar un proveedor
 app.add_page(modificar_proveedor_page, route="/proveedores/modificar_proveedor") 
