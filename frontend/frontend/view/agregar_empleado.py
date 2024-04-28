@@ -18,13 +18,24 @@ def formulario_agregar_empleado():
             boton_dos("plus", "/empleados/agregar_empleado/subir_doc", "Agregar documento"),
             rx.select(
                 [
-                    "Francisco Morazán", #Estos datos seran estraídos de la base de datos
-                    "Comayagua",
+                    "Atlántida", #Estos datos seran estraídos de la base de datos
                     "Choluteca",
-                    "Gracias a Dios",
-                    "La Paz",
+                    "Colón",
+                    "Comayagua",
+                    "Copán",
+                    "Cortés",
                     "El Paraíso",
-                    "Copan",
+                    "Francisco Morazán", #Estos datos seran estraídos de la base de datos
+                    "Gracias a Dios",
+                    "Intibucá",
+                    "Islas de la Bahía",
+                    "La Paz",
+                    "Lempira",
+                    "Ocotepeque",
+                    "Olancho",
+                    "Santa Bárbara",
+                    "Valle",
+                    "Yoro",
                 ],
                 name="departamento",
                 placeholder="Selecciona un departamento",
@@ -186,8 +197,46 @@ def formulario_agregar_empleado():
 
         # Botón de enviar
         rx.hstack(
-            boton_tres("save","/alert","Guardar"),
-            boton_tres("x","/alert","Cancelar"),
+            rx.alert_dialog.root(
+                rx.alert_dialog.trigger(
+                    rx.button("Guardar"),
+                ),
+                rx.alert_dialog.content(
+                    rx.alert_dialog.title("Agregar proveedor"),
+                    rx.alert_dialog.description(
+                        "Confirmar y guardar proveedor.",
+                    ),
+                    rx.flex(
+                        rx.alert_dialog.cancel(
+                            boton_tres("x", "/alert", "Cancelar"),
+                        ),
+                        rx.alert_dialog.action(
+                            boton_tres("save", "/alert", "Confirmar"),
+                        ),
+                        spacing="3",
+                    ),
+                ),
+            ),
+            rx.alert_dialog.root(
+                rx.alert_dialog.trigger(
+                    rx.button("Cancelar"),
+                ),
+                rx.alert_dialog.content(
+                    rx.alert_dialog.title("Agregar proveedor"),
+                    rx.alert_dialog.description(
+                        "Descartar cambios.",
+                    ),
+                    rx.flex(
+                        rx.alert_dialog.cancel(
+                            boton_tres("x", "/alert", "Cancelar"),
+                        ),
+                        rx.alert_dialog.action(
+                            boton_tres("save", "/alert", "Descartar"),
+                        ),
+                        spacing="3",
+                    ),
+                ),
+            ),#
         ),
     )
 
