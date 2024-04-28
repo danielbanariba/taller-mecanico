@@ -17,6 +17,7 @@ import frontend.URL as URL
 from frontend.view.error_404 import error_404
 from frontend.user_page import user_page, UserState
 
+
 #Página de inicio 
 def login():
     return Login()
