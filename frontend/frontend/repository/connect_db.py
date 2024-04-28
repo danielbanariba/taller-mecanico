@@ -17,29 +17,5 @@ def connect():
 
     return engine
 
-if __name__ == "__main__":
-    connect()
-
-
-
-# def conectar_a_oracle():
-
-#     # Configuración de la conexión Oracle
-#     config = {
-#         'user': 'C##SOUNDCLOUD11',
-#         'password': 'root1234',
-#         'dsn': 'localhost:1521/xe',
-#         'encoding': 'UTF-8'
-#     }
-
-# #Tenemos que poner un try Exception, para evitar cualquier error que pueda ocurrir en la base de datos
-#     try:
-#         connection = cx_Oracle.connect(**config)
-#         print(f"Conectado a Oracle Database {connection.version}")
-#         return config  # Devolver el diccionario de configuración
-#     except cx_Oracle.Error as err:
-#         print("Error de conexión a Oracle:", err)
-#         return None
-
 # if __name__ == "__main__":
-#     conectar_a_oracle()
+#     connect()

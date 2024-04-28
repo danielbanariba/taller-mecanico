@@ -122,8 +122,6 @@ def proveedores_page():
         ),
     )"""
 
-
-
 # Página de proveedor
 def proveedores_page():
     return rx.vstack(
@@ -160,6 +158,7 @@ def agregar_proveedor_page():
             formulario_agregar_proveedor(),   
         ),
     )
+
 #Página de modificar proveedor
 def modificar_proveedor_page():
     return rx.vstack(#Combina los elementos en una columna vertical
@@ -209,12 +208,6 @@ app.add_page(modificar_proveedor_page, route="/proveedores/modificar_proveedor")
 app.add_page(listado_proveedor_page, route="/proveedores/listado_proveedor") 
 app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc")
 app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc")
-
-
-#404 error personalizado
-# Define tu componente personalizado para la página 404
-def custom_404_component():
-    return rx.text("Lo sentimos, la página que estás buscando no se pudo encontrar.")
 
 
 # Ahora, puedes llamar al método para definir tu página 404 personalizada
