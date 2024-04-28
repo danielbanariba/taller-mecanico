@@ -2,7 +2,7 @@ import reflex as rx
 from frontend.view.navbar import navbar
 from frontend.view.inventario import Inventario
 from frontend.view.inicio import Inicio
-from frontend.view.pantalla_dashboard import grafica_de_barras, grafica_lineal
+from frontend.view.pantalla_dashboard import grafica_de_barras, grafica_lineal, grafica_de_barras_comparable, grafica_de_area
 #from frontend.view.empleados import Empleados
 from frontend.view.proveedores import Proveedores
 from frontend.login import Login
@@ -17,7 +17,6 @@ import frontend.URL as URL
 from frontend.view.error_404 import error_404
 from frontend.user_page import user_page, UserState
 
-
 #Página de inicio 
 def login():
     return Login()
@@ -29,12 +28,17 @@ def estadisticas():
         navbar(),
         rx.hstack(
             Inicio(),
-            rx.hstack(
-                grafica_lineal(),
-                grafica_de_barras()
+                rx.flex(
+                    grafica_lineal(),
+                    grafica_de_barras(),
+                    grafica_de_barras_comparable(),
+                    grafica_de_area(),
+                    spacing="2",
+                    flex_wrap="wrap",
+                    width="100%",
+                )
             )
         )
-    )
 
 
 #Página de ejemplo
