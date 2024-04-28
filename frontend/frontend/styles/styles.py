@@ -69,7 +69,7 @@ STYLE_BUTTON_TWO={
     },
 },
 
-style_notify = {
+STYLE_NOTIFY = {
     'position': 'fixed',
     'top': '0',
     'right': '0',

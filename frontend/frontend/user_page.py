@@ -1,6 +1,6 @@
 import reflex as rx
 from .model.user_model import User
-#from .service.user_service import select_all_user_serice, selec_user_by_email_service, create_user_service, delete_user_service
+from .service.user_service import select_all_user_serice, selec_user_by_email_service, create_user_service, delete_user_service
 from .components.notify import notify_component
 import asyncio
 from .styles.styles import STYLE_NOTIFY
