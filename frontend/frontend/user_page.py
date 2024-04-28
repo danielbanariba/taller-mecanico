@@ -38,36 +38,38 @@ class UserState(rx.State):
 
     def buscar_on_change(self, value: str):
         self.user_buscar = value
-        
+    
     @rx.background
     async def delete_user_by_email(self, email):
         async with self:
             self.users = delete_user_service(email)
 
-@rx.page(route='/user', title='user', on_load=UserState.get_all_user)
 def user_page() -> rx.Component:
-    return rx.flex(
-        rx.heading('Usuarios', align='center'),
+    return rx.vstack(
         rx.hstack(
-            buscar_user_component(),
-            create_user_dialogo_component(),
-            justify='center',
-            style={"margin-top": "30px"}
-        ),
-        table_user(UserState.users),
-        rx.cond(
-            UserState.error != '',
-            rx.callout(
-                "No puedes crear un usuario que ya existe",
-                icon="alert_triangle",
-                color_scheme="red",
-                role="alert",
-                style = STYLE_NOTIFY,
-            ),
-        ),
-        #TODO cambiar el estilo, para que sincronice con el estilo de cada componente
-        direction='column',
-        style={"width": "60vw", "margin": "auto"}
+            rx.flex(
+                rx.hstack(
+                    buscar_user_component(),
+                    create_user_dialogo_component(),
+                    justify='center',
+                    style={"margin-top": "10px"}
+                ),
+                table_user(UserState.users),
+                rx.cond(
+                    UserState.error != '',
+                    rx.callout(
+                        "No puedes crear un usuario que ya existe",
+                        icon="alert_triangle",
+                        color_scheme="red",
+                        role="alert",
+                        style = STYLE_NOTIFY,
+                    ),
+                ),
+                #TODO cambiar el estilo, para que sincronice con el estilo de cada componente
+                direction='column',
+                style={"width": "80vw", "margin": "auto"}
+            )
+        )
     )
 
 
@@ -98,8 +100,8 @@ def row_table(user: User) -> rx.Component:
             ),
         ),
     )
-    
-    
+
+
 def buscar_user_component() -> rx.Component:
     return rx.hstack(
         rx.input(placeholder="ingrese el email del usuario", on_change=UserState.buscar_on_change),
