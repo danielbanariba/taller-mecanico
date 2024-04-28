@@ -6,7 +6,6 @@ import asyncio
 from .styles.styles import STYLE_NOTIFY
 
 class UserState(rx.State):
-    #states
     users:list[User]
     user_buscar: str
     error: str = ''
@@ -104,7 +103,7 @@ def row_table(user: User) -> rx.Component:
 
 def buscar_user_component() -> rx.Component:
     return rx.hstack(
-        rx.input(placeholder="ingrese el email del usuario", on_change=UserState.buscar_on_change),
+        rx.input(placeholder="Ingrese el email del usuario", on_change=UserState.buscar_on_change),
         rx.button("Buscar usuario", on_click=UserState.get_user_by_email)
     )
 

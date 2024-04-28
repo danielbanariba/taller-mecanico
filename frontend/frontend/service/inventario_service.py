@@ -13,10 +13,10 @@ def select_inventario_by_id_service(id_inventario: int):
     else:
         return select_all()
 
-def create_inventario_service(cantidad_productos: int, fecha_entrada: str, fecha_salida: str, id_repuesto: int):
-    inventario = select_inventario_by_id(id_repuesto)
+def create_inventario_service(id_inventario: int, cantidad_productos: int, fecha_entrada: str, fecha_salida: str, id_repuesto: int):
+    inventario = select_inventario_by_id(id_inventario)
     if not inventario:
-        inventario_save = Inventario(cantidad_productos=cantidad_productos, fecha_entrada=fecha_entrada, fecha_salida=fecha_salida, id_repuesto=id_repuesto)
+        inventario_save = Inventario(id_inventario=id_inventario, cantidad_productos=cantidad_productos, fecha_entrada=fecha_entrada, fecha_salida=fecha_salida, id_repuesto=id_repuesto)
         try:
             return create_inventario(inventario_save)
         except cx_Oracle.IntegrityError as e:

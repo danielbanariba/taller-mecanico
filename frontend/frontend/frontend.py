@@ -16,6 +16,7 @@ from frontend.components.botones import boton_dos
 import frontend.URL as URL
 from frontend.view.error_404 import error_404
 from frontend.user_page import user_page, UserState
+from frontend.inventario_page import inventario_page, InventarioState
 
 #Página de inicio 
 def login():
@@ -62,17 +63,15 @@ def clientes():
             user_page()
         )
     )
-
-
-#Página de inventario
-# def inventario_page():
-#     return rx.vstack(#Combina los elementos en una columna vertical
-#         navbar(),
-#         rx.hstack(
-#             Inicio(),
-#             Inventario(),   
-#         ),
-#     )
+    
+def inventarios():
+    return rx.vstack(
+        navbar(),
+        rx.hstack(
+            Inicio(),
+            inventario_page()
+        )
+    )
 
 # Página de empleado
 def proveedores_page():
@@ -210,8 +209,8 @@ app = rx.App()
 app.add_page(login, route="/")
 app.add_page(estadisticas, route="/estadisticas")
 app.add_page(clientes, route='/clientes', title='clientes', on_load=UserState.get_all_user)
+#app.add_page(inventarios, route='/inventarios', title='inventarios', on_load=InventarioState.get_all_inventario)
 app.add_page(about)
-#app.add_page(inventario_page, route="/inventario")
 app.add_page(inicio_page, route="/inicio")
 """app.add_page(proveedores_page, route="/empleados")
 app.add_page(agregar_proveedor_page, route="/empleados/agregar_empleado") 
