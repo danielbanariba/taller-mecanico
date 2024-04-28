@@ -9,7 +9,6 @@ def select_all():
     with Session(engine) as session:
         query = select(User)
         return session.exec(query).all() #Nos devuelve una lista con todos los registros de la tabla
-    
 
 # Se convierte en un buscardor de usuario por email    
 def select_user_by_email(email):
@@ -18,7 +17,7 @@ def select_user_by_email(email):
         # Esto lo que esta haciendo por debajo es un select * from user where username = email
         query = select(User).where(User.username == email)
         return session.exec(query).all() 
-    
+
 # crea usuarios nuevos en la base de datos
 def create_user(user: User):
     engine = connect()

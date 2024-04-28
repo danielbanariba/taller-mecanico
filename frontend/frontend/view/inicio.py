@@ -4,7 +4,7 @@ import frontend.URL as URL
 
 def Inicio():
     return rx.vstack(
-        boton("users-round", "/Clientes", "Clientes"),
+        boton("users-round", "/clientes", "Clientes"),
         boton("notebook-text", "/Cotizacion/Factura", "Cotizacion/Factura"),
         boton("notebook-pen", "/Orden de servicio", "Orden de servicio"),
         boton("package-search", "/inventario", "Inventario"), #TODO investigar porque no abre la pagina
