@@ -2,6 +2,8 @@ import reflex as rx
 from frontend.view.navbar import navbar
 from frontend.view.inventario import Inventario
 from frontend.view.inicio import Inicio
+from frontend.view.pantalla_dashboard import grafica_de_barras, grafica_lineal
+from frontend.view.agregar_cliente import code_setter
 from frontend.view.pantalla_dashboard import grafica_de_barras, grafica_lineal, grafica_de_barras_comparable, grafica_de_area
 #from frontend.view.empleados import Empleados
 from frontend.view.proveedores import Proveedores
@@ -202,6 +204,16 @@ def listado_proveedor_page():
         ),
     )
 
+#CLIENTES
+#Página de agregar proveedores
+def agregar_cliente_page():
+    return rx.vstack(#Combina los elementos en una columna vertical
+        navbar(),
+        rx.hstack(
+            Inicio(),
+            code_setter(),   
+        ),
+    )
 # Crea la aplicación
 app = rx.App()
 
@@ -223,8 +235,8 @@ app.add_page(agregar_proveedor_page, route="/proveedores/agregar_proveedor") #Re
 app.add_page(modificar_proveedor_page, route="/proveedores/modificar_proveedor") 
 app.add_page(listado_proveedor_page, route="/proveedores/listado_proveedor") 
 app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc")
-app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc")
-
+app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc") 
+app.add_page(agregar_cliente_page, route="/clientes/agregar_cliente")
 
 # Ahora, puedes llamar al método para definir tu página 404 personalizada
 app.add_custom_404_page(

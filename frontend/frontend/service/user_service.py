@@ -1,6 +1,6 @@
 from ..repository.user_repository import select_all, select_user_by_email, create_user, delete_user
 from ..model.user_model import User
-import cx_Oracle  # Importamos el módulo cx_Oracle para manejar errores de Oracle
+#import cx_Oracle  # Importamos el módulo cx_Oracle para manejar errores de Oracle
 
 # Esta función obtiene todos los usuarios
 def select_all_user_serice():

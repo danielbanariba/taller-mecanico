@@ -22,3 +22,5 @@ MODIFICAR_PROVEEDORES = "#detalles_proveedor"
 AGREGAR_DOCUMENTOS = "#Subir_DOC"
 
 LISTADO_PROVEEDOR = "#Proveedores"
+
+AGREGAR_CLIENTES = "#form_selector"
