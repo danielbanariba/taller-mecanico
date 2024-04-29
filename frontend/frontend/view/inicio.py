@@ -10,7 +10,7 @@ def Inicio():
         boton("package-search", "/inventario", "Inventario"), #TODO investigar porque no abre la pagina
         boton("user-round-search", "/Empleados", "Empleados"),
         boton("scroll-text", "/Agenda", "Agenda"),
-        boton("text-search", "/Informes", "Informes"),
+        boton("text-search", "/estadisticas", "Informes"),
         boton("factory", "/proveedores", "Proveedores"),
         boton("settings", "/Configuracion", "Configuracion"),
         margin="20px"# Le da un espacio de 20px a todos los botones

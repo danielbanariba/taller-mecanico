@@ -8,11 +8,6 @@ from frontend.view.proveedores import Proveedores
 from frontend.login import Login
 #from frontend.view.agregar_proveedor import formulario_agregar_empleado
 #from frontend.view.modificar_proveedor import detalles_empleado
-from frontend.view.agregar_proveedor import formulario_agregar_proveedor
-from frontend.view.modificar_proveedor import detalles_proveedor
-from frontend.view.subir_doc import Subir_DOC
-from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
-from frontend.components.botones import boton_dos
 from frontend.view.error_404 import error_404
 from frontend.user_page import UserState
 from frontend.inventario_page import InventarioState
@@ -20,6 +15,8 @@ from frontend.proveedor_page import ProvedorState
 from frontend.pages.estadisticas import estadisticas
 from frontend.pages.clientes import clientes
 from frontend.pages.inventarios import inventarios
+from frontend.pages.proveedores import proveedores_page, agregar_proveedor_page, modificar_proveedor_page, listado_proveedor_page, agregar_doc_page
+
 
 #Página de inicio 
 def login():
@@ -36,44 +33,6 @@ def inicio_page():
     return rx.vstack(
         navbar(),
         Inicio(),   
-    )
-
-
-def proveedores():
-    return rx.vstack(
-        navbar(),
-        rx.hstack(
-            Inicio(),
-            proveedores_page()
-        )
-    )
-
-
-# Página de empleado
-def proveedores_page():
-    return rx.vstack(
-        navbar(),
-        rx.hstack(  # Mantenemos los elementos en una fila
-            Inicio(),
-            rx.vstack(  # Los botones y la tabla se colocan verticalmente uno encima del otro
-                # Botones para agregar, modificar y listar proveedores
-                rx.hstack(
-                    boton_dos("plus", "/empleados/agregar_empleado", "Agregar empleado"),
-                    boton_dos("plus", "/empleados/modificar_empleado","Modificar empleado"),
-                    boton_dos("plus", "/empleados/listado_empleado","Listado empleados")
-                ),
-                # Separador entre los botones y la tabla
-                rx.divider(),
-                # Contenedor flexible para la tabla
-                rx.container(
-                    Empleados(),
-                    style={
-                        "overflow-x": "auto",  # Agrega desplazamiento horizontal si es necesario
-                        "width": "900px",  # Establece el ancho en 830px
-                    }
-                ),
-            ),
-        ),
     )
 
 #Página de agregar proveedores
@@ -113,71 +72,6 @@ def proveedores_page():
         ),
     )"""
 
-# Página de proveedor
-def proveedores_page():
-    return rx.vstack(
-        navbar(),
-        rx.hstack(  # Mantenemos los elementos en una fila
-            Inicio(),
-            rx.vstack(  # Los botones y la tabla se colocan verticalmente uno encima del otro
-                # Botones para agregar, modificar y listar proveedores
-                rx.hstack(
-                    boton_dos("plus", "/proveedores/agregar_proveedor", "Agregar proveedor"),
-                    boton_dos("plus", "/proveedores/modificar_proveedor","Modificar proveedor"),
-                    boton_dos("plus", "/proveedores/listado_proveedor","Listado proveedores")
-                ),
-                # Separador entre los botones y la tabla
-                rx.divider(),
-                # Contenedor flexible para la tabla
-                rx.container(
-                    Proveedores(),
-                    style={
-                        "overflow-x": "auto",  # Agrega desplazamiento horizontal si es necesario
-                        "width": "900px",  # Establece el ancho en 830px
-                    }
-                ),
-            ),
-        ),
-    )
-
-#Página de agregar proveedores
-def agregar_proveedor_page():
-    return rx.vstack(#Combina los elementos en una columna vertical
-        navbar(),
-        rx.hstack(
-            Inicio(),
-            formulario_agregar_proveedor(),   
-        ),
-    )
-
-#Página de modificar proveedor
-def modificar_proveedor_page():
-    return rx.vstack(#Combina los elementos en una columna vertical
-        navbar(),
-        rx.hstack(
-            Inicio(),
-            detalles_proveedor(),   
-        ),
-    )
-#Página de agregar o subir socumentación 
-def agregar_doc_page():
-    return rx.vstack(#Combina los elementos en una columna vertical
-        navbar(),
-        rx.hstack(
-            Inicio(),
-            Subir_DOC(),   
-        ),
-    )
-
-def listado_proveedor_page():
-    return rx.vstack(#Combina los elementos en una columna vertical
-        navbar(),
-        rx.hstack(
-            #Inicio(),
-            Proveedores(),   
-        ),
-    )
-
 #CLIENTES
 #Página de agregar proveedores
 def agregar_cliente_page():
@@ -195,7 +89,7 @@ app = rx.App()
 app.add_page(login, route="/")
 app.add_page(estadisticas, route="/estadisticas")
 app.add_page(clientes, route='/clientes', title='clientes', on_load=UserState.get_all_user)
-app.add_page(proveedores, route='/proveedor', title='proveedor', on_load=ProvedorState.get_all_provedor)
+#app.add_page(proveedores, route='/proveedor', title='proveedor', on_load=ProvedorState.get_all_provedor)
 app.add_page(inventarios, route='/inventarios', title='inventarios', on_load=InventarioState.get_all_inventario)
 app.add_page(about)
 """app.add_page(proveedores_page, route="/empleados")
@@ -204,7 +98,7 @@ app.add_page(modificar_proveedor_page, route="/empleados/modificar_empleado")
 app.add_page(listado_proveedor_page, route="/empleados/listado_empleado") 
 app.add_page(agregar_doc_page, route="/empleados/agregar_empleado/subir_doc")
 app.add_page(agregar_doc_page, route="/empleados/agregar_empleado/subir_doc")"""
-#app.add_page(proveedores_page, route="/proveedores")
+app.add_page(proveedores_page, route="/proveedores")
 app.add_page(agregar_proveedor_page, route="/proveedores/agregar_proveedor") #Redirige al formulario para agregar un proveedor
 app.add_page(modificar_proveedor_page, route="/proveedores/modificar_proveedor") 
 app.add_page(listado_proveedor_page, route="/proveedores/listado_proveedor") 
