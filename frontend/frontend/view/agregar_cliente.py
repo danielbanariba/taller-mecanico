@@ -345,7 +345,6 @@ def formulario_empresa():
                     ),
                 ),
 
-                
                 # Botón de enviar
                 rx.hstack(
                     rx.alert_dialog.root(

@@ -1,3 +1,13 @@
+-- Provedores
+INSERT INTO proveedor (id_proveedor, nom_proveedor, id_direccion, rtn, id_tel, correo, id_vendedor, adj_doc)
+VALUES (1, 'Proveedor 1', 100, 'RTN1', 1234567890, 'proveedor1@example.com', 10, NULL);
+
+INSERT INTO proveedor (id_proveedor, nom_proveedor, id_direccion, rtn, id_tel, correo, id_vendedor, adj_doc)
+VALUES (2, 'Proveedor 2', 101, 'RTN2', 2345678901, 'proveedor2@example.com', 11, NULL);
+
+INSERT INTO proveedor (id_proveedor, nom_proveedor, id_direccion, rtn, id_tel, correo, id_vendedor, adj_doc)
+VALUES (3, 'Proveedor 3', 102, 'RTN3', 3456789012, 'proveedor3@example.com', 12, NULL);
+
 -- Tabla Departamento
 INSERT ALL
 INTO DEPARTAMENTO (ID_DEPARTAMENTO, NOMBRE_DEPARTAMENTO) VALUES (1, 'Atlántida')

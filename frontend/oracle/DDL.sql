@@ -6,6 +6,17 @@ CREATE TABLE "user"(
 	PHONE VARCHAR(50),
 ); 
 
+-- tabla para proveedores para evitar cualquier error
+CREATE TABLE proveedor (
+    id_proveedor NUMBER PRIMARY KEY,
+    nom_proveedor VARCHAR2(255),
+    id_direccion NUMBER,
+    rtn VARCHAR2(255),
+    id_tel NUMBER,
+    correo VARCHAR2(255),
+    id_vendedor NUMBER,
+    adj_doc BLOB
+);
 
 -- TABLA DEPARTAMENTO
 CREATE TABLE DEPARTAMENTO (

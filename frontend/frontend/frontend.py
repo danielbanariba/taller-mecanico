@@ -2,9 +2,7 @@ import reflex as rx
 from frontend.view.navbar import navbar
 from frontend.view.inventario import Inventario
 from frontend.view.inicio import Inicio
-from frontend.view.pantalla_dashboard import grafica_de_barras, grafica_lineal
 from frontend.view.agregar_cliente import code_setter
-from frontend.view.pantalla_dashboard import grafica_de_barras, grafica_lineal, grafica_de_barras_comparable, grafica_de_area
 #from frontend.view.empleados import Empleados
 from frontend.view.proveedores import Proveedores
 from frontend.login import Login
@@ -15,33 +13,17 @@ from frontend.view.modificar_proveedor import detalles_proveedor
 from frontend.view.subir_doc import Subir_DOC
 from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
 from frontend.components.botones import boton_dos
-import frontend.URL as URL
 from frontend.view.error_404 import error_404
-from frontend.user_page import user_page, UserState
-from frontend.inventario_page import inventario_page, InventarioState
+from frontend.user_page import UserState
+from frontend.inventario_page import InventarioState
+from frontend.proveedor_page import ProvedorState
+from frontend.pages.estadisticas import estadisticas
+from frontend.pages.clientes import clientes
+from frontend.pages.inventarios import inventarios
 
 #Página de inicio 
 def login():
     return Login()
-
-
-#Pagina de estadisticas
-def estadisticas():
-    return rx.vstack(
-        navbar(),
-        rx.hstack(
-            Inicio(),
-                rx.flex(
-                    grafica_lineal(),
-                    grafica_de_barras(),
-                    grafica_de_barras_comparable(),
-                    grafica_de_area(),
-                    spacing="2",
-                    flex_wrap="wrap",
-                    width="100%",
-                )
-            )
-        )
 
 
 #Página de ejemplo
@@ -55,25 +37,17 @@ def inicio_page():
         navbar(),
         Inicio(),   
     )
-    
-#Página de inicio
-def clientes():
+
+
+def proveedores():
     return rx.vstack(
         navbar(),
         rx.hstack(
             Inicio(),
-            user_page()
+            proveedores_page()
         )
     )
-    
-def inventarios():
-    return rx.vstack(
-        navbar(),
-        rx.hstack(
-            Inicio(),
-            inventario_page()
-        )
-    )
+
 
 # Página de empleado
 def proveedores_page():
@@ -221,16 +195,16 @@ app = rx.App()
 app.add_page(login, route="/")
 app.add_page(estadisticas, route="/estadisticas")
 app.add_page(clientes, route='/clientes', title='clientes', on_load=UserState.get_all_user)
-#app.add_page(inventarios, route='/inventarios', title='inventarios', on_load=InventarioState.get_all_inventario)
+app.add_page(proveedores, route='/proveedor', title='proveedor', on_load=ProvedorState.get_all_provedor)
+app.add_page(inventarios, route='/inventarios', title='inventarios', on_load=InventarioState.get_all_inventario)
 app.add_page(about)
-app.add_page(inicio_page, route="/inicio")
 """app.add_page(proveedores_page, route="/empleados")
 app.add_page(agregar_proveedor_page, route="/empleados/agregar_empleado") 
 app.add_page(modificar_proveedor_page, route="/empleados/modificar_empleado") 
 app.add_page(listado_proveedor_page, route="/empleados/listado_empleado") 
 app.add_page(agregar_doc_page, route="/empleados/agregar_empleado/subir_doc")
 app.add_page(agregar_doc_page, route="/empleados/agregar_empleado/subir_doc")"""
-app.add_page(proveedores_page, route="/proveedores")
+#app.add_page(proveedores_page, route="/proveedores")
 app.add_page(agregar_proveedor_page, route="/proveedores/agregar_proveedor") #Redirige al formulario para agregar un proveedor
 app.add_page(modificar_proveedor_page, route="/proveedores/modificar_proveedor") 
 app.add_page(listado_proveedor_page, route="/proveedores/listado_proveedor") 
