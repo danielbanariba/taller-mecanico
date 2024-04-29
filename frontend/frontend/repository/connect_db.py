@@ -3,7 +3,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 #pip install cx_oracle
 def connect():
-    username = 'C##TALLER_MECANICO'
+    username = 'C##TALLER_MEC'
     password = 'root1234'
     dns = 'localhost:1521/xe'
     engine = create_engine(f'oracle+cx_oracle://{username}:{password}@{dns}')

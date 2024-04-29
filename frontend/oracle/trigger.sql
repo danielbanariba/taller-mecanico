@@ -1,0 +1,46 @@
+-- Usuario
+CREATE SEQUENCE user_id_seq;
+
+CREATE TABLE "user"(
+    ID_USER INT,
+    NAME VARCHAR(50),
+    USERNAME VARCHAR(50),
+    PASSWORD VARCHAR(50),
+    PHONE VARCHAR(50)
+);
+
+ALTER TABLE "user"
+ADD CONSTRAINT user_pk PRIMARY KEY (ID_USER);
+
+CREATE OR REPLACE TRIGGER user_id_trigger
+BEFORE INSERT ON "user"
+FOR EACH ROW
+BEGIN
+    SELECT user_id_seq.NEXTVAL
+    INTO :new.ID_USER
+    FROM dual;
+END;
+
+
+-- Inventario
+CREATE SEQUENCE inventario_id_seq;
+
+CREATE TABLE "inventario"(
+    ID_INVENTARIO INT,
+    CANTIDAD_PRODUCTOS INT,
+    FECHA_ENTRADA VARCHAR(50),
+    FECHA_SALIDA VARCHAR(50),
+    ID_REPUESTO INT
+);
+
+ALTER TABLE "inventario"
+ADD CONSTRAINT inventario_pk PRIMARY KEY (ID_INVENTARIO);
+
+CREATE OR REPLACE TRIGGER inventario_id_trigger
+BEFORE INSERT ON "inventario"
+FOR EACH ROW
+BEGIN
+    SELECT inventario_id_seq.NEXTVAL
+    INTO :new.ID_INVENTARIO
+    FROM dual;
+END;
