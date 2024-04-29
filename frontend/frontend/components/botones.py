@@ -63,7 +63,7 @@ def boton_tres (icon: str, url: str, name: str):
                 'backgroundColor': '#b39eff',
                 'cursor': 'pointer',  # Cambia el cursor a una mano
                 'margin': '0',
-                'fontSize': '15px',  # Ajusta el tamaño del texto aquí
+                'fontSize': '9px',  # Ajusta el tamaño del texto aquí
                 ':hover': {
                     'backgroundColor': '#9f87de',  # Cambia el color de fondo cuando se pasa el cursor por encima
                     'transition': '0.3s',

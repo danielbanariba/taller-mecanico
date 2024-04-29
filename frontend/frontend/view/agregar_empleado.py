@@ -5,17 +5,17 @@ from frontend.view.navbar import navbar
 from frontend.styles.styles import Size, MAX_WIDTH
 from frontend.components.botones import boton_dos
 from frontend.components.botones import boton_tres
-from frontend.view.modificar_empleado import detalles_proveedor
+from frontend.view.empleados import Empleados
 
 import os
 
 def formulario_agregar_empleado():
     return rx.container(
-        rx.text("Agregar Empleado", size="3", margin_bottom="35px"),  # Título del formulario
-
+        #rx.text("Agregar Empleado", size="3", margin_bottom="35px"),  # Título del formulario
+        rx.badge("Agregar empleado", size="2",variant="soft"),
         # Subir documentación y Seleccionar departamento en una misma fila
         rx.hstack(
-            boton_dos("plus", "/empleados/agregar_empleado/subir_doc", "Agregar documento"),
+            boton_tres("plus", "/empleados/agregar_empleado/subir_doc", "Agregar documento"),
             rx.select(
                 [
                     "Atlántida", #Estos datos seran estraídos de la base de datos
@@ -39,7 +39,8 @@ def formulario_agregar_empleado():
                 ],
                 name="departamento",
                 placeholder="Selecciona un departamento",
-                margin_bottom="35px"
+                margin_bottom="35px",
+                style={"width": "400px", "high": "100px"}
             ),
         ),
 
@@ -171,7 +172,7 @@ def formulario_agregar_empleado():
             margin_bottom="35px",
             style={"width": "400px"}  # Ancho de 400px
         ),
-
+        rx.badge("Información de contacto de emergencia", size="2",variant="soft"),
         # Teléfono de contacto de emergencia (con área del país predefinida)
         rx.input(
             type="number",
@@ -199,7 +200,7 @@ def formulario_agregar_empleado():
         rx.hstack(
             rx.alert_dialog.root(
                 rx.alert_dialog.trigger(
-                    rx.button("Guardar"),
+                    rx.button("Guardar", color_scheme="purple"),
                 ),
                 rx.alert_dialog.content(
                     rx.alert_dialog.title("Agregar proveedor"),
@@ -208,10 +209,22 @@ def formulario_agregar_empleado():
                     ),
                     rx.flex(
                         rx.alert_dialog.cancel(
-                            boton_tres("x", "/alert", "Cancelar"),
+                            rx.button("Cancelar"),
+                            style={
+                                        'width': '150px', 
+                                        'height': '30px',
+                                        'backgroundColor': '#b39eff',
+                                        'cursor': 'pointer',  # Cambia el cursor a una mano
+                                        'margin': '0',
+                                        'fontSize': '15px',  # Ajusta el tamaño del texto aquí
+                                        ':hover': {
+                                            'backgroundColor': '#9f87de',  # Cambia el color de fondo cuando se pasa el cursor por encima
+                                            'transition': '0.3s',
+                                            },
+                                    },
                         ),
                         rx.alert_dialog.action(
-                            boton_tres("save", "/alert", "Confirmar"),
+                            boton_tres("check", "/empleados", "Confirmar"),
                         ),
                         spacing="3",
                     ),
@@ -219,7 +232,7 @@ def formulario_agregar_empleado():
             ),
             rx.alert_dialog.root(
                 rx.alert_dialog.trigger(
-                    rx.button("Cancelar"),
+                    rx.button("Descartar", color_scheme="purple"),
                 ),
                 rx.alert_dialog.content(
                     rx.alert_dialog.title("Agregar proveedor"),
@@ -228,10 +241,22 @@ def formulario_agregar_empleado():
                     ),
                     rx.flex(
                         rx.alert_dialog.cancel(
-                            boton_tres("x", "/alert", "Cancelar"),
+                            rx.button("Cancelar"),
+                            style={
+                                        'width': '150px', 
+                                        'height': '30px',
+                                        'backgroundColor': '#b39eff',
+                                        'cursor': 'pointer',  # Cambia el cursor a una mano
+                                        'margin': '0',
+                                        'fontSize': '15px',  # Ajusta el tamaño del texto aquí
+                                        ':hover': {
+                                            'backgroundColor': '#9f87de',  # Cambia el color de fondo cuando se pasa el cursor por encima
+                                            'transition': '0.3s',
+                                            },
+                                    },
                         ),
                         rx.alert_dialog.action(
-                            boton_tres("save", "/alert", "Descartar"),
+                            boton_tres("check", "/empleados", "Descartar"),
                         ),
                         spacing="3",
                     ),

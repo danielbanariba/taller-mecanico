@@ -6,15 +6,16 @@ from frontend.view.navbar import navbar
 from frontend.styles.styles import Size, MAX_WIDTH
 from frontend.components.botones import boton_dos
 from frontend.components.botones import boton_tres
-from frontend.view.modificar_proveedor import detalles_proveedor
+from frontend.view.proveedores import Proveedores
 
 def formulario_agregar_proveedor():
     return rx.container(
-        rx.text("Agregar Proveedor", size="3", margin_bottom="35px"),  # Título del formulario
+        #rx.text("Agregar Proveedor", size="2", margin_bottom="25px", margin_top="25px"),  # Título del formulario
+        rx.badge("Agregar proveedor", size="2",variant="soft"),
 
         # Subir documentación y Seleccionar departamento en la misma fila
         rx.hstack(
-            boton_dos("plus", "/proveedores/agregar_proveedor/subir_doc", "Agregar documento"),
+            boton_tres("plus", "/proveedores/agregar_proveedor/subir_doc", "Agregar documento"),
             rx.select(
                 [
                     "Atlántida", #Estos datos seran estraídos de la base de datos
@@ -39,7 +40,7 @@ def formulario_agregar_proveedor():
                 name="departamento",
                 placeholder="Selecciona un departamento",
                 margin_bottom="35px",
-                style={"width": "400px"}
+                style={"width": "400px", "high": "100px"}
             ),
         ),
 
@@ -108,7 +109,7 @@ def formulario_agregar_proveedor():
             ),
 
             # Información del Vendedor
-            rx.text("Información del Vendedor", margin_top="30px", margin_bottom="35px"),
+            rx.badge("Información del vendedor", size="2",variant="soft"),
 
             # Primer nombre y Segundo nombre del vendedor
             rx.hstack(
@@ -198,7 +199,7 @@ def formulario_agregar_proveedor():
             rx.hstack(
                 rx.alert_dialog.root(
                     rx.alert_dialog.trigger(
-                        rx.button("Guardar"),
+                        rx.button("Guardar", color_scheme="purple"),
                     ),
                     rx.alert_dialog.content(
                         rx.alert_dialog.title("Agregar proveedor"),
@@ -207,10 +208,22 @@ def formulario_agregar_proveedor():
                         ),
                         rx.flex(
                             rx.alert_dialog.cancel(
-                                boton_tres("x", "/alert", "Cancelar"),
+                                rx.button("Cancelar"),
+                                style={
+                                        'width': '150px', 
+                                        'height': '30px',
+                                        'backgroundColor': '#b39eff',
+                                        'cursor': 'pointer',  # Cambia el cursor a una mano
+                                        'margin': '0',
+                                        'fontSize': '15px',  # Ajusta el tamaño del texto aquí
+                                        ':hover': {
+                                            'backgroundColor': '#9f87de',  # Cambia el color de fondo cuando se pasa el cursor por encima
+                                            'transition': '0.3s',
+                                            },
+                                    },
                             ),
                             rx.alert_dialog.action(
-                                boton_tres("save", "/alert", "Confirmar"),
+                                boton_tres("check", "/proveedores", "Confirmar"),
                             ),
                             spacing="3",
                         ),
@@ -218,7 +231,7 @@ def formulario_agregar_proveedor():
                 ),
                 rx.alert_dialog.root(
                     rx.alert_dialog.trigger(
-                        rx.button("Cancelar"),
+                        rx.button("Descartar", color_scheme="purple"),
                     ),
                     rx.alert_dialog.content(
                         rx.alert_dialog.title("Agregar proveedor"),
@@ -227,10 +240,22 @@ def formulario_agregar_proveedor():
                         ),
                         rx.flex(
                             rx.alert_dialog.cancel(
-                                boton_tres("x", "/alert", "Cancelar"),
+                                rx.button("Cancelar"),
+                                style={
+                                        'width': '150px', 
+                                        'height': '30px',
+                                        'backgroundColor': '#b39eff',
+                                        'cursor': 'pointer',  # Cambia el cursor a una mano
+                                        'margin': '0',
+                                        'fontSize': '15px',  # Ajusta el tamaño del texto aquí
+                                        ':hover': {
+                                            'backgroundColor': '#9f87de',  # Cambia el color de fondo cuando se pasa el cursor por encima
+                                            'transition': '0.3s',
+                                            },
+                                    },
                             ),
                             rx.alert_dialog.action(
-                                boton_tres("save", "/alert", "Descartar"),
+                                boton_tres("check", "/proveedores", "Confirmar"),
                             ),
                             spacing="3",
                         ),

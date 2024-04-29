@@ -5,7 +5,7 @@ from frontend.view.navbar import navbar
 from frontend.styles.styles import Size, MAX_WIDTH
 from frontend.components.botones import boton_dos
 from frontend.components.botones import boton_tres
-from frontend.view.modificar_proveedor import detalles_proveedor
+#from frontend.view.clientes import user_page #Aca debe de ir el en lace al incio de clientes
 
 
 # Opciones para el selector
@@ -22,13 +22,10 @@ class SetterState1(rx.State):
 # Formulario 1 cliente natural
 def formulario_cliente_natural():
     return rx.vstack(
-        rx.text("Cliente natural", size="4", margin_bottom="35px"),
-        
-            rx.text("Agregar Cliente", size="3", margin_bottom="35px"),  
-
-            # Subir documentación y Seleccionar departamento en la misma fila
+        #rx.text("Cliente natural", size="4", margin_bottom="35px"), 
+        rx.badge("Cliente natural", size="2",variant="soft"),
             rx.hstack(
-                boton_dos("plus", "/clientes/agregar_cliente/subir_doc", "Agregar documento"),
+                boton_tres("plus", "/clientes/agregar_cliente/subir_doc", "Agregar documento"),
                 rx.select(
                     [
                         "Atlántida", #Estos datos seran estraídos de la base de datos
@@ -38,7 +35,7 @@ def formulario_cliente_natural():
                         "Copán",
                         "Cortés",
                         "El Paraíso",
-                        "Francisco Morazán", #Estos datos seran estraídos de la base de datos
+                        "Francisco Morazán", 
                         "Gracias a Dios",
                         "Intibucá",
                         "Islas de la Bahía",
@@ -53,7 +50,7 @@ def formulario_cliente_natural():
                     name="departamento",
                     placeholder="Selecciona un departamento",
                     margin_bottom="35px",
-                    style={"width": "400px"}
+                    style={"width": "400px", "high": "100px"}
                 ),
             ),
 
@@ -69,23 +66,11 @@ def formulario_cliente_natural():
                         multiline=True,
                         rows=3,
                         margin_bottom="20px",
-                        style={"width": "400px"}
+                        style={"width": "800px"}
                     ),
                 ),
 
-                # Nombre del proveedor y RTN
-                rx.hstack(
-                    rx.vstack(
-                        rx.text("RTN", margin_bottom="5px"),
-                        rx.input(
-                            type="number",
-                            placeholder="RTN",
-                            name="rtn",
-                            margin_bottom="20px",
-                            style={"width": "400px"}
-                        ),
-                    ),
-                ),
+                #Telefono
 
 
                 # Primer nombre y Segundo nombre del vendedor
@@ -148,35 +133,50 @@ def formulario_cliente_natural():
                             style={"width": "400px"}
                         ),
                     ),
+                    # RTN
+                
                     rx.vstack(
-                        rx.text("Teléfono ", margin_bottom="5px"),
+                        rx.text("RTN", margin_bottom="5px"),
                         rx.input(
                             type="number",
-                            placeholder="Teléfono ",
-                            name="telefono_vendedor",
+                            placeholder="RTN",
+                            name="rtn",
+                            margin_bottom="20px",
+                            style={"width": "400px"}
+                        ),
+                    ),
+                
+                ),
+
+                rx.hstack(
+                    # Correo 
+                    rx.vstack(
+                        rx.text("Correo ", margin_bottom="5px"),
+                        rx.input(
+                            type="email",
+                            placeholder="Correo ",
+                            name="correo_vendedor",
                             margin_bottom="35px",
                             style={"width": "400px"}
                         ),
                     ),
-                ),
-
-                # Correo 
-                rx.vstack(
-                    rx.text("Correo ", margin_bottom="5px"),
-                    rx.input(
-                        type="email",
-                        placeholder="Correo ",
-                        name="correo_vendedor",
-                        margin_bottom="35px",
-                        style={"width": "400px"}
-                    ),
+                    rx.vstack(
+                            rx.text("Teléfono ", margin_bottom="5px"),
+                            rx.input(
+                                type="number",
+                                placeholder="Teléfono ",
+                                name="telefono_vendedor",
+                                margin_bottom="35px",
+                                style={"width": "400px"}
+                            ),
+                        ),
                 ),
 
                 # Botón de enviar
                 rx.hstack(
                     rx.alert_dialog.root(
                         rx.alert_dialog.trigger(
-                            rx.button("Guardar"),
+                            rx.button("Guardar", color_scheme="purple"),
                         ),
                         rx.alert_dialog.content(
                             rx.alert_dialog.title("Agregar proveedor"),
@@ -185,10 +185,22 @@ def formulario_cliente_natural():
                             ),
                             rx.flex(
                                 rx.alert_dialog.cancel(
-                                    boton_tres("x", "/alert", "Cancelar"),
+                                    rx.button("Cancel"),
+                                    style={
+                                        'width': '150px', 
+                                        'height': '30px',
+                                        'backgroundColor': '#b39eff',
+                                        'cursor': 'pointer',  # Cambia el cursor a una mano
+                                        'margin': '0',
+                                        'fontSize': '15px',  # Ajusta el tamaño del texto aquí
+                                        ':hover': {
+                                            'backgroundColor': '#9f87de',  # Cambia el color de fondo cuando se pasa el cursor por encima
+                                            'transition': '0.3s',
+                                            },
+                                    },
                                 ),
                                 rx.alert_dialog.action(
-                                    boton_tres("save", "/alert", "Confirmar"),
+                                    boton_tres("check", "/alert", "Confirmar"),
                                 ),
                                 spacing="3",
                             ),
@@ -196,7 +208,7 @@ def formulario_cliente_natural():
                     ),
                     rx.alert_dialog.root(
                         rx.alert_dialog.trigger(
-                            rx.button("Cancelar"),
+                            rx.button("Descartar", color_scheme="purple"),
                         ),
                         rx.alert_dialog.content(
                             rx.alert_dialog.title("Agregar proveedor"),
@@ -205,10 +217,22 @@ def formulario_cliente_natural():
                             ),
                             rx.flex(
                                 rx.alert_dialog.cancel(
-                                    boton_tres("x", "/alert", "Cancelar"),
+                                    rx.button("Cancelar"),
+                                    style={
+                                        'width': '150px', 
+                                        'height': '30px',
+                                        'backgroundColor': '#b39eff',
+                                        'cursor': 'pointer',  # Cambia el cursor a una mano
+                                        'margin': '0',
+                                        'fontSize': '15px',  # Ajusta el tamaño del texto aquí
+                                        ':hover': {
+                                            'backgroundColor': '#9f87de',  # Cambia el color de fondo cuando se pasa el cursor por encima
+                                            'transition': '0.3s',
+                                            },
+                                    },
                                 ),
                                 rx.alert_dialog.action(
-                                    boton_tres("save", "/alert", "Descartar"),
+                                    boton_tres("check", "/clientes", "Confirmar"),
                                 ),
                                 spacing="3",
                             ),
@@ -225,13 +249,10 @@ def formulario_cliente_natural():
 # Formulario 2
 def formulario_empresa():
     return rx.vstack(
-        rx.text("Empresa"),
-        
-            rx.text("Agregar Cliente", size="3", margin_bottom="35px"),  # Título del formulario
-
-            # Subir documentación y Seleccionar departamento en la misma fila
+        #rx.text("Empresa", size="4", margin_bottom="35px"),
+        rx.badge("Cliente empresa", size="2",variant="soft"),
             rx.hstack(
-                boton_dos("plus", "/clientes/agregar_cliente/subir_doc", "Agregar documento"),
+                boton_tres("plus", "/clientes/agregar_cliente/subir_doc", "Agregar documento"),
                 rx.select(
                     [
                         "Atlántida", #Estos datos seran estraídos de la base de datos
@@ -256,7 +277,7 @@ def formulario_empresa():
                     name="departamento",
                     placeholder="Selecciona un departamento",
                     margin_bottom="35px",
-                    style={"width": "400px"}
+                    style={"width": "400px", "high": "100px"}
                 ),
             ),
 
@@ -272,7 +293,7 @@ def formulario_empresa():
                         multiline=True,
                         rows=3,
                         margin_bottom="20px",
-                        style={"width": "400px"}
+                        style={"width": "800px"}
                     ),
                 ),
 
@@ -329,7 +350,7 @@ def formulario_empresa():
                 rx.hstack(
                     rx.alert_dialog.root(
                         rx.alert_dialog.trigger(
-                            rx.button("Guardar"),
+                            rx.button("Guardar", color_scheme="purple"),
                         ),
                         rx.alert_dialog.content(
                             rx.alert_dialog.title("Agregar "),
@@ -338,10 +359,22 @@ def formulario_empresa():
                             ),
                             rx.flex(
                                 rx.alert_dialog.cancel(
-                                    boton_tres("x", "/alert", "Cancelar"),
+                                    rx.button("Cancelar"),
+                                    style={
+                                        'width': '150px', 
+                                        'height': '30px',
+                                        'backgroundColor': '#b39eff',
+                                        'cursor': 'pointer',  # Cambia el cursor a una mano
+                                        'margin': '0',
+                                        'fontSize': '15px',  # Ajusta el tamaño del texto aquí
+                                        ':hover': {
+                                            'backgroundColor': '#9f87de',  # Cambia el color de fondo cuando se pasa el cursor por encima
+                                            'transition': '0.3s',
+                                            },
+                                    },
                                 ),
                                 rx.alert_dialog.action(
-                                    boton_tres("save", "/alert", "Confirmar"),
+                                    boton_tres("check", "/alert", "Confirmar"),
                                 ),
                                 spacing="3",
                             ),
@@ -349,7 +382,7 @@ def formulario_empresa():
                     ),
                     rx.alert_dialog.root(
                         rx.alert_dialog.trigger(
-                            rx.button("Cancelar"),
+                            rx.button("Descartar", color_scheme="purple"),
                         ),
                         rx.alert_dialog.content(
                             rx.alert_dialog.title("Agregar "),
@@ -358,10 +391,22 @@ def formulario_empresa():
                             ),
                             rx.flex(
                                 rx.alert_dialog.cancel(
-                                    boton_tres("x", "/alert", "Cancelar"),
+                                    rx.button("Cancelar"),
+                                    style={
+                                        'width': '150px', 
+                                        'height': '30px',
+                                        'backgroundColor': '#b39eff',
+                                        'cursor': 'pointer',  # Cambia el cursor a una mano
+                                        'margin': '0',
+                                        'fontSize': '15px',  # Ajusta el tamaño del texto aquí
+                                        ':hover': {
+                                            'backgroundColor': '#9f87de',  # Cambia el color de fondo cuando se pasa el cursor por encima
+                                            'transition': '0.3s',
+                                            },
+                                    },
                                 ),
                                 rx.alert_dialog.action(
-                                    boton_tres("save", "/alert", "Descartar"),
+                                    boton_tres("check", "/alert", "Confirmar"),
                                 ),
                                 spacing="3",
                             ),
@@ -385,12 +430,31 @@ def form_selector():
     )
 
 
-# Componente principal con selector y formulario condicional
+"""# Componente principal con selector y formulario condicional
 def code_setter():
     return rx.vstack(
-        rx.select(
-            options,
-            on_change=lambda value: SetterState1.change(value),  # Cambiar estado
+        rx.hstack(
+            rx.vstack(
+                rx.text("Seleccione el tipo de cliente", margin_bottom="5px"),
+                rx.select(
+                    options,
+                    on_change=lambda value: SetterState1.change(value),  # Cambiar estado
+                ),
+                form_selector(), 
+            ),
+         ), # Renderizar el formulario correspondiente
+    )"""
+
+def code_setter():
+    return rx.vstack(
+        rx.hstack(
+            rx.select(
+                options,
+                on_change=lambda value: SetterState1.change(value),
+            ),
+            rx.text("Seleccione el tipo de cliente", margin_top="5px", margin_left="10px"),  # Texto a la derecha del selector
+            justify_content="flex-start",  # Alinear al inicio del contenedor
+            margin_top="25px",  # Margen superior para todo el hstack
         ),
         form_selector(),  # Renderizar el formulario correspondiente
     )
@@ -600,10 +664,10 @@ def agregar_cliente_page():
                         ),
                         rx.flex(
                             rx.alert_dialog.cancel(
-                                boton_tres("x", "/alert", "Cancelar"),
+                                rx.button("Cancel"),
                             ),
                             rx.alert_dialog.action(
-                                boton_tres("save", "/alert", "Confirmar"),
+                                boton_tres("check", "/alert", "Confirmar"),
                             ),
                             spacing="3",
                         ),
@@ -620,10 +684,10 @@ def agregar_cliente_page():
                         ),
                         rx.flex(
                             rx.alert_dialog.cancel(
-                                boton_tres("x", "/alert", "Cancelar"),
+                                rx.button("Cancel"),
                             ),
                             rx.alert_dialog.action(
-                                boton_tres("save", "/alert", "Descartar"),
+                                boton_tres("check", "/alert", "Descartar"),
                             ),
                             spacing="3",
                         ),
