@@ -112,6 +112,7 @@ def perfil(photo: str, naturaleza_cliente: str, name: str, email: str, direccion
                 ),
             ),
         ),
+        #TODO: Cambiar el fixed por otro que no peque la imagen al scroll
     position = "fixed",
     right = "10px",
     top = "2%",
