@@ -11,19 +11,26 @@ class ProvedorState(rx.State):
         async with self:
             self.proveedores = select_all()
 
-
-@rx.page(route='/PROVEEDOR', title='PROVEEDOR', on_load=ProvedorState.get_all_provedor)
 def proveedor_page() -> rx.Component:
-    return rx.flex(
-        rx.heading('Proveedores', align='center'),
-        #rx.hstack(
-            
-        #),
-        table_provedor(ProvedorState.proveedores),
-        #TODO cambiar el estilo, para que sincronice con el estilo de cada componente
-        direction='column',
-        style={"width": "60vw", "margin": "auto"}
+    return rx.vstack(
+        rx.hstack(
+            rx.flex(
+                rx.heading('Proveedores', align='center'),
+                #rx.hstack(
+                    #buscar_user_component(),
+                    #create_user_dialogo_component(),
+                    #justify='center',
+                    #style={"margin-top": "10px"}
+                #),
+                table_provedor(ProvedorState.proveedores),
+                #TODO cambiar el estilo, para que sincronice con el estilo de cada componente
+                direction='column',
+                style={"width": "60vw", "margin": "auto"}
+            )
+        )
     )
+
+
 
 
 def table_provedor(list_provedor: list[Proveedor]) -> rx.Component:

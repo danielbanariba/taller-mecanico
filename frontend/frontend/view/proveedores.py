@@ -6,11 +6,6 @@ from frontend.styles.styles import Size, MAX_WIDTH
 from frontend.components.botones import boton_tres
 from frontend.view.modificar_proveedor import detalles_proveedor
 
-import os
-
-
-
-
 # Datos de proveedores como lista de diccionarios
 datos_proveedores = [
     {

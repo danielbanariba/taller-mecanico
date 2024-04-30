@@ -162,7 +162,7 @@ def delete_inventario_dialogo_component(id_inventario: int) -> rx.Component:
         rx.dialog.trigger(rx.button(rx.icon("trash-2"))),
         rx.dialog.content(
             rx.dialog.title("Eliminar inventario"),
-            rx.dialog.description("¿Estás seguro de que quieres eliminar el inventario con ID " + id_inventario + "?"),
+            rx.dialog.description("¿Estás seguro de que quieres eliminar el inventario con ID " + str(id_inventario) + "?"),
             rx.flex(
                 rx.dialog.close(
                     rx.button(
