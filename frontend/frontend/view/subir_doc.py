@@ -1,59 +1,67 @@
 import reflex as rx
 
-#Pagina para la subida de documentación 
-class State(rx.State):
-    """The app state."""
+class UploadExample(rx.State):
+    uploading: bool = False
+    progress: int = 0
+    total_bytes: int = 0
 
-    # The images to show.
-    img: list[str]
-
-    async def handle_upload(self, files: list[rx.UploadFile]):
-        """Handle the upload of file(s).
-
-        Args:
-            files: The uploaded files.
-        """
+    async def handle_upload(
+        self, files: list[rx.UploadFile]
+    ):
         for file in files:
-            upload_data = await file.read()
-            outfile = rx.get_upload_dir() / file.filename
+            self.total_bytes += len(await file.read())
 
-            # Save the file.
-            with outfile.open("wb") as file_object:
-                file_object.write(upload_data)
+    def handle_upload_progress(self, progress: dict):
+        self.uploading = True
+        self.progress = round(progress["progress"] * 100)
+        if self.progress >= 100:
+            self.uploading = False
 
-            # Update the img var.
-            self.img.append(file.filename)
-
-
-color = "rgb(107,99,246)"
-
+    def cancel_upload(self):
+        self.uploading = False
+        return rx.cancel_upload("upload3")
 
 def Subir_DOC():
-    """The main view."""
     return rx.vstack(
         rx.upload(
-            rx.vstack(
-                rx.button("Select File", color=color, bg="white", border=f"1px solid {color}"),
-                rx.text("Drag and drop files here or click to select files"),
+            rx.text(
+                "Arrastre y suelte archivos aquí o haga clic para seleccionar archivos."
             ),
-            id="upload1",
-            border=f"1px dotted {color}",
+            id="upload3",
+            border="1px dotted rgb(107,99,246)",
             padding="5em",
+            margin_top="25px",
         ),
-        rx.hstack(rx.foreach(rx.selected_files("upload1"), rx.text)),
-        rx.button(
-            "Upload",
-            on_click=State.handle_upload(rx.upload_files(upload_id="upload1")),
+        rx.vstack(
+            rx.foreach(
+                rx.selected_files("upload3"), rx.text
+            )
         ),
-        rx.button(
-            "Clear",
-            on_click=rx.clear_selected_files("upload1"),
+        rx.progress(value=UploadExample.progress, max=100),
+        rx.cond(
+            ~UploadExample.uploading,
+            rx.button(
+                "Cargar",color_scheme="purple", ###########
+                on_click=UploadExample.handle_upload(
+                    rx.upload_files(
+                        upload_id="upload3",
+                        on_upload_progress=UploadExample.handle_upload_progress,
+                    ),
+                ),
+            ),
+            rx.button(
+                "Cancelar",
+                on_click=UploadExample.cancel_upload,
+            ),
         ),
-        rx.foreach(State.img, lambda img: rx.image(src=rx.get_upload_url(img))),
-        padding="5em",
+        rx.text(
+            "Total de bytes cargados: ",
+            UploadExample.total_bytes,
+        ),
+        align="center",
     )
-
-
+   
+   
 def agregar_doc_page(): 
     return rx.container(
         Subir_DOC(),

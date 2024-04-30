@@ -23,7 +23,13 @@ class SetterState1(rx.State):
 def formulario_cliente_natural():
     return rx.vstack(
         #rx.text("Cliente natural", size="4", margin_bottom="35px"), 
-        rx.badge("Cliente natural", size="2",variant="soft"),
+        #rx.badge("Cliente natural", size="2",variant="soft"),
+        rx.flex(
+            rx.center(rx.text("Cliente natural"), bg="lightblue"), 
+            width="800px",
+            margin_top="25px",
+            margin_bottom="20px",
+        ),
             rx.hstack(
                 boton_tres("plus", "/clientes/agregar_cliente/subir_doc", "Agregar documento"),
                 rx.select(
@@ -250,7 +256,13 @@ def formulario_cliente_natural():
 def formulario_empresa():
     return rx.vstack(
         #rx.text("Empresa", size="4", margin_bottom="35px"),
-        rx.badge("Cliente empresa", size="2",variant="soft"),
+        #rx.badge("Cliente empresa", size="2",variant="soft"),
+        rx.flex(
+            rx.center(rx.text("Cliente empresa"), bg="lightblue"), 
+            width="800px",
+            margin_top="25px",
+            margin_bottom="20px",
+        ),
             rx.hstack(
                 boton_tres("plus", "/clientes/agregar_cliente/subir_doc", "Agregar documento"),
                 rx.select(

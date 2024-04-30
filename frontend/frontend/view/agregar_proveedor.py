@@ -11,7 +11,13 @@ from frontend.view.proveedores import Proveedores
 def formulario_agregar_proveedor():
     return rx.container(
         #rx.text("Agregar Proveedor", size="2", margin_bottom="25px", margin_top="25px"),  # Título del formulario
-        rx.badge("Agregar proveedor", size="2",variant="soft"),
+        #rx.badge("Agregar proveedor", size="2",variant="soft"),
+        rx.flex(
+            rx.center(rx.text("Agregar proveedor"), bg="lightblue"), 
+            width="800px",
+            margin_top="25px",
+            margin_bottom="20px",
+        ),
 
         # Subir documentación y Seleccionar departamento en la misma fila
         rx.hstack(
@@ -109,7 +115,13 @@ def formulario_agregar_proveedor():
             ),
 
             # Información del Vendedor
-            rx.badge("Información del vendedor", size="2",variant="soft"),
+            #rx.badge("Información del vendedor", size="2",variant="soft"),
+            rx.flex(
+                rx.center(rx.text("Información del vendedor"), bg="lightblue"), 
+                width="800px",
+                margin_top="25px",
+                margin_bottom="20px",
+             ),
 
             # Primer nombre y Segundo nombre del vendedor
             rx.hstack(
@@ -260,9 +272,9 @@ def formulario_agregar_proveedor():
                             spacing="3",
                         ),
                     ),
-                )
+                ),
                 
-###############################
+
             ),
         )
     )
