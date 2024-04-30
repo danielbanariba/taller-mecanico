@@ -1,9 +1,4 @@
-from typing import List
-import pandas as pd
 import reflex as rx
-from frontend.view.navbar import navbar
-from frontend.styles.styles import Size, MAX_WIDTH
-from frontend.components.botones import boton_dos
 from frontend.components.botones import boton_tres
 #from frontend.view.clientes import user_page #Aca debe de ir el en lace al incio de clientes
 
@@ -244,13 +239,9 @@ def formulario_cliente_natural():
                             ),
                         ),
                     )
-                    
-   
                 ),
             )
-        
     )
-
 
 # Formulario 2
 def formulario_empresa():
@@ -423,12 +414,8 @@ def formulario_empresa():
                             ),
                         ),
                     )
-                    
-   
                 ),
             )
-        
-
     )
 
 

@@ -25,3 +25,5 @@ pip install pyjwt
 pip install pydantic[email]
 pip install cx_Oracle
 pip install plotly
+pip install reflex-dynoselect
+pip install reflex-calendar

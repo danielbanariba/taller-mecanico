@@ -11,7 +11,7 @@ def perfil(photo: str, naturaleza_cliente: str, name: str, email: str, direccion
             rx.dialog.content(
                 rx.dialog.title("Editar Perfil"),
                 rx.dialog.description(
-                    "Change your profile details and preferences.",
+                    "Puedes editar tu perfil en cualquier momento, solo asegurate de que la información sea correcta.",
                     size="2",
                     margin_bottom="16px",
                 ),

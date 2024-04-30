@@ -154,7 +154,6 @@ def formulario_cotizacion():
             rx.data_table(
                 data=pd.DataFrame(
                     columns=["ID Repuesto", "Nombre de repuesto", "Precio unitario", "Precio Total"],
-                   
                 ),
                 pagination=True,
                 sort=True,

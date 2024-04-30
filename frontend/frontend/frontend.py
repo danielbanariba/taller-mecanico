@@ -1,29 +1,18 @@
 import reflex as rx
 from frontend.view.navbar import navbar
-from frontend.view.inventario import Inventario
 from frontend.view.inicio import Inicio
 from frontend.view.agregar_cliente import code_setter
-#from frontend.view.empleados import Empleados
-from frontend.view.proveedores import Proveedores
 from frontend.login import Login
 from frontend.view.agregar_empleado import formulario_agregar_empleado
-#from frontend.view.modificar_proveedor import detalles_empleado
-from frontend.view.agregar_proveedor import formulario_agregar_proveedor
 from frontend.view.agregar_cotizacion import formulario_cotizacion
-from frontend.view.modificar_proveedor import detalles_proveedor
-from frontend.view.subir_doc import Subir_DOC
-from frontend.components.botones import boton #para los botones de cada inicio de módulo, agregar, modificar, etc...
-from frontend.components.botones import boton_dos
-import frontend.URL as URL
 from frontend.view.error_404 import error_404
-from frontend.user_page import UserState
-from frontend.inventario_page import InventarioState
-from frontend.proveedor_page import ProvedorState
+from frontend.user_page import UserState, user_page
+from frontend.inventario_page import InventarioState, inventario_page
 from frontend.pages.estadisticas import estadisticas
 from frontend.pages.clientes import clientes
 from frontend.pages.inventarios import inventarios
 from frontend.pages.proveedores import proveedores_page, agregar_proveedor_page, modificar_proveedor_page, listado_proveedor_page, agregar_doc_page
-
+from frontend.figures.calendar import calendar_page
 
 #Página de inicio 
 def login():
@@ -123,7 +112,7 @@ app = rx.App()
 #Genera las url o los directorios de la paginas correspondientes
 app.add_page(login, route="/")
 app.add_page(estadisticas, route="/estadisticas")
-app.add_page(clientes, route='/clientes', title='clientes', on_load=UserState.get_all_user)
+app.add_page(clientes, route='/usuarios', title='usuarios', on_load=UserState.get_all_user)
 #app.add_page(proveedores, route='/proveedor', title='proveedor', on_load=ProvedorState.get_all_provedor)
 app.add_page(inventarios, route='/inventarios', title='inventarios', on_load=InventarioState.get_all_inventario)
 app.add_page(about)
@@ -142,7 +131,8 @@ app.add_page(listado_proveedor_page, route="/proveedores/listado_proveedor")
 app.add_page(agregar_doc_page, route="/proveedores/agregar_proveedor/subir_doc")
 app.add_page(agregar_doc_page, route="/clientes/agregar_cliente/subir_doc") 
 app.add_page(agregar_cliente_page, route="/clientes/agregar_cliente")
-app.add_page(agregar_cotizacion_page, route="/cotizacion/agregar_cotizacion") 
+app.add_page(agregar_cotizacion_page, route="/cotizacion/agregar_cotizacion")
+app.add_page(calendar_page, route="/agenda")
 
 
 # Ahora, puedes llamar al método para definir tu página 404 personalizada
