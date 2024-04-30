@@ -9,7 +9,7 @@ from frontend.view.error_404 import error_404
 from frontend.user_page import UserState, user_page
 from frontend.inventario_page import InventarioState, inventario_page
 from frontend.pages.estadisticas import estadisticas
-from frontend.pages.clientes import clientes
+from frontend.pages.clientes import usuarios
 from frontend.pages.inventarios import inventarios
 from frontend.pages.proveedores import proveedores_page, agregar_proveedor_page, modificar_proveedor_page, listado_proveedor_page, agregar_doc_page
 from frontend.figures.calendar import calendar_page
@@ -18,29 +18,13 @@ from frontend.figures.calendar import calendar_page
 def login():
     return Login()
 
-
-#Página de ejemplo
-def about():
-    return rx.text("About Page")
-
-
 #Página de inicio
 def inicio_page():
     return rx.vstack(
         navbar(),
         Inicio(),   
     )
-    
-#Página de inicio
-def clientes():
-    return rx.vstack(
-        navbar(),
-        rx.hstack(
-            Inicio(),
-            user_page()
-        )
-    )
-    
+
 def inventarios():
     return rx.vstack(
         navbar(),
@@ -106,18 +90,34 @@ def agregar_cotizacion_page():
             formulario_cotizacion(),   
         ),
     )
+    
+def clientes_page2():
+    return rx.vstack(
+        navbar(),
+        rx.hstack(
+            Inicio(),
+            rx.link(
+                rx.image(
+                    src="/img/cliente/agregar_cliente.png",
+                    width="100",
+                    height="100",
+                ),
+                href="/clientes/agregar_cliente",
+            ),
+        )
+    )
 # Crea la aplicación
 app = rx.App()
 
 #Genera las url o los directorios de la paginas correspondientes
 app.add_page(login, route="/")
 app.add_page(estadisticas, route="/estadisticas")
-app.add_page(clientes, route='/usuarios', title='usuarios', on_load=UserState.get_all_user)
+app.add_page(usuarios, route='/usuarios', title='usuarios', on_load=UserState.get_all_user)
 #app.add_page(proveedores, route='/proveedor', title='proveedor', on_load=ProvedorState.get_all_provedor)
 app.add_page(inventarios, route='/inventarios', title='inventarios', on_load=InventarioState.get_all_inventario)
-app.add_page(about)
 app.add_page(inicio_page, route="/inicio")
 app.add_page(agregar_empleado_page, route="/empleados/agregar_empleado") 
+app.add_page(clientes_page2, route="/clientes2")
 """app.add_page(proveedores_page, route="/empleados")
 app.add_page(agregar_empleado_page, route="/empleados/agregar_empleado") 
 app.add_page(modificar_proveedor_page, route="/empleados/modificar_empleado") 

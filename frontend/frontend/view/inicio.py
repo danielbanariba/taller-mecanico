@@ -4,8 +4,8 @@ import frontend.URL as URL
 
 def Inicio():
     return rx.vstack(
-        boton("user", "/usuario", "Usuario"),
-        boton("users-round", "usuarios", "Clientes"),
+        boton("user", "/usuarios", "Usuario"),
+        boton("users-round", "/clientes2", "Clientes"),
         boton("notebook-text", "/cotizacion/agregar_cotizacion", "Cotizacion/Factura"),
         boton("notebook-pen", "/Orden de servicio", "Orden de servicio"),
         boton("package-search", "/inventario", "Inventario"),

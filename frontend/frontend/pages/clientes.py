@@ -4,7 +4,7 @@ from frontend.view.inicio import Inicio
 from frontend.user_page import user_page, UserState
 
 #Página de inicio
-def clientes():
+def usuarios():
     return rx.vstack(
         navbar(),
         rx.hstack(
@@ -12,3 +12,4 @@ def clientes():
             user_page()
         )
     )
+    
