@@ -16,3 +16,8 @@ venv
 .ruff_cache/
 api/.env
 
+# Web (web/)
+web/node_modules/
+web/dist/
+web/dev-dist/
+

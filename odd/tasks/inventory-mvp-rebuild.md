@@ -34,6 +34,7 @@ Replace the university project (Reflex 0.4.8 frontend talking directly to Oracle
 - **Negative stock is allowed and flagged**, never blocked: a mechanic mid-job must not be stopped by the app, and offline replays must always apply. The UI marks negative stock as "revisar".
 - **Identity:** login with a Honduran phone number (8 digits) + password; no email required. Session is a signed JWT in an httpOnly, SameSite=Lax cookie (web and API served same-origin; Vite proxies `/api` in dev).
 - **Money** stored as integer cents of HNL.
+- **Web toolchain pins:** TypeScript 6.0 (typescript-eslint 8.71 requires <6.1), react-router 7, MSW 3, Vitest 5, Vite 8.
 - **Language:** code, identifiers, comments and CLAUDE.md in English; UI copy and README in Spanish (product market).
 - **Local ports** (5432–5434 and 8000–8001 are taken on the dev machine): Postgres `5440`, API `8010`, web dev `5173`.
 - **Review mode:** RDD disabled for this clone (user decision, 2026-10-06) after two `lens_context_budget_exceeded` stops caused by generated lockfiles (`api/uv.lock` was 903 of 1653 lines). Replacement: per-task checks, an independent verifier for high-risk tasks per `gentle-ai review assess`, and one independent review of all code (lockfiles excluded) before the PR.
@@ -47,7 +48,8 @@ Route per task: delegated direct (one bounded writer) unless stated. Trigger evi
 - [x] **T1** API scaffold: uv project, app factory, settings, DB session, Alembic, `/api/health` with DB check, docker-compose Postgres, ruff + pytest setup.
 - [x] **T2** Identity + workshops: register workshop with owner, login/logout via cookie, `me`, password hashing, authenticated workshop dependency.
 - [x] **T3** Inventory API: items (create, update, archive, list with stock + search + low-stock filter), idempotent movements (in/out/adjust), item history, tenant isolation.
-- [ ] **T4** Web scaffold + auth: Vite React TS, Tailwind, router, query client, API client, PWA manifest, Vitest, login/register screens, protected routes.
+- [ ] **T3b** Inventory API hardening from the T3 verifier: cross-tenant id collision returns 409 instead of an unhandled 500; upper bounds on quantities and prices (no integer overflow 500s); `initial_stock` covered by item replay idempotency (deterministic initial-movement id); escape `%`/`_` in search. Runs after T4 (single writer).
+- [x] **T4** Web scaffold + auth: Vite React TS, Tailwind, router, query client, API client, PWA manifest, Vitest, login/register screens, protected routes.
 - [ ] **T5** Inventory UI: list + search, +/- stepper, add/edit item, item detail with history, low-stock view, physical count.
 - [ ] **T6** Offline: persisted query cache, movement outbox in IndexedDB with sync on reconnect, online/offline indicator.
 - [ ] **T7** Remove legacy code; rewrite README (Spanish) and CLAUDE.md for the new architecture.
@@ -73,11 +75,12 @@ Route per task: delegated direct (one bounded writer) unless stated. Trigger evi
 | --- | --- | --- | --- | --- |
 | T0 | inline (mechanical) | b3c8fee (research), b50514b (CLAUDE.md, plan, .gitignore) | structural readback | b3c8fee passive (boundary advanced); b50514b medium, under budget (pending in slice). First attempt as one commit: consent granted, review stopped with lens_context_budget_exceeded, so it was split. |
 | T1 | delegated (writer; 2+ non-trivial files) | 858d65a | ruff check/format clean, pytest 2 passed, alembic upgrade ok, boot + curl health 200; parent spot check pytest 2 passed | high (alembic.ini starts processes); consent granted, review stopped with lens_context_budget_exceeded; RDD then disabled; independent verifier: pass with follow-ups (add `connect_timeout` to `build_engine`, anchor `env_file` to the package path; folded into T3) |
-| T2 | delegated (writer; 2+ non-trivial files) | see git log (`feat(api): add workshop registration...`) | ruff clean, pytest 26 passed, migration up/down/up ok, boot register→me→logout→me = 201/200/204/401; parent spot check pytest 26 passed | high (auth; assess unassessable → treated high); independent verifier: pass with follow-ups (bound login password length, deterministic tampered-token test, narrow IntegrityError mapping, `secure=` on delete_cookie; fixed in a follow-up commit after T3) |
-| T3 | delegated (writer; 2+ non-trivial files) | see git log (`feat(api): add inventory items...`) | ruff clean, pytest 60 passed, migration up/down/up ok, boot: initial_stock 5 → out 2 → replay = 201/201/200, final stock 3; parent spot check pytest 60 passed | high (tenant isolation, row locking); independent verifier launched |
+| T2 | delegated (writer; 2+ non-trivial files) | see git log (`feat(api): add workshop registration...`) | ruff clean, pytest 26 passed, migration up/down/up ok, boot register→me→logout→me = 201/200/204/401; parent spot check pytest 26 passed | high (auth; assess unassessable → treated high); independent verifier: pass with follow-ups (bound login password length, deterministic tampered-token test, narrow IntegrityError mapping, `secure=` on delete_cookie; fixed in 0316d68 with a RED→GREEN test for the login bound; pytest 61 passed) |
+| T3 | delegated (writer; 2+ non-trivial files) | see git log (`feat(api): add inventory items...`) | ruff clean, pytest 60 passed, migration up/down/up ok, boot: initial_stock 5 → out 2 → replay = 201/201/200, final stock 3; parent spot check pytest 60 passed | high (tenant isolation, row locking); independent verifier: pass with follow-ups → T3b |
+| T4 | delegated (writer; 2+ non-trivial files) | see git log (`feat(web): scaffold the installable PWA...`) | lint, typecheck clean; vitest 9 passed; build emits sw.js + Spanish manifest; smoke via Vite proxy: health 200, register 201, me 200; parent spot check vitest 9 passed | assessed after commit |
 
 T3 decisions: quantities are integers; movement replay compares `{item_id, kind, quantity, note}` (not `occurred_at`); `initial_stock` always records an `adjust` (even 0); simple UUID primary keys; concurrent insert races retried once after `IntegrityError`; accent-insensitive search and name uniqueness via an IMMUTABLE plpgsql wrapper `taller_unaccent_lower`.
 
 ## Next step
 
-T2 verifier fixes, then T4 (web scaffold + auth).
+T3b (API hardening), then T5 (inventory UI).

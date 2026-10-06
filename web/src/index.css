@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+  /* Utilitarian, high-contrast palette (navy + blue) sized for sunlit phone
+     screens and greasy-handed taps. See ui-ux-pro-max design-system search:
+     "Government/Public Service" colors + "Minimal Swiss" (Inter) type. */
+  --color-brand-primary: #0f172a;
+  --color-brand-on-primary: #ffffff;
+  --color-brand-secondary: #334155;
+  --color-brand-accent: #0369a1;
+  --color-brand-on-accent: #ffffff;
+  --color-brand-background: #f8fafc;
+  --color-brand-foreground: #020617;
+  --color-brand-card: #ffffff;
+  --color-brand-muted: #e8ecf1;
+  --color-brand-muted-foreground: #64748b;
+  --color-brand-border: #e2e8f0;
+  --color-brand-destructive: #dc2626;
+  --color-brand-on-destructive: #ffffff;
+
+  --font-sans: "Inter", "system-ui", sans-serif;
+}
+
+body {
+  background-color: var(--color-brand-background);
+  color: var(--color-brand-foreground);
+  font-family: var(--font-sans);
+}

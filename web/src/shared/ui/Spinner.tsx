@@ -1,0 +1,25 @@
+export interface SpinnerProps {
+  /** Screen-reader label; defaults to the Spanish "loading" announcement. */
+  label?: string;
+}
+
+/** Atomic loading indicator. Purely presentational. */
+export function Spinner({ label = "Cargando" }: SpinnerProps) {
+  return (
+    <svg
+      role="status"
+      aria-label={label}
+      viewBox="0 0 24 24"
+      className="h-5 w-5 animate-spin"
+      fill="none"
+    >
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+      <path
+        d="M22 12a10 10 0 0 0-10-10"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
