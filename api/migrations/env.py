@@ -3,6 +3,11 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+# Importing a feature's ORM models module registers its tables on
+# Base.metadata (via the declarative class bodies), which is what
+# 'autogenerate' diffs against. Each feature's adapters.models module must
+# be imported here, even though nothing in this file calls it directly.
+import taller.identity.adapters.models  # noqa: F401,E402
 from taller.shared.config import Settings
 from taller.shared.db import Base
 

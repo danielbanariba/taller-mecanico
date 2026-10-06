@@ -15,8 +15,18 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
-from taller.main import app
-from taller.shared.db import get_db
+# Settings() is constructed at import time (see taller.shared.db), so the
+# JWT secret and cookie flag must be in the environment *before* taller.main
+# is imported below. TALLER_JWT_SECRET has no default (it must be a real
+# secret in every real environment), and TALLER_COOKIE_SECURE must be false
+# here because TestClient talks to the app over plain HTTP: a browser (and
+# httpx's cookie jar) never sends a Secure cookie back over a non-HTTPS
+# connection, which would silently break every cookie-authenticated test.
+os.environ.setdefault("TALLER_JWT_SECRET", "test-only-jwt-secret-value-needs-32-chars-minimum")
+os.environ.setdefault("TALLER_COOKIE_SECURE", "false")
+
+from taller.main import app  # noqa: E402
+from taller.shared.db import get_db  # noqa: E402
 
 API_ROOT = Path(__file__).resolve().parent.parent
 TEST_DATABASE_URL = os.environ.get(
@@ -94,3 +104,29 @@ def client(db_session: Session) -> Generator[TestClient]:
             yield test_client
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.fixture
+def register_payload() -> dict[str, str]:
+    """A valid /api/auth/register request body for a fresh workshop owner."""
+    return {
+        "workshop_name": "Taller Don Chepe",
+        "owner_name": "Chepe Martinez",
+        "phone": "9988-7766",
+        "password": "a-strong-enough-password",
+    }
+
+
+@pytest.fixture
+def authenticated_client(client: TestClient, register_payload: dict[str, str]) -> TestClient:
+    """A ``client`` that has just registered a workshop and is logged in.
+
+    The session cookie from ``/api/auth/register`` stays in the client's
+    cookie jar, so every later request through this fixture is authenticated
+    as that workshop's owner. Reuse this fixture in any feature (e.g.
+    inventory) that needs a tenant-scoped, already-authenticated client
+    instead of registering a workshop by hand in every test.
+    """
+    response = client.post("/api/auth/register", json=register_payload)
+    assert response.status_code == 201
+    return client

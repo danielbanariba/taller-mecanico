@@ -36,6 +36,7 @@ Replace the university project (Reflex 0.4.8 frontend talking directly to Oracle
 - **Money** stored as integer cents of HNL.
 - **Language:** code, identifiers, comments and CLAUDE.md in English; UI copy and README in Spanish (product market).
 - **Local ports** (5432–5434 and 8000–8001 are taken on the dev machine): Postgres `5440`, API `8010`, web dev `5173`.
+- **Review mode:** RDD disabled for this clone (user decision, 2026-10-06) after two `lens_context_budget_exceeded` stops caused by generated lockfiles (`api/uv.lock` was 903 of 1653 lines). Replacement: per-task checks, an independent verifier for high-risk tasks per `gentle-ai review assess`, and one independent review of all code (lockfiles excluded) before the PR.
 - **Delivery strategy:** `single-pr` (user policy: one task = one branch = one PR, atomic commits). If the final size is unreasonable for one review, agree a cut with the user before splitting.
 
 ## Tasks
@@ -44,7 +45,7 @@ Route per task: delegated direct (one bounded writer) unless stated. Trigger evi
 
 - [x] **T0** Repo hygiene: ignore local tooling dirs, commit research docs, this plan and the legacy CLAUDE.md. Route: inline (mechanical).
 - [x] **T1** API scaffold: uv project, app factory, settings, DB session, Alembic, `/api/health` with DB check, docker-compose Postgres, ruff + pytest setup.
-- [ ] **T2** Identity + workshops: register workshop with owner, login/logout via cookie, `me`, password hashing, authenticated workshop dependency.
+- [x] **T2** Identity + workshops: register workshop with owner, login/logout via cookie, `me`, password hashing, authenticated workshop dependency.
 - [ ] **T3** Inventory API: items (create, update, archive, list with stock + search + low-stock filter), idempotent movements (in/out/adjust), item history, tenant isolation.
 - [ ] **T4** Web scaffold + auth: Vite React TS, Tailwind, router, query client, API client, PWA manifest, Vitest, login/register screens, protected routes.
 - [ ] **T5** Inventory UI: list + search, +/- stepper, add/edit item, item detail with history, low-stock view, physical count.
@@ -71,7 +72,9 @@ Route per task: delegated direct (one bounded writer) unless stated. Trigger evi
 | Task | Route | Commit | Checks | Review tier |
 | --- | --- | --- | --- | --- |
 | T0 | inline (mechanical) | b3c8fee (research), b50514b (CLAUDE.md, plan, .gitignore) | structural readback | b3c8fee passive (boundary advanced); b50514b medium, under budget (pending in slice). First attempt as one commit: consent granted, review stopped with lens_context_budget_exceeded, so it was split. |
+| T1 | delegated (writer; 2+ non-trivial files) | 858d65a | ruff check/format clean, pytest 2 passed, alembic upgrade ok, boot + curl health 200; parent spot check pytest 2 passed | high (alembic.ini starts processes); consent granted, review stopped with lens_context_budget_exceeded; RDD then disabled; independent verifier: pass with follow-ups (add `connect_timeout` to `build_engine`, anchor `env_file` to the package path; folded into T3) |
+| T2 | delegated (writer; 2+ non-trivial files) | see git log (`feat(api): add workshop registration...`) | ruff clean, pytest 26 passed, migration up/down/up ok, boot register→me→logout→me = 201/200/204/401; parent spot check pytest 26 passed | high (auth; assess unassessable → treated high); independent verifier launched |
 
 ## Next step
 
-T1 (API scaffold). Last reviewed boundary: b3c8fee.
+T3 (inventory API) + T1 verifier follow-ups.
