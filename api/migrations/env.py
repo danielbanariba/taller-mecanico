@@ -8,6 +8,7 @@ from sqlalchemy import engine_from_config, pool
 # 'autogenerate' diffs against. Each feature's adapters.models module must
 # be imported here, even though nothing in this file calls it directly.
 import taller.identity.adapters.models  # noqa: F401,E402
+import taller.inventory.adapters.models  # noqa: F401,E402
 from taller.shared.config import Settings
 from taller.shared.db import Base
 

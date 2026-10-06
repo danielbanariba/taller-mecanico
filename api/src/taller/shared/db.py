@@ -18,9 +18,15 @@ class Base(DeclarativeBase):
 
 
 def build_engine(database_url: str | None = None) -> Engine:
-    """Create a SQLAlchemy engine for the given (or configured) database URL."""
+    """Create a SQLAlchemy engine for the given (or configured) database URL.
+
+    ``connect_timeout`` makes a new connection attempt fail fast (5s)
+    instead of hanging when the database is unreachable, so ``/api/health``
+    and every other request return promptly rather than blocking on the
+    driver's default (much longer) TCP timeout.
+    """
     url = database_url or get_settings().database_url
-    return create_engine(url, pool_pre_ping=True)
+    return create_engine(url, pool_pre_ping=True, connect_args={"connect_timeout": 5})
 
 
 engine: Engine = build_engine()
