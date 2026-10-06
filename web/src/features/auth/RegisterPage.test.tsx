@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -60,6 +60,33 @@ describe("RegisterPage", () => {
 
     expect(
       await screen.findByText("La contraseña debe tener al menos 8 caracteres."),
+    ).toBeInTheDocument();
+    expect(apiWasCalled).toBe(false);
+  });
+
+  it("blocks a 129-character password without calling the API", async () => {
+    // `maxLength` on the input only stops keyboard typing; a pasted or
+    // programmatically set value can still exceed it, so this sets the
+    // value directly (bypassing the HTML attribute) to prove the
+    // component's own length check is what actually blocks submission.
+    let apiWasCalled = false;
+    server.use(
+      http.post("/api/auth/register", () => {
+        apiWasCalled = true;
+        return HttpResponse.json({ detail: "unexpected" }, { status: 500 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderRegisterPage();
+
+    await user.type(screen.getByLabelText(/nombre del taller/i), "Taller Ana");
+    await user.type(screen.getByLabelText(/nombre del propietario/i), "Ana Pérez");
+    await user.type(screen.getByLabelText(/teléfono/i), "99998888");
+    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: "a".repeat(129) } });
+    await user.click(screen.getByRole("button", { name: /crear cuenta/i }));
+
+    expect(
+      await screen.findByText("La contraseña no puede tener más de 128 caracteres."),
     ).toBeInTheDocument();
     expect(apiWasCalled).toBe(false);
   });

@@ -1,0 +1,163 @@
+import { useState } from "react";
+import { useNavigate, useParams, Link } from "react-router";
+
+import { ApiError } from "../../shared/api/http";
+import { Alert } from "../../shared/ui/Alert";
+import { Button } from "../../shared/ui/Button";
+import { Dialog } from "../../shared/ui/Dialog";
+import { Spinner } from "../../shared/ui/Spinner";
+import { TextField } from "../../shared/ui/TextField";
+import { getInventoryErrorMessage, inventoryCopy } from "./copy";
+import { useArchiveItem, useItem, useMovements, useRecordMovement } from "./hooks";
+import { MovementHistory } from "./MovementHistory";
+
+/** Container: the item detail screen -- stock stepper, physical count, edit and archive. */
+export function ItemDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const itemId = id ?? "";
+  const navigate = useNavigate();
+
+  const item = useItem(itemId);
+  const movements = useMovements(itemId);
+  const recordMovement = useRecordMovement();
+  const archiveItem = useArchiveItem();
+
+  const [countOpen, setCountOpen] = useState(false);
+  const [countText, setCountText] = useState("");
+  const [archiveOpen, setArchiveOpen] = useState(false);
+
+  if (item.isPending) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (item.isError || !item.data) {
+    return (
+      <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 py-8">
+        <Alert variant="error">{getInventoryErrorMessage("item_not_found")}</Alert>
+      </main>
+    );
+  }
+
+  const data = item.data;
+
+  const movementErrorMessage =
+    recordMovement.error instanceof ApiError
+      ? getInventoryErrorMessage(recordMovement.error.code)
+      : undefined;
+
+  function openCountDialog() {
+    setCountText(String(data.stock));
+    setCountOpen(true);
+  }
+
+  function handleCountSubmit() {
+    const counted = Math.max(0, Math.trunc(Number(countText) || 0));
+    recordMovement.mutate(
+      { itemId, kind: "adjust", quantity: counted },
+      { onSuccess: () => setCountOpen(false) },
+    );
+  }
+
+  function handleArchiveConfirm() {
+    archiveItem.mutate(itemId, {
+      onSuccess: () => navigate("/inventario", { replace: true }),
+    });
+  }
+
+  return (
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-4 py-8">
+      <header>
+        <h1 className="text-2xl font-bold text-brand-primary">{data.name}</h1>
+        <p className="text-sm text-brand-muted-foreground">
+          {[data.category, data.unit].filter(Boolean).join(" · ")}
+        </p>
+      </header>
+
+      {movementErrorMessage ? <Alert variant="error">{movementErrorMessage}</Alert> : null}
+
+      <section className="flex flex-col items-center gap-4 rounded-2xl border border-brand-border bg-brand-card py-8">
+        <p className="text-base text-brand-muted-foreground">{inventoryCopy.detail.stockLabel}</p>
+        <p className="text-6xl font-bold tabular-nums text-brand-primary">{data.stock}</p>
+        <div className="flex gap-4">
+          <button
+            type="button"
+            aria-label={inventoryCopy.list.decrementLabel(data.name)}
+            onClick={() => recordMovement.mutate({ itemId, kind: "out", quantity: 1 })}
+            className="flex h-14 w-14 items-center justify-center rounded-xl bg-brand-muted text-2xl font-bold text-brand-primary active:bg-brand-border"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            aria-label={inventoryCopy.list.incrementLabel(data.name)}
+            onClick={() => recordMovement.mutate({ itemId, kind: "in", quantity: 1 })}
+            className="flex h-14 w-14 items-center justify-center rounded-xl bg-brand-accent text-2xl font-bold text-brand-on-accent active:bg-brand-secondary"
+          >
+            +
+          </button>
+        </div>
+        <Button variant="secondary" onClick={openCountDialog}>
+          {inventoryCopy.detail.countAction}
+        </Button>
+      </section>
+
+      <div className="flex gap-3">
+        <Link to={`/inventario/${itemId}/editar`} className="flex-1">
+          <Button variant="secondary">{inventoryCopy.detail.editAction}</Button>
+        </Link>
+        <Button variant="destructive" onClick={() => setArchiveOpen(true)}>
+          {inventoryCopy.detail.archiveAction}
+        </Button>
+      </div>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-lg font-bold text-brand-primary">{inventoryCopy.detail.historyTitle}</h2>
+        <MovementHistory movements={movements.data ?? []} />
+      </section>
+
+      <Dialog open={countOpen} title={inventoryCopy.detail.countDialogTitle} onClose={() => setCountOpen(false)}>
+        <div className="flex flex-col gap-4">
+          <TextField
+            label={inventoryCopy.detail.countLabel}
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={countText}
+            onChange={(event) => setCountText(event.target.value)}
+            autoFocus
+          />
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setCountOpen(false)}>
+              {inventoryCopy.detail.countCancel}
+            </Button>
+            <Button onClick={handleCountSubmit} loading={recordMovement.isPending}>
+              {inventoryCopy.detail.countSubmit}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={archiveOpen}
+        title={inventoryCopy.detail.archiveConfirmTitle}
+        onClose={() => setArchiveOpen(false)}
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-base text-brand-foreground">{inventoryCopy.detail.archiveConfirmBody}</p>
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setArchiveOpen(false)}>
+              {inventoryCopy.detail.archiveConfirmCancel}
+            </Button>
+            <Button variant="destructive" onClick={handleArchiveConfirm} loading={archiveItem.isPending}>
+              {inventoryCopy.detail.archiveConfirmSubmit}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+    </main>
+  );
+}

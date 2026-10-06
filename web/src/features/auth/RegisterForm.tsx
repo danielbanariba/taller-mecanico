@@ -13,11 +13,15 @@ export interface RegisterFormProps {
 }
 
 const MIN_PASSWORD_LENGTH = 8;
+const MAX_PASSWORD_LENGTH = 128;
 
 /**
- * Presentational, except for the one client-side rule worth enforcing
- * before spending a round trip: password length. Everything else (phone
- * format, duplicate phone) is the API's call.
+ * Presentational, except for the client-side rules worth enforcing before
+ * spending a round trip: password length, both bounds. `maxLength` on the
+ * input stops typing past the limit, but a pasted or programmatically set
+ * value can still exceed it, so the length check here is the one that
+ * actually blocks submission. Everything else (phone format, duplicate
+ * phone) is the API's call.
  */
 export function RegisterForm({ onSubmit, pending, errorMessage }: RegisterFormProps) {
   const [workshopName, setWorkshopName] = useState("");
@@ -27,11 +31,17 @@ export function RegisterForm({ onSubmit, pending, errorMessage }: RegisterFormPr
   const [passwordTouched, setPasswordTouched] = useState(false);
 
   const passwordTooShort = password.length > 0 && password.length < MIN_PASSWORD_LENGTH;
+  const passwordTooLong = password.length > MAX_PASSWORD_LENGTH;
+  const passwordError = passwordTooShort
+    ? authCopy.register.passwordTooShort
+    : passwordTooLong
+      ? authCopy.register.passwordTooLong
+      : undefined;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPasswordTouched(true);
-    if (password.length < MIN_PASSWORD_LENGTH) {
+    if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
       return;
     }
     onSubmit({ workshop_name: workshopName, owner_name: ownerName, phone, password });
@@ -75,7 +85,8 @@ export function RegisterForm({ onSubmit, pending, errorMessage }: RegisterFormPr
         value={password}
         onChange={(event) => setPassword(event.target.value)}
         onBlur={() => setPasswordTouched(true)}
-        error={passwordTouched && passwordTooShort ? authCopy.register.passwordTooShort : undefined}
+        maxLength={MAX_PASSWORD_LENGTH}
+        error={passwordTouched ? passwordError : undefined}
         helperText={authCopy.register.passwordHelper}
         required
       />

@@ -22,6 +22,7 @@ export const authCopy = {
     passwordLabel: "Contraseña",
     passwordHelper: "Mínimo 8 caracteres.",
     passwordTooShort: "La contraseña debe tener al menos 8 caracteres.",
+    passwordTooLong: "La contraseña no puede tener más de 128 caracteres.",
     submit: "Crear cuenta",
     submitPending: "Creando cuenta...",
     goToLogin: "¿Ya tiene cuenta? Inicie sesión",

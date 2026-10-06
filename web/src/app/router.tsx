@@ -1,8 +1,11 @@
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter, Navigate, Outlet } from "react-router";
 
 import { LoginPage } from "../features/auth/LoginPage";
 import { RegisterPage } from "../features/auth/RegisterPage";
+import { EditItemPage } from "../features/inventory/EditItemPage";
 import { InventoryPage } from "../features/inventory/InventoryPage";
+import { ItemDetailPage } from "../features/inventory/ItemDetailPage";
+import { NewItemPage } from "../features/inventory/NewItemPage";
 import { RequireSession } from "./RequireSession";
 
 export const router = createBrowserRouter([
@@ -13,8 +16,14 @@ export const router = createBrowserRouter([
     path: "/inventario",
     element: (
       <RequireSession>
-        <InventoryPage />
+        <Outlet />
       </RequireSession>
     ),
+    children: [
+      { index: true, element: <InventoryPage /> },
+      { path: "nuevo", element: <NewItemPage /> },
+      { path: ":id", element: <ItemDetailPage /> },
+      { path: ":id/editar", element: <EditItemPage /> },
+    ],
   },
 ]);
