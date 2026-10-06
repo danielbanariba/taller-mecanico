@@ -5,3 +5,6 @@ __pycache__
 __pycache__/
 env
 venv
+# Local tooling
+.codegraph/
+.atl/
