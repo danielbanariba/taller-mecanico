@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { ApiError } from "../../shared/api/http";
+import { useOnlineStatus } from "../../shared/offline/useOnlineStatus";
 import { getInventoryErrorMessage, inventoryCopy } from "./copy";
 import { useCreateItem, useItems } from "./hooks";
 import { ItemForm, type ItemFormValues } from "./ItemForm";
@@ -9,6 +10,7 @@ import { ItemForm, type ItemFormValues } from "./ItemForm";
 /** Container: wires the shared item form to the create mutation and routing. */
 export function NewItemPage() {
   const navigate = useNavigate();
+  const isOffline = useOnlineStatus();
   const [itemId] = useState(() => crypto.randomUUID());
   const createItem = useCreateItem();
   const existingItems = useItems();
@@ -55,6 +57,7 @@ export function NewItemPage() {
         errorMessage={errorMessage}
         submitLabel={inventoryCopy.create.submit}
         submitPendingLabel={inventoryCopy.create.submitPending}
+        offline={isOffline}
       />
     </main>
   );

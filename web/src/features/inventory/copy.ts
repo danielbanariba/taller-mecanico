@@ -63,6 +63,13 @@ export const inventoryCopy = {
     historyEmpty: "Todavía no hay movimientos.",
   },
   units: ["unidad", "galón", "litro", "juego", "par", "caja"],
+  offline: {
+    offlineMessage: "Sin conexión. Los cambios se guardan en el teléfono.",
+    syncingMessage: "Sincronizando...",
+    pendingCount: (count: number) => `${count} cambio${count === 1 ? "" : "s"} por enviar`,
+    createDisabled: "Conéctese a internet para agregar repuestos.",
+    editDisabled: "Conéctese a internet para editar repuestos.",
+  },
 } as const;
 
 /** Builds the Spanish label for one movement row, e.g. "Entrada +3". */

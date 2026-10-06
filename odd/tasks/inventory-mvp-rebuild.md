@@ -51,7 +51,8 @@ Route per task: delegated direct (one bounded writer) unless stated. Trigger evi
 - [x] **T3b** Inventory API hardening from the T3 verifier: cross-tenant id collision returns 409 instead of an unhandled 500; upper bounds on quantities and prices (no integer overflow 500s); `initial_stock` covered by item replay idempotency (deterministic initial-movement id); escape `%`/`_` in search. Runs after T4 (single writer).
 - [x] **T4** Web scaffold + auth: Vite React TS, Tailwind, router, query client, API client, PWA manifest, Vitest, login/register screens, protected routes.
 - [x] **T5** Inventory UI: list + search, +/- stepper, add/edit item, item detail with history, low-stock view, physical count.
-- [ ] **T6** Offline: persisted query cache, movement outbox in IndexedDB with sync on reconnect, online/offline indicator.
+- [ ] **T5b** Inventory UI fixes from the T5 verifier: accept thousands-grouped lempira amounts with `format.ts` tests, client-side upper bounds with Spanish messages, no `<button>` nested in `<a>` on the detail page, a 404 detail test. Runs after T6 (single writer).
+- [x] **T6** Offline: persisted query cache, movement outbox in IndexedDB with sync on reconnect, online/offline indicator.
 - [ ] **T7** Remove legacy code; rewrite README (Spanish) and CLAUDE.md for the new architecture.
 - [ ] **T8** End-to-end check in a real browser (register, add item, move stock, offline queue + sync).
 
@@ -79,10 +80,13 @@ Route per task: delegated direct (one bounded writer) unless stated. Trigger evi
 | T3 | delegated (writer; 2+ non-trivial files) | 8cd5db6 | ruff clean, pytest 60 passed, migration up/down/up ok, boot: initial_stock 5 → out 2 → replay = 201/201/200, final stock 3; parent spot check pytest 60 passed | high (tenant isolation, row locking); independent verifier: pass with follow-ups → T3b |
 | T4 | delegated (writer; 2+ non-trivial files) | 896d9fe | lint, typecheck clean; vitest 9 passed; build emits sw.js + Spanish manifest; smoke via Vite proxy: health 200, register 201, me 200; parent spot check vitest 9 passed | high (auth signal); independent verifier: pass with follow-ups (RegisterForm lacks the 128-char password max; folded into T5) |
 | T3b | delegated (writer) | 104c8b3 | ruff clean, pytest 79 passed (RED per defect observed by stashing the fix); parent spot check pytest 79 passed | follow-up of a verified high-risk task; fixes only |
-| T5 | delegated (writer; 2+ non-trivial files) | see next commit (`feat(web): add inventory screens...`) | lint, typecheck clean; vitest 24 passed; build ok; smoke via proxy: register 201, item initial 3, in +1, stock 4; parent spot check vitest 24 passed. Test-first exception: writer wrote most code and tests together; RED proven retroactively for 7 behaviors by reverting each fix | assessed after commit |
+| T5 | delegated (writer; 2+ non-trivial files) | see next commit (`feat(web): add inventory screens...`) | lint, typecheck clean; vitest 24 passed; build ok; smoke via proxy: register 201, item initial 3, in +1, stock 4; parent spot check vitest 24 passed. Test-first exception: writer wrote most code and tests together; RED proven retroactively for 7 behaviors by reverting each fix | high (auth signal from RegisterForm); independent verifier: pass with follow-ups: out-of-order reconciliation of concurrent taps (sent to the T6 writer, same code); thousands-grouped prices rejected, missing client upper bounds, Button nested in Link, no 404/format tests → T5b |
+| T6 | delegated (writer; 2+ non-trivial files) | see next commit (`feat(web): work offline...`) | lint, typecheck clean; vitest 50 passed (stable x3); build: sw.js routes `/api/` NetworkOnly, shell precached; RED observed before implementing each module, plus the reverse-order taps regression test failing on the old transport; parent spot check vitest | assessed after commit |
+
+T6 decisions: creating/editing items requires a connection (disabled offline with a message); the outbox is the only movement transport (FIFO, one at a time, Web Locks + in-tab mutex, 20 s timeout) so responses cannot reconcile out of order; pending outbox entries are folded onto fetched/persisted item data so a refetch never hides a queued tap; persisted query cache max age 7 days, busted by app version, cleared on logout; outbox entries carry the workshop id and only flush for the matching session.
 
 T3 decisions: quantities are integers; movement replay compares `{item_id, kind, quantity, note}` (not `occurred_at`); `initial_stock` always records an `adjust` (even 0); simple UUID primary keys; concurrent insert races retried once after `IntegrityError`; accent-insensitive search and name uniqueness via an IMMUTABLE plpgsql wrapper `taller_unaccent_lower`.
 
 ## Next step
 
-T6 (offline outbox) through `recordMovement()` in `web/src/features/inventory/commands.ts`.
+T5b (UI fixes), then T7 (legacy removal + docs), then T8 (browser check).

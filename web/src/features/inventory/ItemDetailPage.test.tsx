@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -41,6 +41,17 @@ function movement(overrides: Partial<MovementOut>): MovementOut {
 }
 
 function mockItemAndMovements(movements: MovementOut[] = []) {
+  // useRecordMovement/useItem need the session's workshop id to tag and
+  // fold outbox entries (see T6); ItemDetailPage always renders behind
+  // RequireSession in the real app, so every test mocks it too.
+  server.use(
+    http.get("/api/auth/me", () =>
+      HttpResponse.json({
+        user: { id: "u1", full_name: "Ana Pérez", phone: "99998888", role: "owner" },
+        workshop: { id: "w1", name: "Taller Ana" },
+      }),
+    ),
+  );
   server.use(http.get("/api/inventory/items/item-1", () => HttpResponse.json(ITEM)));
   server.use(http.get("/api/inventory/items/item-1/movements", () => HttpResponse.json(movements)));
 }
@@ -79,8 +90,12 @@ describe("ItemDetailPage", () => {
     await user.type(countField, "7");
     await user.click(screen.getByRole("button", { name: "Guardar conteo" }));
 
+    // The optimistic update renders "7" immediately; the actual PUT lands a
+    // few ticks later (it goes through the outbox write and the flush lock
+    // first -- see T6), so the request body is asserted via `waitFor`
+    // rather than right after the optimistic render settles.
     expect(await screen.findByText("7")).toBeInTheDocument();
-    expect(capturedBody).toMatchObject({ item_id: "item-1", kind: "adjust", quantity: 7 });
+    await waitFor(() => expect(capturedBody).toMatchObject({ item_id: "item-1", kind: "adjust", quantity: 7 }));
   });
 
   it("renders the movement history newest first with Spanish labels", async () => {

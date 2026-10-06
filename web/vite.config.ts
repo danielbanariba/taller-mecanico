@@ -3,7 +3,15 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 
+import packageJson from "./package.json" with { type: "json" };
+
 export default defineConfig({
+  define: {
+    // Ties the persisted query cache's buster (see src/app/providers.tsx)
+    // to the app version, so a new release never hydrates an old,
+    // incompatible IndexedDB cache shape.
+    __APP_VERSION__: JSON.stringify(packageJson.version),
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -39,9 +47,20 @@ export default defineConfig({
           },
         ],
       },
-      // T6 wires offline API runtime caching; keep this scaffold to app-shell only.
       workbox: {
         navigateFallbackDenylist: [/^\/api\//],
+        // `/api/*` is served by the same origin but must never be answered
+        // from the service worker's cache: the persisted TanStack Query
+        // cache (src/shared/offline/idbPersister.ts) is the offline data
+        // source, so API responses stay network-only (NetworkOnly never
+        // caches), and a stale cached API response can never win a race
+        // against the real backend.
+        runtimeCaching: [
+          {
+            urlPattern: /^\/api\//,
+            handler: "NetworkOnly",
+          },
+        ],
       },
     }),
   ],

@@ -100,4 +100,36 @@ describe("NewItemPage", () => {
 
     expect(await screen.findByText("Ya existe un repuesto con ese nombre.")).toBeInTheDocument();
   });
+
+  it("disables submission and explains why when offline, without calling the API", async () => {
+    // Defect this catches: creating an item has no client-generated-id
+    // conflict recovery for a server round trip that can never happen
+    // offline in this MVP, so letting the form submit anyway would just
+    // hang on a network_error with no clear explanation.
+    mockEmptyItemsList();
+    let apiWasCalled = false;
+    server.use(
+      http.post("/api/inventory/items", () => {
+        apiWasCalled = true;
+        return HttpResponse.json({ detail: "unexpected" }, { status: 500 });
+      }),
+    );
+    const originalOnLine = Object.getOwnPropertyDescriptor(window.navigator, "onLine");
+    Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+    try {
+      const user = userEvent.setup();
+      renderNewItemPage();
+
+      await user.type(screen.getByLabelText(/^nombre$/i), "Filtro de aire");
+      expect(screen.getByText("Conéctese a internet para agregar repuestos.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /guardar repuesto/i })).toBeDisabled();
+
+      await user.click(screen.getByRole("button", { name: /guardar repuesto/i }));
+      expect(apiWasCalled).toBe(false);
+    } finally {
+      if (originalOnLine) {
+        Object.defineProperty(window.navigator, "onLine", originalOnLine);
+      }
+    }
+  });
 });

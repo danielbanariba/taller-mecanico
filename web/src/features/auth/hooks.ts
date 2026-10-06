@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { idbPersister } from "../../shared/offline/idbPersister";
 import { authApi, type LoginPayload, type Me, type RegisterPayload } from "./api";
 
 export const sessionQueryKey = ["auth", "session"] as const;
@@ -42,10 +43,14 @@ export function useLogout() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => authApi.logout(),
-    onSuccess: () => {
-      // Forces the next `useSession` read to refetch instead of serving
-      // the now-stale cached user.
-      queryClient.removeQueries({ queryKey: sessionQueryKey });
+    onSuccess: async () => {
+      // Clears both layers: the in-memory QueryClient cache (so the next
+      // `useSession` read refetches instead of serving the now-stale
+      // cached user) and the persisted IndexedDB cache (so a different
+      // workshop logging in on this same phone never sees the previous
+      // one's inventory, even offline, before its own data loads).
+      queryClient.clear();
+      await idbPersister.removeClient();
     },
   });
 }

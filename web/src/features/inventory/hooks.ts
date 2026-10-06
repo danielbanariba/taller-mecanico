@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 
+import { ApiError } from "../../shared/api/http";
+import { useSession } from "../auth/hooks";
 import {
   inventoryApi,
   type ItemOut,
@@ -8,9 +10,13 @@ import {
   type CreateItemPayload,
   type UpdateItemPayload,
 } from "./api";
-import { applyMovementToItem, recordMovement, type RecordMovementInput } from "./commands";
+import { applyMovementToItem, applyPendingOutboxEntries, recordMovement, type RecordMovementInput } from "./commands";
+import { getInventoryErrorMessage } from "./copy";
+import { flushOutboxOnce, subscribeOutboxChange } from "./offlineSync";
+import { defaultOutbox } from "./outbox";
 
 const ITEMS_QUERY_BASE = ["inventory", "items"] as const;
+const INVENTORY_QUERY_BASE = ["inventory"] as const;
 
 export const itemsQueryKey = (params: ListItemsParams = {}) => [...ITEMS_QUERY_BASE, params] as const;
 export const itemQueryKey = (id: string) => ["inventory", "item", id] as const;
@@ -28,17 +34,45 @@ export function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
+/** The current session's workshop id, or undefined before it resolves. */
+function useWorkshopId(): string | undefined {
+  const session = useSession();
+  return session.data?.workshop.id;
+}
+
 export function useItems(params: ListItemsParams = {}) {
+  const workshopId = useWorkshopId();
   return useQuery({
     queryKey: itemsQueryKey(params),
-    queryFn: () => inventoryApi.listItems(params),
+    queryFn: async () => {
+      const items = await inventoryApi.listItems(params);
+      if (!workshopId) {
+        return items;
+      }
+      const pending = await defaultOutbox.listForWorkshop(workshopId);
+      if (pending.length === 0) {
+        return items;
+      }
+      return items.map((item) => applyPendingOutboxEntries(item, pending));
+    },
   });
 }
 
 export function useItem(id: string) {
+  const workshopId = useWorkshopId();
   return useQuery({
     queryKey: itemQueryKey(id),
-    queryFn: () => inventoryApi.getItem(id),
+    queryFn: async () => {
+      const item = await inventoryApi.getItem(id);
+      if (!workshopId) {
+        return item;
+      }
+      const pending = await defaultOutbox.listForWorkshop(workshopId);
+      if (pending.length === 0) {
+        return item;
+      }
+      return applyPendingOutboxEntries(item, pending);
+    },
   });
 }
 
@@ -91,14 +125,28 @@ interface RecordMovementSnapshot {
  * The one hook every screen uses to change stock (list stepper, detail
  * stepper and the physical count dialog). It applies the new stock to both
  * the list and detail caches before the request settles, reconciles with
- * the server's `item` summary on success, and rolls every cache back on
- * failure.
+ * the server's `item` summary once the movement is actually sent, and
+ * rolls every cache back if it is definitively rejected.
+ *
+ * `recordMovement` resolves with `{status: "queued"}` while offline --
+ * `onSuccess` below treats that as a no-op and keeps the optimistic state
+ * from `onMutate` untouched, exactly as if the request were still in
+ * flight. There is nothing to roll back in that case because nothing was
+ * rejected; `useOfflineSync`'s flush is what eventually reconciles it.
  */
 export function useRecordMovement() {
   const queryClient = useQueryClient();
+  const workshopId = useWorkshopId();
 
   return useMutation({
-    mutationFn: (input: RecordMovementInput) => recordMovement(input),
+    mutationFn: (input: RecordMovementInput) => {
+      if (!workshopId) {
+        // Every screen that calls this hook renders behind RequireSession,
+        // which only renders its children once a workshop session exists.
+        return Promise.reject(new ApiError(401, "not_authenticated"));
+      }
+      return recordMovement(input, { workshopId });
+    },
     onMutate: async (input): Promise<RecordMovementSnapshot> => {
       await queryClient.cancelQueries({ queryKey: itemQueryKey(input.itemId) });
       await queryClient.cancelQueries({ queryKey: ITEMS_QUERY_BASE });
@@ -123,8 +171,18 @@ export function useRecordMovement() {
       for (const [key, data] of onMutateResult.previousLists) {
         queryClient.setQueryData(key, data);
       }
+      // A rejection this mutation actually threw is definitive (recordMovement
+      // never throws for a network/offline failure, only for a 4xx the
+      // server will never reconsider). Refetch the authoritative state
+      // instead of trusting the rolled-back snapshot alone, in case another
+      // movement (a background flush, another device) has since changed it.
+      queryClient.invalidateQueries({ queryKey: itemQueryKey(input.itemId) });
+      queryClient.invalidateQueries({ queryKey: ITEMS_QUERY_BASE });
     },
     onSuccess: (result, input) => {
+      if (result.status === "queued") {
+        return;
+      }
       queryClient.setQueryData<ItemOut>(itemQueryKey(input.itemId), (current) =>
         current ? { ...current, ...result.item } : current,
       );
@@ -134,4 +192,99 @@ export function useRecordMovement() {
       queryClient.invalidateQueries({ queryKey: movementsQueryKey(input.itemId) });
     },
   });
+}
+
+const FLUSH_INTERVAL_MS = 30_000;
+
+export interface OfflineSyncStatus {
+  pendingCount: number;
+  syncing: boolean;
+  lastErrorMessage: string | undefined;
+}
+
+const INITIAL_SYNC_STATUS: OfflineSyncStatus = { pendingCount: 0, syncing: false, lastErrorMessage: undefined };
+
+function syncStatusQueryKey(workshopId: string) {
+  return ["inventory", "sync-status", workshopId] as const;
+}
+
+/**
+ * Drives the outbox flush for `workshopId`: once on mount (app start),
+ * whenever the browser's `online` event fires, every 30s while the tab is
+ * open, and whenever the outbox changes (so the pending count reacts to a
+ * `recordMovement` call immediately, not just on the next scheduled
+ * flush). Call once near the root of the authenticated area (see
+ * `RequireSession`); every screen just reads the banner it renders.
+ *
+ * `flushOutboxOnce` is called directly here (not through `useQuery`'s own
+ * fetch/refetch pipeline): TanStack Query dedupes concurrent fetches for
+ * the same query, which would merge an `online`-triggered flush into one
+ * already in flight instead of giving it its own fresh pass over the
+ * outbox -- exactly the out-of-order risk `flushOutboxOnce`'s own queueing
+ * (see `offlineSync.ts`) exists to prevent. The status this hook reports
+ * is still kept in the query cache via `setQueryData`, not a local
+ * `useState`, purely so a mount-time flush has somewhere sanctioned to
+ * publish its result from inside an effect (an external store, same as
+ * the cache every other screen already reads through `useQuery`) --
+ * `recordMovement` itself remains the one true transport.
+ */
+export function useOfflineSync(workshopId: string | undefined): OfflineSyncStatus {
+  const queryClient = useQueryClient();
+
+  const statusQuery = useQuery({
+    queryKey: workshopId !== undefined ? syncStatusQueryKey(workshopId) : ["inventory", "sync-status"],
+    queryFn: () => INITIAL_SYNC_STATUS,
+    enabled: false,
+    initialData: INITIAL_SYNC_STATUS,
+  });
+
+  useEffect(() => {
+    if (workshopId === undefined) {
+      // No session yet: nothing to flush or count. `OfflineStatusBanner`
+      // only mounts this hook once a session exists, so this is only a
+      // defensive guard, not a transition this effect needs to react to.
+      return;
+    }
+    const key = syncStatusQueryKey(workshopId);
+    const patch = (change: Partial<OfflineSyncStatus>) =>
+      queryClient.setQueryData<OfflineSyncStatus>(key, (current) => ({ ...(current ?? INITIAL_SYNC_STATUS), ...change }));
+
+    const refreshPendingCount = async () => {
+      const entries = await defaultOutbox.listForWorkshop(workshopId);
+      patch({ pendingCount: entries.length });
+    };
+
+    const runFlush = async () => {
+      patch({ syncing: true });
+      try {
+        const result = await flushOutboxOnce({ outbox: defaultOutbox, workshopId });
+        if (result.removedWithError.length > 0) {
+          const last = result.removedWithError[result.removedWithError.length - 1];
+          patch({ lastErrorMessage: last ? getInventoryErrorMessage(last.error.code) : undefined });
+        }
+        if (result.sent.length > 0 || result.removedWithError.length > 0) {
+          queryClient.invalidateQueries({ queryKey: INVENTORY_QUERY_BASE });
+        }
+      } finally {
+        patch({ syncing: false });
+        await refreshPendingCount();
+      }
+    };
+
+    void refreshPendingCount();
+    void runFlush();
+
+    const unsubscribe = subscribeOutboxChange(() => void refreshPendingCount());
+    const handleOnline = () => void runFlush();
+    window.addEventListener("online", handleOnline);
+    const interval = window.setInterval(() => void runFlush(), FLUSH_INTERVAL_MS);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("online", handleOnline);
+      window.clearInterval(interval);
+    };
+  }, [workshopId, queryClient]);
+
+  return statusQuery.data ?? INITIAL_SYNC_STATUS;
 }

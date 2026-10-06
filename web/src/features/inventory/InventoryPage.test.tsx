@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
 
 import { server } from "../../test/server";
@@ -133,7 +133,30 @@ describe("InventoryPage", () => {
   it("opens the detail screen when the row is tapped, not when a stepper button is tapped", async () => {
     mockSession();
     server.use(http.get("/api/inventory/items", () => HttpResponse.json([baseItem({})])));
-    server.use(http.put("/api/inventory/movements/:movementId", () => new Promise<Response>(() => {})));
+    // Resolves, but not instantly: the assertion right after the click
+    // still runs while the request (and the outbox flush behind it) is in
+    // flight, without leaving a PUT permanently unresolved -- a mock that
+    // never resolves would hold the outbox's single flush lock forever and
+    // deadlock every later test in this file.
+    server.use(
+      http.put("/api/inventory/movements/:movementId", async () => {
+        await delay(50);
+        return HttpResponse.json({
+          movement: {
+            id: "m1",
+            item_id: "item-1",
+            kind: "in",
+            quantity: 1,
+            delta: 1,
+            note: null,
+            occurred_at: "2026-01-02T00:00:00Z",
+            recorded_at: "2026-01-02T00:00:00Z",
+            created_by: "u1",
+          },
+          item: { id: "item-1", stock: 11, needs_review: false, is_low: false },
+        });
+      }),
+    );
     const user = userEvent.setup();
     renderInventoryPage();
 
@@ -236,5 +259,88 @@ describe("InventoryPage", () => {
 
     await waitFor(() => expect(capturedIds).toHaveLength(2));
     expect(capturedIds[0]).not.toBe(capturedIds[1]);
+  });
+
+  it("keeps showing the optimistic stock when the movement is queued (network down)", async () => {
+    // Defect this catches: treating a queued (offline) result the same as
+    // an error would roll the optimistic stock back to its pre-tap value
+    // even though nothing was actually rejected -- the movement is just
+    // waiting to be sent.
+    mockSession();
+    server.use(http.get("/api/inventory/items", () => HttpResponse.json([baseItem({ stock: 5 })])));
+    server.use(http.put("/api/inventory/movements/:movementId", () => HttpResponse.error()));
+    const user = userEvent.setup();
+    renderInventoryPage();
+
+    await screen.findByText("5");
+    await user.click(screen.getByRole("button", { name: "Agregar una unidad de Filtro de aceite" }));
+
+    expect(await screen.findByText("6")).toBeInTheDocument();
+    // Give the (failing) flush attempt a moment to actually run and settle
+    // as "queued" rather than an error, then confirm the stock is still 6,
+    // not rolled back to 5.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByText("6")).toBeInTheDocument();
+    expect(screen.queryByText("Ocurrió un error. Intente de nuevo.")).not.toBeInTheDocument();
+  });
+
+  it("ends with the correct final stock when two rapid taps' server responses would resolve in reverse order", async () => {
+    // Defect this catches (the out-of-order reconciliation bug found in
+    // the T5 review): if each tap sent its own independent, unsynchronized
+    // PUT, a slow first response arriving after a fast second response
+    // could overwrite the cache back to the first (now-stale) value. Since
+    // every send goes through the single FIFO outbox flush, the server
+    // never has two of this item's movement PUTs in flight at once, so the
+    // responses can never be reconciled out of order.
+    mockSession();
+    server.use(http.get("/api/inventory/items", () => HttpResponse.json([baseItem({ stock: 5 })])));
+
+    let requestNumber = 0;
+    let inFlight = 0;
+    let maxInFlight = 0;
+    server.use(
+      http.put("/api/inventory/movements/:movementId", async ({ params }) => {
+        requestNumber += 1;
+        const isFirstRequest = requestNumber === 1;
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        // The first request the server receives is deliberately the
+        // slower one to resolve; the old (buggy) direct-PUT design would
+        // let the second tap's fast response land first, then have the
+        // first tap's late response overwrite it afterwards.
+        await delay(isFirstRequest ? 40 : 5);
+        inFlight -= 1;
+        return HttpResponse.json({
+          movement: {
+            id: params.movementId,
+            item_id: "item-1",
+            kind: "in",
+            quantity: 1,
+            delta: 1,
+            note: null,
+            occurred_at: "2026-01-02T00:00:00Z",
+            recorded_at: "2026-01-02T00:00:00Z",
+            created_by: "u1",
+          },
+          item: { id: "item-1", stock: isFirstRequest ? 6 : 7, needs_review: false, is_low: false },
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderInventoryPage();
+
+    await screen.findByText("5");
+    const incrementButton = screen.getByRole("button", { name: "Agregar una unidad de Filtro de aceite" });
+    await user.click(incrementButton);
+    await user.click(incrementButton);
+
+    await waitFor(() => expect(requestNumber).toBe(2));
+    await waitFor(() => expect(screen.getByText("7")).toBeInTheDocument());
+    expect(maxInFlight).toBe(1);
+    // Give any trailing reconciliation one more tick, then confirm the
+    // second (later, authoritative) response's stock is still the one
+    // shown -- the defect this regression test targets would show "6" here.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.getByText("7")).toBeInTheDocument();
   });
 });

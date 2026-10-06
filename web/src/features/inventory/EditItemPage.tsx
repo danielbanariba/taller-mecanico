@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { ApiError } from "../../shared/api/http";
+import { useOnlineStatus } from "../../shared/offline/useOnlineStatus";
 import { Alert } from "../../shared/ui/Alert";
 import { Spinner } from "../../shared/ui/Spinner";
 import { getInventoryErrorMessage, inventoryCopy } from "./copy";
@@ -44,6 +45,7 @@ export function EditItemPage() {
   const { id } = useParams<{ id: string }>();
   const itemId = id ?? "";
   const navigate = useNavigate();
+  const isOffline = useOnlineStatus();
 
   const item = useItem(itemId);
   const existingItems = useItems();
@@ -106,6 +108,7 @@ export function EditItemPage() {
         errorMessage={errorMessage}
         submitLabel={inventoryCopy.edit.submit}
         submitPendingLabel={inventoryCopy.edit.submitPending}
+        offline={isOffline}
       />
     </main>
   );

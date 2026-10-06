@@ -36,6 +36,8 @@ export interface ItemFormProps {
   errorMessage?: string;
   submitLabel: string;
   submitPendingLabel: string;
+  /** Disables submission with an explanation: creating/editing items needs a connection in this MVP (see T6 decisions). */
+  offline?: boolean;
 }
 
 /**
@@ -55,6 +57,7 @@ export function ItemForm({
   errorMessage,
   submitLabel,
   submitPendingLabel,
+  offline = false,
 }: ItemFormProps) {
   const unitListId = useId();
   const categoryListId = useId();
@@ -81,6 +84,9 @@ export function ItemForm({
     if (nameMissing || priceInvalid) {
       return;
     }
+    if (offline) {
+      return;
+    }
     onSubmit({
       name: name.trim(),
       category: category.trim(),
@@ -95,6 +101,11 @@ export function ItemForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
       {errorMessage ? <Alert variant="error">{errorMessage}</Alert> : null}
+      {offline ? (
+        <Alert variant="info">
+          {mode === "create" ? inventoryCopy.offline.createDisabled : inventoryCopy.offline.editDisabled}
+        </Alert>
+      ) : null}
       <TextField
         label={inventoryCopy.create.nameLabel}
         name="name"
@@ -177,7 +188,7 @@ export function ItemForm({
         value={notes}
         onChange={(event) => setNotes(event.target.value)}
       />
-      <Button type="submit" loading={pending} disabled={pending}>
+      <Button type="submit" loading={pending} disabled={pending || offline}>
         {pending ? submitPendingLabel : submitLabel}
       </Button>
     </form>

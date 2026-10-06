@@ -30,6 +30,10 @@ export const authCopy = {
   logout: {
     submit: "Cerrar sesión",
   },
+  offline: {
+    title: "Sin conexión",
+    body: "No se pudo verificar su sesión porque no hay conexión a internet. Conéctese e intente de nuevo.",
+  },
 } as const;
 
 /**

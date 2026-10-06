@@ -1,5 +1,18 @@
 import { useState, type ReactNode } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+
+import { idbPersister } from "../shared/offline/idbPersister";
+
+/**
+ * How long a persisted (or in-memory) cache entry is kept. Generous on
+ * purpose: a shop may go a week between opening the app, and the point of
+ * T6 is that inventory stays readable through that gap. `gcTime` (the
+ * in-memory garbage-collection window) is set to at least `maxAge` (the
+ * persisted-cache expiry below) -- otherwise a query could be garbage
+ * collected from memory before it is ever persisted.
+ */
+export const PERSISTED_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
 
 export function AppProviders({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -8,13 +21,28 @@ export function AppProviders({ children }: { children: ReactNode }) {
         defaultOptions: {
           queries: {
             // A 401 from /api/auth/me means "not logged in", not a
-            // transient failure, so it must not retry. Offline-aware retry
-            // for data queries is T6's job.
+            // transient failure, so it must not retry. A network_error
+            // (offline) also should not retry: RequireSession reads the
+            // cached data straight away instead of waiting out retries.
             retry: false,
+            gcTime: PERSISTED_CACHE_MAX_AGE_MS,
           },
         },
       }),
   );
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister: idbPersister,
+        maxAge: PERSISTED_CACHE_MAX_AGE_MS,
+        // Busts any cache left over from a previous deployed version whose
+        // dehydrated shape may not match this build's query keys/shapes.
+        buster: __APP_VERSION__,
+      }}
+    >
+      {children}
+    </PersistQueryClientProvider>
+  );
 }
