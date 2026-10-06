@@ -37,7 +37,8 @@ class RegisterRequest(BaseModel):
 
 class LoginRequest(BaseModel):
     phone: str
-    password: str
+    # Bounded like registration so oversized input never reaches Argon2.
+    password: str = Field(max_length=128)
 
     @field_validator("phone")
     @classmethod

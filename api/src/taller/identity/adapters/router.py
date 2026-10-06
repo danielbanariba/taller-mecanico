@@ -26,6 +26,13 @@ from taller.shared.db import get_db
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+PHONE_UNIQUE_INDEX = "ix_users_phone"
+
+
+def _violated_constraint(exc: IntegrityError) -> str | None:
+    diag = getattr(exc.orig, "diag", None)
+    return getattr(diag, "constraint_name", None)
+
 
 def _set_session_cookie(response: Response, token: str, settings: Settings) -> None:
     response.set_cookie(
@@ -67,8 +74,11 @@ def register(
     except IntegrityError as exc:
         # Defends against the race between the pre-check above and the
         # insert (two concurrent registrations for the same phone); the
-        # unique constraint on users.phone is the real guarantee.
+        # unique index on users.phone is the real guarantee. Any other
+        # integrity error is a bug and must not be reported as a duplicate.
         db.rollback()
+        if _violated_constraint(exc) != PHONE_UNIQUE_INDEX:
+            raise
         raise HTTPException(status.HTTP_409_CONFLICT, detail="phone_already_registered") from exc
 
     token = token_service.issue(user_id=user.id, workshop_id=workshop.id)
@@ -109,8 +119,14 @@ def login(
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(response: Response) -> None:
-    response.delete_cookie(key=SESSION_COOKIE_NAME, path=SESSION_COOKIE_PATH)
+def logout(response: Response, settings: Settings = Depends(get_settings)) -> None:
+    response.delete_cookie(
+        key=SESSION_COOKIE_NAME,
+        path=SESSION_COOKIE_PATH,
+        httponly=True,
+        samesite="lax",
+        secure=settings.cookie_secure,
+    )
 
 
 @router.get("/me", response_model=MeResponse)

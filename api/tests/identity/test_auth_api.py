@@ -111,7 +111,11 @@ def test_me_with_a_tampered_cookie_is_not_authenticated(
     client.post("/api/auth/register", json=register_payload)
     token = client.cookies.get(SESSION_COOKIE_NAME)
     assert token is not None
-    tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
+    header, claims, signature = token.split(".")
+    # Change the first signature character: unlike the last one, all six of
+    # its bits are significant, so the decoded signature always differs.
+    flipped = ("A" if signature[0] != "A" else "B") + signature[1:]
+    tampered = f"{header}.{claims}.{flipped}"
     client.cookies.set(SESSION_COOKIE_NAME, tampered)
 
     response = client.get("/api/auth/me")
@@ -167,3 +171,18 @@ def test_password_is_never_stored_in_plain_text(
 
     assert stored_hash != register_payload["password"]
     assert PwdlibPasswordHasher().verify(register_payload["password"], stored_hash)
+
+
+def test_login_rejects_an_oversized_password_before_hashing(
+    client: TestClient, register_payload: dict
+) -> None:
+    # Defect caught: an unbounded login password reaches Argon2, so huge
+    # payloads become a cheap CPU/memory amplifier against the server.
+    client.post("/api/auth/register", json=register_payload)
+
+    response = client.post(
+        "/api/auth/login",
+        json={"phone": register_payload["phone"], "password": "x" * 129},
+    )
+
+    assert response.status_code == 422
