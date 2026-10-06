@@ -43,7 +43,7 @@ Replace the university project (Reflex 0.4.8 frontend talking directly to Oracle
 Route per task: delegated direct (one bounded writer) unless stated. Trigger evidence: each task touches 2+ non-trivial files.
 
 - [x] **T0** Repo hygiene: ignore local tooling dirs, commit research docs, this plan and the legacy CLAUDE.md. Route: inline (mechanical).
-- [ ] **T1** API scaffold: uv project, app factory, settings, DB session, Alembic, `/api/health` with DB check, docker-compose Postgres, ruff + pytest setup.
+- [x] **T1** API scaffold: uv project, app factory, settings, DB session, Alembic, `/api/health` with DB check, docker-compose Postgres, ruff + pytest setup.
 - [ ] **T2** Identity + workshops: register workshop with owner, login/logout via cookie, `me`, password hashing, authenticated workshop dependency.
 - [ ] **T3** Inventory API: items (create, update, archive, list with stock + search + low-stock filter), idempotent movements (in/out/adjust), item history, tenant isolation.
 - [ ] **T4** Web scaffold + auth: Vite React TS, Tailwind, router, query client, API client, PWA manifest, Vitest, login/register screens, protected routes.
@@ -70,8 +70,8 @@ Route per task: delegated direct (one bounded writer) unless stated. Trigger evi
 
 | Task | Route | Commit | Checks | Review tier |
 | --- | --- | --- | --- | --- |
-| T0 | inline (mechanical) | ba7d7b7 | structural readback | medium (CLAUDE.md + .gitignore), consent pending |
+| T0 | inline (mechanical) | b3c8fee (research), b50514b (CLAUDE.md, plan, .gitignore) | structural readback | b3c8fee passive (boundary advanced); b50514b medium, under budget (pending in slice). First attempt as one commit: consent granted, review stopped with lens_context_budget_exceeded, so it was split. |
 
 ## Next step
 
-T0 review consent, then T1 (API scaffold).
+T1 (API scaffold). Last reviewed boundary: b3c8fee.
