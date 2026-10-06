@@ -7,6 +7,23 @@ import { TextField } from "../../shared/ui/TextField";
 import { inventoryCopy } from "./copy";
 import { parseLempirasToCents } from "./format";
 
+/** Upper bound for `initial_stock`/`min_stock`, matching the API's own bound. */
+const MAX_STOCK = 1_000_000;
+
+/** Upper bound for a sale price in cents (L 10,000,000.00), matching the API's own bound. */
+const MAX_PRICE_CENTS = 1_000_000_000;
+
+const MAX_NAME_LENGTH = 120;
+
+/** Parses a non-negative integer typed as a stock quantity; `undefined` for anything else (letters, a sign, a decimal point, or empty). */
+function parseStockQuantity(text: string): number | undefined {
+  const trimmed = text.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    return undefined;
+  }
+  return Number(trimmed);
+}
+
 export interface ItemFormInitialValues {
   name: string;
   category: string;
@@ -72,29 +89,47 @@ export function ItemForm({
 
   const [nameTouched, setNameTouched] = useState(false);
   const [priceTouched, setPriceTouched] = useState(false);
+  const [initialStockTouched, setInitialStockTouched] = useState(false);
+  const [minStockTouched, setMinStockTouched] = useState(false);
 
-  const nameMissing = name.trim().length === 0;
+  const trimmedName = name.trim();
+  const nameMissing = trimmedName.length === 0;
+  const nameTooLong = trimmedName.length > MAX_NAME_LENGTH;
+  const nameInvalid = nameMissing || nameTooLong;
+
   const parsedPrice = parseLempirasToCents(priceText);
-  const priceInvalid = parsedPrice === undefined;
+  const priceMalformed = parsedPrice === undefined;
+  const priceTooHigh = typeof parsedPrice === "number" && parsedPrice > MAX_PRICE_CENTS;
+  const priceInvalid = priceMalformed || priceTooHigh;
+
+  const parsedInitialStock = parseStockQuantity(initialStockText);
+  const initialStockInvalid = parsedInitialStock === undefined || parsedInitialStock > MAX_STOCK;
+
+  const parsedMinStock = parseStockQuantity(minStockText);
+  const minStockInvalid = parsedMinStock === undefined || parsedMinStock > MAX_STOCK;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setNameTouched(true);
     setPriceTouched(true);
-    if (nameMissing || priceInvalid) {
+    setInitialStockTouched(true);
+    setMinStockTouched(true);
+    if (nameInvalid || priceInvalid || initialStockInvalid || minStockInvalid) {
       return;
     }
     if (offline) {
       return;
     }
     onSubmit({
-      name: name.trim(),
+      name: trimmedName,
       category: category.trim(),
       unit: unit.trim() || inventoryCopy.units[0],
-      minStock: Math.max(0, Math.trunc(Number(minStockText) || 0)),
+      // `?? 0` is unreachable here (we already returned above when
+      // either parse failed), it only satisfies the non-optional type.
+      minStock: parsedMinStock ?? 0,
       priceCents: parsedPrice ?? null,
       notes: notes.trim(),
-      initialStock: Math.max(0, Math.trunc(Number(initialStockText) || 0)),
+      initialStock: parsedInitialStock ?? 0,
     });
   }
 
@@ -112,7 +147,14 @@ export function ItemForm({
         value={name}
         onChange={(event) => setName(event.target.value)}
         onBlur={() => setNameTouched(true)}
-        error={nameTouched && nameMissing ? inventoryCopy.create.nameRequired : undefined}
+        error={
+          nameTouched && nameMissing
+            ? inventoryCopy.create.nameRequired
+            : nameTouched && nameTooLong
+              ? inventoryCopy.create.nameTooLong
+              : undefined
+        }
+        maxLength={MAX_NAME_LENGTH + 1}
         required
       />
       {mode === "create" ? (
@@ -122,8 +164,11 @@ export function ItemForm({
           type="number"
           inputMode="numeric"
           min={0}
+          max={MAX_STOCK}
           value={initialStockText}
           onChange={(event) => setInitialStockText(event.target.value)}
+          onBlur={() => setInitialStockTouched(true)}
+          error={initialStockTouched && initialStockInvalid ? inventoryCopy.create.stockRangeInvalid : undefined}
         />
       ) : null}
       <div className="flex flex-col gap-1.5">
@@ -168,9 +213,12 @@ export function ItemForm({
         type="number"
         inputMode="numeric"
         min={0}
+        max={MAX_STOCK}
         helperText={inventoryCopy.create.minStockHelper}
         value={minStockText}
         onChange={(event) => setMinStockText(event.target.value)}
+        onBlur={() => setMinStockTouched(true)}
+        error={minStockTouched && minStockInvalid ? inventoryCopy.create.stockRangeInvalid : undefined}
       />
       <TextField
         label={inventoryCopy.create.priceLabel}
@@ -180,7 +228,13 @@ export function ItemForm({
         value={priceText}
         onChange={(event) => setPriceText(event.target.value)}
         onBlur={() => setPriceTouched(true)}
-        error={priceTouched && priceInvalid ? inventoryCopy.create.priceInvalid : undefined}
+        error={
+          priceTouched && priceTooHigh
+            ? inventoryCopy.create.priceTooHigh
+            : priceTouched && priceMalformed
+              ? inventoryCopy.create.priceInvalid
+              : undefined
+        }
       />
       <TextArea
         label={inventoryCopy.create.notesLabel}

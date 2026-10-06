@@ -1,8 +1,9 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 import { Spinner } from "./Spinner";
+import { BUTTON_VARIANT_CLASSES, type ButtonVariant } from "./buttonVariants";
 
-export type ButtonVariant = "primary" | "secondary" | "destructive";
+export type { ButtonVariant };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -10,13 +11,6 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
   children: ReactNode;
 }
-
-const VARIANT_CLASSES: Record<ButtonVariant, string> = {
-  primary: "bg-brand-primary text-brand-on-primary active:bg-brand-secondary",
-  secondary:
-    "bg-brand-card text-brand-primary border border-brand-border active:bg-brand-muted",
-  destructive: "bg-brand-destructive text-brand-on-destructive active:bg-red-700",
-};
 
 /**
  * Atomic, presentational button sized for a greasy-handed tap on a cheap
@@ -38,7 +32,7 @@ export function Button({
       {...rest}
       disabled={isDisabled}
       aria-busy={loading}
-      className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-lg font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${VARIANT_CLASSES[variant]} ${className}`}
+      className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-lg font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${BUTTON_VARIANT_CLASSES[variant]} ${className}`}
     >
       {loading ? <Spinner /> : null}
       {children}

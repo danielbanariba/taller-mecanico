@@ -134,4 +134,44 @@ describe("ItemDetailPage", () => {
     expect(await screen.findByText("Pantalla de inventario")).toBeInTheDocument();
     expect(archiveWasCalled).toBe(true);
   });
+
+  it("renders the edit action as a single link, not a button nested inside one", async () => {
+    // Defect this catches: a <button> rendered inside an <a> is invalid
+    // HTML and gives assistive tech and keyboard users two overlapping
+    // interactive elements with the same accessible name instead of one.
+    mockItemAndMovements();
+    renderDetailPage();
+
+    await screen.findByText("10");
+
+    expect(screen.getByRole("link", { name: "Editar" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
+  });
+
+  it("shows the Spanish not-found message with a way back to the list for a 404", async () => {
+    // Defect this catches: the not-found state had no way back to the
+    // list, leaving the mechanic stuck on a dead-end screen.
+    server.use(
+      http.get("/api/auth/me", () =>
+        HttpResponse.json({
+          user: { id: "u1", full_name: "Ana Pérez", phone: "99998888", role: "owner" },
+          workshop: { id: "w1", name: "Taller Ana" },
+        }),
+      ),
+    );
+    server.use(
+      http.get("/api/inventory/items/item-1", () =>
+        HttpResponse.json({ detail: "item_not_found" }, { status: 404 }),
+      ),
+    );
+    renderDetailPage();
+
+    expect(await screen.findByText("No se encontró el repuesto.")).toBeInTheDocument();
+    const backLink = screen.getByRole("link", { name: /volver al inventario/i });
+    expect(backLink).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(backLink);
+    expect(await screen.findByText("Pantalla de inventario")).toBeInTheDocument();
+  });
 });

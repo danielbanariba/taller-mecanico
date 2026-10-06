@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { useNavigate, useParams, Link } from "react-router";
+import { useNavigate, useParams } from "react-router";
 
 import { ApiError } from "../../shared/api/http";
 import { Alert } from "../../shared/ui/Alert";
 import { Button } from "../../shared/ui/Button";
 import { Dialog } from "../../shared/ui/Dialog";
+import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
 import { TextField } from "../../shared/ui/TextField";
 import { getInventoryErrorMessage, inventoryCopy } from "./copy";
@@ -38,6 +39,9 @@ export function ItemDetailPage() {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 py-8">
         <Alert variant="error">{getInventoryErrorMessage("item_not_found")}</Alert>
+        <LinkButton to="/inventario" variant="secondary">
+          {inventoryCopy.detail.backToList}
+        </LinkButton>
       </main>
     );
   }
@@ -106,9 +110,9 @@ export function ItemDetailPage() {
       </section>
 
       <div className="flex gap-3">
-        <Link to={`/inventario/${itemId}/editar`} className="flex-1">
-          <Button variant="secondary">{inventoryCopy.detail.editAction}</Button>
-        </Link>
+        <LinkButton to={`/inventario/${itemId}/editar`} variant="secondary" className="flex-1">
+          {inventoryCopy.detail.editAction}
+        </LinkButton>
         <Button variant="destructive" onClick={() => setArchiveOpen(true)}>
           {inventoryCopy.detail.archiveAction}
         </Button>
