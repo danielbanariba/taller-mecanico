@@ -10,12 +10,51 @@ from taller.inventory.domain.errors import (
     ItemNameTaken,
     ItemNotFound,
     MovementIdConflict,
+    StockOutOfRange,
 )
 from taller.inventory.domain.item_name import normalize_item_name
-from taller.inventory.domain.stock import compute_delta
+from taller.inventory.domain.stock import compute_delta, is_stock_in_range
 
 #: Note recorded on the implicit adjustment created by `initial_stock`.
 INITIAL_STOCK_NOTE = "Inventario inicial"
+
+#: Fixed namespace for deriving a deterministic initial-stock movement id
+#: from an item id (see `_initial_movement_id`). `uuid5` is a pure function
+#: of its inputs, so this is identical across every process and run.
+_INITIAL_STOCK_NAMESPACE = uuid.uuid5(
+    uuid.NAMESPACE_URL, "https://taller-mecanico.invalid/inventory/initial-stock"
+)
+
+
+def _initial_movement_id(item_id: uuid.UUID) -> uuid.UUID:
+    """Deterministic id for an item's implicit initial-stock movement.
+
+    Lets a replayed ``POST /items`` load the movement it created the first
+    time (see `_initial_stock_matches`) instead of being unable to see it,
+    the way a random id would.
+    """
+    return uuid.uuid5(_INITIAL_STOCK_NAMESPACE, str(item_id))
+
+
+def _initial_stock_matches(
+    *,
+    workshop_id: uuid.UUID,
+    item_id: uuid.UUID,
+    initial_stock: int | None,
+    movement_repo: MovementRepository,
+) -> bool:
+    """Whether a replayed create's `initial_stock` matches what was recorded.
+
+    Compares both presence (was an initial movement recorded at all) and
+    quantity, since `initial_stock=None` (no movement) and `initial_stock=0`
+    (a recorded zero-quantity adjustment) are different, observable states.
+    """
+    existing_movement = movement_repo.get_by_id(
+        workshop_id=workshop_id, movement_id=_initial_movement_id(item_id)
+    )
+    if initial_stock is None:
+        return existing_movement is None
+    return existing_movement is not None and existing_movement.quantity == initial_stock
 
 
 def _normalize_unit(raw: str | None) -> str:
@@ -68,10 +107,13 @@ def create_item(
     """Create an item, or replay an idempotent create.
 
     Returns ``(item, is_new)``: ``is_new`` is False when ``item_id`` already
-    existed with identical fields (the caller should respond 200, not 201).
+    existed with identical fields *and* the same ``initial_stock`` (the
+    caller should respond 200, not 201).
 
     Raises:
-        ItemIdConflict: ``item_id`` already exists with different fields.
+        ItemIdConflict: ``item_id`` already exists with different fields,
+            or with the same fields but a different ``initial_stock`` than
+            what was originally recorded.
         ItemNameTaken: another active item already has this name.
     """
     normalized_name = normalize_item_name(name)
@@ -82,7 +124,7 @@ def create_item(
     if item_id is not None:
         existing = item_repo.get_by_id(workshop_id=workshop_id, item_id=item_id)
         if existing is not None:
-            if _item_fields_match(
+            if not _item_fields_match(
                 existing,
                 name=normalized_name,
                 category=normalized_category,
@@ -91,8 +133,15 @@ def create_item(
                 sale_price_cents=sale_price_cents,
                 notes=normalized_notes,
             ):
-                return existing, False
-            raise ItemIdConflict(item_id)
+                raise ItemIdConflict(item_id)
+            if not _initial_stock_matches(
+                workshop_id=workshop_id,
+                item_id=item_id,
+                initial_stock=initial_stock,
+                movement_repo=movement_repo,
+            ):
+                raise ItemIdConflict(item_id)
+            return existing, False
 
     if item_repo.get_active_by_name(workshop_id=workshop_id, name=normalized_name) is not None:
         raise ItemNameTaken(normalized_name)
@@ -117,7 +166,7 @@ def create_item(
     if initial_stock is not None:
         delta = compute_delta(kind="adjust", quantity=initial_stock, current_stock=0)
         movement = StockMovement(
-            id=uuid.uuid4(),
+            id=_initial_movement_id(item.id),
             workshop_id=workshop_id,
             item_id=item.id,
             kind="adjust",
@@ -270,6 +319,8 @@ def record_movement(
             accept movements, so an offline replay always applies).
         MovementIdConflict: ``movement_id`` already exists with a different
             payload.
+        StockOutOfRange: applying this movement would push the item's
+            cached stock outside PostgreSQL's `integer` column range.
     """
     existing = movement_repo.get_by_id(workshop_id=workshop_id, movement_id=movement_id)
     if existing is not None:
@@ -285,6 +336,10 @@ def record_movement(
         raise ItemNotFound(item_id)
 
     delta = compute_delta(kind=kind, quantity=quantity, current_stock=item.stock)
+    new_stock = item.stock + delta
+    if not is_stock_in_range(new_stock):
+        raise StockOutOfRange(item_id=item_id, resulting_stock=new_stock)
+
     now = datetime.now(UTC)
     movement = StockMovement(
         id=movement_id,
@@ -300,7 +355,7 @@ def record_movement(
     )
     movement_repo.add(movement)
 
-    item.stock += delta
+    item.stock = new_stock
     item.updated_at = now
     item_repo.save(item)
 

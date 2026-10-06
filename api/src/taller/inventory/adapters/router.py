@@ -36,10 +36,26 @@ from taller.inventory.domain.errors import (
     ItemNameTaken,
     ItemNotFound,
     MovementIdConflict,
+    StockOutOfRange,
 )
 from taller.shared.db import get_db
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
+
+#: Default PostgreSQL primary key constraint names (no explicit name was
+#: given in the migration, so these are the `<table>_pkey` defaults). Item
+#: and movement ids are global primary keys, not scoped to a workshop, so a
+#: client-supplied id colliding with another workshop's row surfaces here
+#: as a violation of one of these constraints, never as the workshop-scoped
+#: pre-check (which cannot see the other workshop's row at all).
+_ITEM_PK_CONSTRAINT = "inventory_items_pkey"
+_MOVEMENT_PK_CONSTRAINT = "inventory_movements_pkey"
+
+
+def _violated_constraint(exc: IntegrityError) -> str | None:
+    """Mirrors `taller.identity.adapters.router._violated_constraint`."""
+    diag = getattr(exc.orig, "diag", None)
+    return getattr(diag, "constraint_name", None)
 
 
 def _item_conflict(exc: Exception) -> HTTPException:
@@ -114,6 +130,14 @@ def create_item_route(
             raise _item_conflict(exc) from exc
         except IntegrityError as exc:
             db.rollback()
+            # A client-supplied id already used by another workshop: our
+            # tenant-scoped pre-check cannot see that row even on retry, so
+            # it never resolves into ItemIdConflict above. Report the same
+            # 409 a same-workshop id conflict gets, and nothing else about
+            # the other workshop's row. Any other integrity error here is a
+            # genuine bug and must not be reported as a conflict.
+            if _violated_constraint(exc) == _ITEM_PK_CONSTRAINT:
+                raise HTTPException(status.HTTP_409_CONFLICT, detail="item_id_conflict") from exc
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail="item_create_failed"
             ) from (exc or first_exc)
@@ -236,6 +260,11 @@ def record_movement_route(
     except MovementIdConflict as exc:
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, detail="movement_id_conflict") from exc
+    except StockOutOfRange as exc:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="stock_out_of_range"
+        ) from exc
     except IntegrityError as first_exc:
         db.rollback()
         # Another request committed the same movement id between our
@@ -246,8 +275,22 @@ def record_movement_route(
         except MovementIdConflict as exc:
             db.rollback()
             raise HTTPException(status.HTTP_409_CONFLICT, detail="movement_id_conflict") from exc
+        except StockOutOfRange as exc:
+            db.rollback()
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, detail="stock_out_of_range"
+            ) from exc
         except IntegrityError as exc:
             db.rollback()
+            # A client-supplied movement id already used by another
+            # workshop: our tenant-scoped pre-check cannot see that row
+            # even on retry. Report the same 409 a same-workshop id
+            # conflict gets. Any other integrity error here is a genuine
+            # bug and must not be reported as a conflict.
+            if _violated_constraint(exc) == _MOVEMENT_PK_CONSTRAINT:
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT, detail="movement_id_conflict"
+                ) from exc
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR, detail="movement_record_failed"
             ) from (exc or first_exc)

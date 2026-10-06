@@ -26,6 +26,26 @@ def _item_from_model(model: ItemModel) -> Item:
     )
 
 
+#: Character used to escape `%`/`_` when building a `LIKE` pattern from a
+#: user-supplied search term, passed explicitly via `.like(..., escape=...)`
+#: rather than relying on any database's default.
+_LIKE_ESCAPE_CHAR = "\\"
+
+
+def _escape_like(raw: str) -> str:
+    """Escape `LIKE` metacharacters so `raw` matches only literally.
+
+    Without this, a search term containing `%` or `_` (e.g. a part number
+    like "M8_10", or "50% descuento") would trigger unintended SQL wildcard
+    matching instead of a literal substring search. The escape character
+    itself must be escaped first, so a literal backslash in the term is
+    never mistaken for the start of an escape sequence.
+    """
+    escaped = raw.replace(_LIKE_ESCAPE_CHAR, _LIKE_ESCAPE_CHAR * 2)
+    escaped = escaped.replace("%", f"{_LIKE_ESCAPE_CHAR}%")
+    return escaped.replace("_", f"{_LIKE_ESCAPE_CHAR}_")
+
+
 def _movement_from_model(model: StockMovementModel) -> StockMovement:
     return StockMovement(
         id=model.id,
@@ -128,13 +148,17 @@ class SqlAlchemyItemRepository:
         if not include_archived:
             q = q.filter(ItemModel.archived_at.is_(None))
         if query:
-            pattern = func.taller_unaccent_lower(f"%{query}%")
+            pattern = func.taller_unaccent_lower(f"%{_escape_like(query)}%")
             q = q.filter(
                 or_(
-                    func.taller_unaccent_lower(ItemModel.name).like(pattern),
+                    func.taller_unaccent_lower(ItemModel.name).like(
+                        pattern, escape=_LIKE_ESCAPE_CHAR
+                    ),
                     and_(
                         ItemModel.category.is_not(None),
-                        func.taller_unaccent_lower(ItemModel.category).like(pattern),
+                        func.taller_unaccent_lower(ItemModel.category).like(
+                            pattern, escape=_LIKE_ESCAPE_CHAR
+                        ),
                     ),
                 )
             )

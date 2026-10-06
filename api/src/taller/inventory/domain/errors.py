@@ -66,3 +66,17 @@ class MovementIdConflict(Exception):
     def __init__(self, movement_id: uuid.UUID) -> None:
         super().__init__(f"Movement id already exists with a different payload: {movement_id}")
         self.movement_id = movement_id
+
+
+class StockOutOfRange(Exception):
+    """Raised when a movement's resulting stock would not fit PostgreSQL's
+    `integer` column type (`inventory_items.stock`).
+
+    Caught at the HTTP layer and reported as a 422, instead of letting the
+    database raise a numeric overflow error.
+    """
+
+    def __init__(self, *, item_id: uuid.UUID, resulting_stock: int) -> None:
+        super().__init__(f"Resulting stock {resulting_stock} for item {item_id} is out of range")
+        self.item_id = item_id
+        self.resulting_stock = resulting_stock

@@ -11,12 +11,20 @@ Defects these catch:
   mechanic mid-job) instead of recording negative stock flagged for
   review;
 - an item's movement history coming back in the wrong order or ignoring
-  the requested limit.
+  the requested limit;
+- a movement quantity with no upper bound, letting a client push a value
+  large enough to misbehave instead of a clean 422;
+- a movement whose resulting stock would overflow the database's
+  `integer` column reaching the database instead of being rejected first.
 """
 
 import uuid
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from taller.inventory.domain.stock import INT32_MAX
 
 
 def _create_item(client: TestClient, **overrides: object) -> dict:
@@ -107,6 +115,39 @@ def test_an_out_larger_than_stock_allows_negative_stock_and_flags_it(
 
     fetched = authenticated_client.get(f"/api/inventory/items/{item['id']}")
     assert fetched.json()["needs_review"] is True
+
+
+def test_quantity_over_the_maximum_is_rejected_with_422(authenticated_client: TestClient) -> None:
+    item = _create_item(authenticated_client)
+
+    response = _record(
+        authenticated_client, str(uuid.uuid4()), item_id=item["id"], kind="in", quantity=1_000_001
+    )
+
+    assert response.status_code == 422
+
+
+def test_a_movement_that_would_overflow_the_stock_column_is_rejected(
+    authenticated_client: TestClient, db_session: Session
+) -> None:
+    item = _create_item(authenticated_client)
+    near_max = INT32_MAX - 10
+
+    db_session.execute(
+        text("UPDATE inventory_items SET stock = :stock WHERE id = CAST(:item_id AS uuid)"),
+        {"stock": near_max, "item_id": item["id"]},
+    )
+    db_session.commit()
+
+    response = _record(
+        authenticated_client, str(uuid.uuid4()), item_id=item["id"], kind="in", quantity=20
+    )
+
+    assert response.status_code == 422, response.text
+    assert response.json()["detail"] == "stock_out_of_range"
+
+    fetched = authenticated_client.get(f"/api/inventory/items/{item['id']}")
+    assert fetched.json()["stock"] == near_max
 
 
 def test_item_history_is_newest_first_and_respects_the_limit(

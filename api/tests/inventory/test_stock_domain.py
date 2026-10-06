@@ -12,13 +12,15 @@ Defects these catch:
   `in`/`out`, which would silently record a movement that changes nothing
   or corrupts the ledger;
 - missing validation that lets a negative counted quantity through for
-  `adjust`, which cannot represent a real physical count.
+  `adjust`, which cannot represent a real physical count;
+- missing validation that lets a quantity large enough to risk an integer
+  overflow through for any movement kind.
 """
 
 import pytest
 
 from taller.inventory.domain.errors import InvalidMovementKind, InvalidMovementQuantity
-from taller.inventory.domain.stock import compute_delta
+from taller.inventory.domain.stock import MAX_QUANTITY, compute_delta
 
 
 def test_in_adds_the_quantity() -> None:
@@ -58,3 +60,18 @@ def test_adjust_rejects_a_negative_counted_quantity() -> None:
 def test_unknown_kind_is_rejected() -> None:
     with pytest.raises(InvalidMovementKind):
         compute_delta(kind="transfer", quantity=5, current_stock=10)
+
+
+@pytest.mark.parametrize("kind", ["in", "out"])
+def test_in_and_out_reject_a_quantity_over_the_maximum(kind: str) -> None:
+    with pytest.raises(InvalidMovementQuantity):
+        compute_delta(kind=kind, quantity=MAX_QUANTITY + 1, current_stock=10)
+
+
+def test_adjust_rejects_a_quantity_over_the_maximum() -> None:
+    with pytest.raises(InvalidMovementQuantity):
+        compute_delta(kind="adjust", quantity=MAX_QUANTITY + 1, current_stock=10)
+
+
+def test_in_accepts_a_quantity_at_the_maximum() -> None:
+    assert compute_delta(kind="in", quantity=MAX_QUANTITY, current_stock=0) == MAX_QUANTITY

@@ -6,7 +6,11 @@ Defects these catch:
   workshop's items or movements by guessing/observing a UUID;
 - an endpoint that returns a different status (e.g. 403 or an empty body
   with 200) for another workshop's item instead of a plain 404, which
-  would itself leak that the id exists.
+  would itself leak that the id exists;
+- a client-supplied item/movement id colliding with another workshop's row
+  (ids are global primary keys, invisible to the tenant-scoped pre-check)
+  surfacing as an unhandled 500 instead of the same 409 a same-workshop id
+  conflict gets.
 """
 
 import uuid
@@ -99,4 +103,51 @@ def test_second_workshop_cannot_record_a_movement_on_first_workshops_item(
     assert response.json()["detail"] == "item_not_found"
 
     unaffected = authenticated_client.get(f"/api/inventory/items/{item['id']}")
+    assert unaffected.json()["stock"] == 0
+
+
+def test_item_id_already_used_by_another_workshop_is_a_409_not_a_500(
+    authenticated_client: TestClient, second_authenticated_client: TestClient
+) -> None:
+    shared_id = str(uuid.uuid4())
+    first = authenticated_client.post(
+        "/api/inventory/items", json={"id": shared_id, "name": "Disco de freno"}
+    )
+    assert first.status_code == 201, first.text
+
+    second = second_authenticated_client.post(
+        "/api/inventory/items", json={"id": shared_id, "name": "Pastillas de freno"}
+    )
+
+    assert second.status_code == 409, second.text
+    assert second.json()["detail"] == "item_id_conflict"
+
+    # The response must not leak that the id belongs to another workshop's
+    # item: the second workshop still cannot read it.
+    unaffected = second_authenticated_client.get(f"/api/inventory/items/{shared_id}")
+    assert unaffected.status_code == 404
+
+
+def test_movement_id_already_used_by_another_workshop_is_a_409_not_a_500(
+    authenticated_client: TestClient, second_authenticated_client: TestClient
+) -> None:
+    first_item = _create_item(authenticated_client)
+    second_item = _create_item(second_authenticated_client)
+    shared_movement_id = str(uuid.uuid4())
+
+    first = authenticated_client.put(
+        f"/api/inventory/movements/{shared_movement_id}",
+        json={"item_id": first_item["id"], "kind": "in", "quantity": 5},
+    )
+    assert first.status_code == 201, first.text
+
+    second = second_authenticated_client.put(
+        f"/api/inventory/movements/{shared_movement_id}",
+        json={"item_id": second_item["id"], "kind": "in", "quantity": 3},
+    )
+
+    assert second.status_code == 409, second.text
+    assert second.json()["detail"] == "movement_id_conflict"
+
+    unaffected = second_authenticated_client.get(f"/api/inventory/items/{second_item['id']}")
     assert unaffected.json()["stock"] == 0

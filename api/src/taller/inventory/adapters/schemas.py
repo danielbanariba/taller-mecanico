@@ -9,7 +9,13 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from taller.inventory.domain.entities import Item, StockMovement
 from taller.inventory.domain.errors import InvalidItemName, InvalidMovementQuantity
 from taller.inventory.domain.item_name import normalize_item_name
-from taller.inventory.domain.stock import validate_quantity
+from taller.inventory.domain.stock import MAX_QUANTITY, validate_quantity
+
+#: Keeps `sale_price_cents` (HNL, integer cents) within a sane range. The
+#: domain entity has no price validation of its own (unlike quantities,
+#: which share `MAX_QUANTITY` through `taller.inventory.domain.stock`), so
+#: this 422 is the only guard against an overflowing value.
+MAX_SALE_PRICE_CENTS = 1_000_000_000
 
 
 def _validate_name(value: str) -> str:
@@ -30,10 +36,10 @@ class ItemCreateRequest(BaseModel):
     name: str
     category: str | None = None
     unit: str = "unidad"
-    min_stock: int = Field(default=0, ge=0)
-    sale_price_cents: int | None = Field(default=None, ge=0)
+    min_stock: int = Field(default=0, ge=0, le=MAX_QUANTITY)
+    sale_price_cents: int | None = Field(default=None, ge=0, le=MAX_SALE_PRICE_CENTS)
     notes: str | None = None
-    initial_stock: int | None = Field(default=None, ge=0)
+    initial_stock: int | None = Field(default=None, ge=0, le=MAX_QUANTITY)
 
     @field_validator("name")
     @classmethod
@@ -47,8 +53,8 @@ class ItemUpdateRequest(BaseModel):
     name: str | None = None
     category: str | None = None
     unit: str | None = None
-    min_stock: int | None = Field(default=None, ge=0)
-    sale_price_cents: int | None = Field(default=None, ge=0)
+    min_stock: int | None = Field(default=None, ge=0, le=MAX_QUANTITY)
+    sale_price_cents: int | None = Field(default=None, ge=0, le=MAX_SALE_PRICE_CENTS)
     notes: str | None = None
 
     @field_validator("name")
@@ -94,7 +100,7 @@ class ItemOut(BaseModel):
 class MovementCreateRequest(BaseModel):
     item_id: uuid.UUID
     kind: Literal["in", "out", "adjust"]
-    quantity: int = Field(ge=0)
+    quantity: int = Field(ge=0, le=MAX_QUANTITY)
     note: str | None = None
     occurred_at: datetime | None = None
 

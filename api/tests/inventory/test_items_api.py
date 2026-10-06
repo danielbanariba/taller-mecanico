@@ -15,9 +15,20 @@ Defects these catch:
   bypassing the movement ledger that is supposed to be the only source of
   truth for it;
 - an endpoint reachable without a valid session, leaking another
-  workshop's inventory existence/shape to an anonymous caller.
+  workshop's inventory existence/shape to an anonymous caller;
+- a quantity-like field with no upper bound, letting a client push a value
+  large enough to overflow the database's `integer` column into a raw
+  500 instead of a clean 422;
+- a replay of `POST /items` with the same id and fields but a different
+  `initial_stock` returning 200 and silently dropping the difference,
+  instead of a 409;
+- a search `q` that is used as a raw `LIKE` pattern, letting `%`/`_` act as
+  wildcards instead of matching literally.
 """
 
+import uuid
+
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -93,6 +104,34 @@ def test_search_is_case_and_accent_insensitive(authenticated_client: TestClient)
     assert names == [item["name"]]
 
 
+def test_search_underscore_matches_only_a_literal_underscore(
+    authenticated_client: TestClient,
+) -> None:
+    underscored = _create_item(authenticated_client, name="Tornillo_8mm")
+    _create_item(authenticated_client, name="Tornillo 8mm")
+
+    # Unescaped, "_" is a single-character SQL wildcard, so "_8mm" would
+    # also match "Tornillo 8mm" (the space standing in for the wildcard).
+    response = authenticated_client.get("/api/inventory/items", params={"q": "_8mm"})
+
+    assert response.status_code == 200
+    names = [row["name"] for row in response.json()]
+    assert names == [underscored["name"]]
+
+
+def test_search_percent_matches_only_a_literal_percent(authenticated_client: TestClient) -> None:
+    percent_item = _create_item(authenticated_client, name="Descuento 50% aplicado")
+    _create_item(authenticated_client, name="Descuento 50 aplicado")
+
+    # Unescaped, "%" matches any sequence (including empty), so "50%" would
+    # also match "Descuento 50 aplicado" (just requiring "50" to appear).
+    response = authenticated_client.get("/api/inventory/items", params={"q": "50%"})
+
+    assert response.status_code == 200
+    names = [row["name"] for row in response.json()]
+    assert names == [percent_item["name"]]
+
+
 def test_low_stock_filter_returns_only_items_at_or_below_their_minimum(
     authenticated_client: TestClient,
 ) -> None:
@@ -140,6 +179,88 @@ def test_patch_updates_fields_but_never_stock(authenticated_client: TestClient) 
     assert body["name"] == "Llave de cruz 4 puntas"
     assert body["min_stock"] == 1
     assert body["stock"] == 2
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("min_stock", 1_000_001), ("sale_price_cents", 1_000_000_001), ("initial_stock", 1_000_001)],
+)
+def test_create_item_rejects_values_over_the_maximum_with_422(
+    authenticated_client: TestClient, field: str, value: int
+) -> None:
+    response = authenticated_client.post(
+        "/api/inventory/items", json={"name": "Tuerca", field: value}
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("field", "value"), [("min_stock", 1_000_001), ("sale_price_cents", 1_000_000_001)]
+)
+def test_patch_rejects_values_over_the_maximum_with_422(
+    authenticated_client: TestClient, field: str, value: int
+) -> None:
+    item = _create_item(authenticated_client, name="Banda de tiempo")
+
+    response = authenticated_client.patch(f"/api/inventory/items/{item['id']}", json={field: value})
+
+    assert response.status_code == 422
+
+
+def test_replay_with_identical_initial_stock_is_a_no_op(authenticated_client: TestClient) -> None:
+    item_id = str(uuid.uuid4())
+    payload = {"id": item_id, "name": "Rodamiento", "initial_stock": 5}
+
+    first = authenticated_client.post("/api/inventory/items", json=payload)
+    assert first.status_code == 201, first.text
+
+    replay = authenticated_client.post("/api/inventory/items", json=payload)
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["stock"] == 5
+
+    history = authenticated_client.get(f"/api/inventory/items/{item_id}/movements")
+    assert len(history.json()) == 1
+
+
+def test_replay_with_a_different_initial_stock_is_a_conflict(
+    authenticated_client: TestClient,
+) -> None:
+    item_id = str(uuid.uuid4())
+    first = authenticated_client.post(
+        "/api/inventory/items",
+        json={"id": item_id, "name": "Rodamiento", "initial_stock": 5},
+    )
+    assert first.status_code == 201, first.text
+
+    replay = authenticated_client.post(
+        "/api/inventory/items",
+        json={"id": item_id, "name": "Rodamiento", "initial_stock": 8},
+    )
+
+    assert replay.status_code == 409, replay.text
+    assert replay.json()["detail"] == "item_id_conflict"
+
+    unaffected = authenticated_client.get(f"/api/inventory/items/{item_id}")
+    assert unaffected.json()["stock"] == 5
+
+
+def test_replay_that_adds_an_initial_stock_not_present_originally_is_a_conflict(
+    authenticated_client: TestClient,
+) -> None:
+    item_id = str(uuid.uuid4())
+    first = authenticated_client.post(
+        "/api/inventory/items", json={"id": item_id, "name": "Empaque"}
+    )
+    assert first.status_code == 201, first.text
+    assert first.json()["stock"] == 0
+
+    replay = authenticated_client.post(
+        "/api/inventory/items",
+        json={"id": item_id, "name": "Empaque", "initial_stock": 10},
+    )
+
+    assert replay.status_code == 409, replay.text
+    assert replay.json()["detail"] == "item_id_conflict"
 
 
 def test_get_unknown_item_returns_404(authenticated_client: TestClient) -> None:

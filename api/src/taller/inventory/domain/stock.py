@@ -16,6 +16,21 @@ ADJUST = "adjust"
 #: column.
 MOVEMENT_KINDS = frozenset({IN, OUT, ADJUST})
 
+#: Upper bound on a single movement's quantity (and, by extension, on
+#: `initial_stock`, which is recorded as an `adjust` movement). Keeps a
+#: client-supplied value from ever reaching the database as an uncontrolled
+#: integer, and keeps the application layer safe even when a caller bypasses
+#: the HTTP schema layer (see `taller.inventory.adapters.schemas`, which
+#: enforces the same bound at the 422 level).
+MAX_QUANTITY = 1_000_000
+
+#: Bounds of PostgreSQL's `integer` column type, which backs
+#: `inventory_items.stock`. A movement whose resulting stock would not fit
+#: here must be rejected before it reaches the database (see
+#: `is_stock_in_range` and `taller.inventory.application.use_cases.record_movement`).
+INT32_MIN = -2_147_483_648
+INT32_MAX = 2_147_483_647
+
 
 def validate_quantity(*, kind: str, quantity: int) -> None:
     """Validate a movement's declared quantity against its kind's rule.
@@ -25,13 +40,18 @@ def validate_quantity(*, kind: str, quantity: int) -> None:
         InvalidMovementQuantity: the quantity violates its kind's rule.
     """
     if kind in (IN, OUT):
-        if quantity <= 0:
+        if quantity <= 0 or quantity > MAX_QUANTITY:
             raise InvalidMovementQuantity(kind=kind, quantity=quantity)
     elif kind == ADJUST:
-        if quantity < 0:
+        if quantity < 0 or quantity > MAX_QUANTITY:
             raise InvalidMovementQuantity(kind=kind, quantity=quantity)
     else:
         raise InvalidMovementKind(kind)
+
+
+def is_stock_in_range(stock: int) -> bool:
+    """True when ``stock`` fits PostgreSQL's `integer` column type."""
+    return INT32_MIN <= stock <= INT32_MAX
 
 
 def compute_delta(*, kind: str, quantity: int, current_stock: int) -> int:
