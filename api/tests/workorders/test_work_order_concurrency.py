@@ -1,11 +1,12 @@
-"""Concurrency tests for work-order numbering (`create_work_order`).
+"""Concurrency tests for work-order numbering (`create_work_order`) and
+stock-consuming status transitions (`change_status`).
 
 Uses two real connections and real threads, unlike the rest of the suite
-(one connection per test, inside a rolled-back SAVEPOINT): a numbering race
-only shows up between two genuinely concurrent transactions. The workshop,
-user, customer and vehicle this needs are committed on a separate
-connection, the same way `test_login_throttle_repository.py`'s
-`committed_throttle_row` commits the row its own lock test needs; this
+(one connection per test, inside a rolled-back SAVEPOINT): a numbering or
+locking race only shows up between two genuinely concurrent transactions.
+The workshop, user, customer and vehicle this needs are committed on a
+separate connection, the same way `test_login_throttle_repository.py`'s
+`committed_throttle_row` commits the row its own lock test needs; each
 fixture deletes everything it inserted on the way out.
 """
 
@@ -23,12 +24,23 @@ from sqlalchemy.orm import Session
 from taller.customers.adapters.models import CustomerModel, VehicleModel
 from taller.customers.adapters.repositories import SqlAlchemyVehicleRepository
 from taller.identity.adapters.models import UserModel, WorkshopModel
-from taller.workorders.adapters.models import WorkOrderModel, WorkshopCounterModel
+from taller.inventory.adapters.models import ItemModel, StockMovementModel
+from taller.inventory.adapters.repositories import (
+    SqlAlchemyItemRepository,
+    SqlAlchemyMovementRepository,
+)
+from taller.workorders.adapters.models import (
+    WorkOrderLineModel,
+    WorkOrderModel,
+    WorkshopCounterModel,
+)
 from taller.workorders.adapters.repositories import (
     SqlAlchemyWorkOrderRepository,
     SqlAlchemyWorkshopCounterRepository,
 )
-from taller.workorders.application.use_cases import create_work_order
+from taller.workorders.application.use_cases import add_line, change_status, create_work_order
+from taller.workorders.domain.entities import LineKind
+from taller.workorders.domain.status import WorkOrderStatus
 
 #: Fixed phone for this fixture's committed user row (must be unique,
 #: 8 digits, and unused by any other test's committed data).
@@ -235,3 +247,245 @@ def test_concurrent_creates_with_the_same_id_persist_exactly_one_order(
         counter = verify.get(WorkshopCounterModel, (workshop_id, "work_order"))
         assert counter is not None
         assert counter.value == 1
+
+
+#: Fixed phone for this fixture's committed user row (see `_PHONE`'s own
+#: comment above: must be unique across every committed-row fixture).
+_DEADLOCK_PHONE = "87650098"
+
+
+@pytest.fixture
+def committed_deadlock_orders(test_engine: Engine) -> Generator[dict[str, uuid.UUID]]:
+    """Two approved orders for one workshop, each with inventory-part lines
+    referencing the same two items in reverse order (`order_x`: `[A, B]`,
+    `order_y`: `[B, A]`), committed on a connection separate from the
+    per-test SAVEPOINT -- AD-5's deadlock-freedom claim only shows up
+    between two genuinely concurrent transactions locking rows in the
+    order each line declares them, instead of the sorted `(item_id,
+    line_id)` order `plan_reconciliation` actually uses.
+    """
+    ids = {
+        "workshop_id": uuid.uuid4(),
+        "user_id": uuid.uuid4(),
+        "customer_id": uuid.uuid4(),
+        "vehicle_id": uuid.uuid4(),
+        "item_a_id": uuid.uuid4(),
+        "item_b_id": uuid.uuid4(),
+        "order_x_id": uuid.uuid4(),
+        "order_y_id": uuid.uuid4(),
+    }
+    now = datetime.now(UTC)
+    with Session(test_engine) as setup:
+        setup.add(WorkshopModel(id=ids["workshop_id"], name="Taller Deadlock", created_at=now))
+        setup.flush()
+        setup.add(
+            UserModel(
+                id=ids["user_id"],
+                workshop_id=ids["workshop_id"],
+                full_name="Owner Deadlock",
+                phone=_DEADLOCK_PHONE,
+                password_hash="not-a-real-hash",
+                created_at=now,
+            )
+        )
+        setup.flush()
+        setup.add(
+            CustomerModel(
+                id=ids["customer_id"],
+                workshop_id=ids["workshop_id"],
+                full_name="Cliente Deadlock",
+                phone=None,
+                notes=None,
+                archived_at=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        setup.flush()
+        setup.add(
+            VehicleModel(
+                id=ids["vehicle_id"],
+                workshop_id=ids["workshop_id"],
+                customer_id=ids["customer_id"],
+                vehicle_type="car",
+                make="Toyota",
+                model=None,
+                year=None,
+                color=None,
+                plate=None,
+                notes=None,
+                archived_at=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        setup.add(
+            ItemModel(
+                id=ids["item_a_id"],
+                workshop_id=ids["workshop_id"],
+                name="Pieza Deadlock A",
+                category=None,
+                unit="unidad",
+                min_stock=0,
+                sale_price_cents=None,
+                notes=None,
+                stock=10,
+                archived_at=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        setup.add(
+            ItemModel(
+                id=ids["item_b_id"],
+                workshop_id=ids["workshop_id"],
+                name="Pieza Deadlock B",
+                category=None,
+                unit="unidad",
+                min_stock=0,
+                sale_price_cents=None,
+                notes=None,
+                stock=10,
+                archived_at=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        setup.flush()
+
+        order_repo = SqlAlchemyWorkOrderRepository(setup)
+        counter_repo = SqlAlchemyWorkshopCounterRepository(setup)
+        vehicle_repo = SqlAlchemyVehicleRepository(setup)
+        item_repo = SqlAlchemyItemRepository(setup)
+        movement_repo = SqlAlchemyMovementRepository(setup)
+
+        order_x, _ = create_work_order(
+            workshop_id=ids["workshop_id"],
+            order_id=ids["order_x_id"],
+            vehicle_id=ids["vehicle_id"],
+            complaint=None,
+            odometer_km=None,
+            notes=None,
+            created_by=ids["user_id"],
+            order_repo=order_repo,
+            counter_repo=counter_repo,
+            vehicle_repo=vehicle_repo,
+        )
+        order_y, _ = create_work_order(
+            workshop_id=ids["workshop_id"],
+            order_id=ids["order_y_id"],
+            vehicle_id=ids["vehicle_id"],
+            complaint=None,
+            odometer_km=None,
+            notes=None,
+            created_by=ids["user_id"],
+            order_repo=order_repo,
+            counter_repo=counter_repo,
+            vehicle_repo=vehicle_repo,
+        )
+
+        for order, item_order, quantities in (
+            (order_x, (ids["item_a_id"], ids["item_b_id"]), (3, 2)),
+            (order_y, (ids["item_b_id"], ids["item_a_id"]), (4, 1)),
+        ):
+            for item_id, quantity in zip(item_order, quantities, strict=True):
+                add_line(
+                    workshop_id=ids["workshop_id"],
+                    order_id=order.id,
+                    line_id=uuid.uuid4(),
+                    kind=LineKind.inventory_part,
+                    item_id=item_id,
+                    description="Parte",
+                    quantity=quantity,
+                    unit_price_cents=1000,
+                    created_by=ids["user_id"],
+                    order_repo=order_repo,
+                    item_repo=item_repo,
+                    movement_repo=movement_repo,
+                )
+            change_status(
+                workshop_id=ids["workshop_id"],
+                order_id=order.id,
+                target=WorkOrderStatus.approved,
+                created_by=ids["user_id"],
+                order_repo=order_repo,
+                item_repo=item_repo,
+                movement_repo=movement_repo,
+            )
+        setup.commit()
+    try:
+        yield ids
+    finally:
+        with Session(test_engine) as cleanup:
+            cleanup.execute(
+                delete(StockMovementModel).where(
+                    StockMovementModel.workshop_id == ids["workshop_id"]
+                )
+            )
+            cleanup.execute(
+                delete(WorkOrderLineModel).where(
+                    WorkOrderLineModel.workshop_id == ids["workshop_id"]
+                )
+            )
+            cleanup.execute(
+                delete(WorkOrderModel).where(WorkOrderModel.workshop_id == ids["workshop_id"])
+            )
+            cleanup.execute(
+                delete(WorkshopCounterModel).where(
+                    WorkshopCounterModel.workshop_id == ids["workshop_id"]
+                )
+            )
+            cleanup.execute(delete(ItemModel).where(ItemModel.workshop_id == ids["workshop_id"]))
+            cleanup.execute(delete(VehicleModel).where(VehicleModel.id == ids["vehicle_id"]))
+            cleanup.execute(delete(CustomerModel).where(CustomerModel.id == ids["customer_id"]))
+            cleanup.execute(delete(UserModel).where(UserModel.id == ids["user_id"]))
+            cleanup.execute(delete(WorkshopModel).where(WorkshopModel.id == ids["workshop_id"]))
+            cleanup.commit()
+
+
+def test_two_orders_consuming_the_same_items_in_reverse_order_do_not_deadlock(
+    committed_deadlock_orders: dict[str, uuid.UUID], test_engine: Engine
+) -> None:
+    """Defect this catches: locking inventory items in each line's own
+    order (instead of `plan_reconciliation`'s deterministic sorted
+    `(item_id, line_id)` order, AD-5) deadlocks two concurrent transitions
+    that consume overlapping items in reverse order.
+    """
+    ids = committed_deadlock_orders
+    barrier = threading.Barrier(2)
+    errors: list[BaseException] = []
+
+    def _start(order_id: uuid.UUID) -> None:
+        try:
+            with Session(test_engine) as session:
+                barrier.wait()
+                change_status(
+                    workshop_id=ids["workshop_id"],
+                    order_id=order_id,
+                    target=WorkOrderStatus.in_progress,
+                    created_by=ids["user_id"],
+                    order_repo=SqlAlchemyWorkOrderRepository(session),
+                    item_repo=SqlAlchemyItemRepository(session),
+                    movement_repo=SqlAlchemyMovementRepository(session),
+                )
+                session.commit()
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [
+        threading.Thread(target=_start, args=(ids["order_x_id"],)),
+        threading.Thread(target=_start, args=(ids["order_y_id"],)),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert not errors, errors
+
+    with Session(test_engine) as verify:
+        item_a = verify.get(ItemModel, ids["item_a_id"])
+        item_b = verify.get(ItemModel, ids["item_b_id"])
+        assert item_a is not None and item_b is not None
+        assert item_a.stock == 10 - 3 - 1  # order_x's 3 + order_y's 1
+        assert item_b.stock == 10 - 2 - 4  # order_x's 2 + order_y's 4

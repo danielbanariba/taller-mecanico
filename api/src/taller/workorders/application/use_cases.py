@@ -1,23 +1,26 @@
-"""Use cases for the work-orders feature: orders, numbering, and quote
-lines in non-consuming statuses.
+"""Use cases for the work-orders feature: orders, numbering, quote lines,
+and the status machine's stock reconciliation.
 
-Stock reconciliation (status changes, and line edits/removal while a line
-is already consuming) is wired in Slice 3's ``change_status``; this slice
-only ever leaves lines at ``stock_posted_quantity == 0`` because every
-order it creates stays in ``quote``, the only status reachable without the
-Slice-3 status endpoint.
+``change_status`` and the reconciliation extension to ``add_line``/
+``update_line``/``remove_line`` are this feature's one cross-feature call
+into inventory's ``record_movement`` (``design.md``'s AD-2): every line
+whose reconciliation target differs from its posted quantity posts through
+that existing ledger use case, sharing the caller's transaction, so a
+status/line change and its movements commit or roll back together.
 """
 
 import uuid
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Final, Literal
 
 from taller.customers.application.ports import VehicleRepository
 from taller.customers.application.use_cases import get_active_vehicle
-from taller.inventory.application.ports import ItemRepository
+from taller.inventory.application.ports import ItemRepository, MovementRepository
+from taller.inventory.application.use_cases import record_movement
 from taller.workorders.application.ports import WorkOrderRepository, WorkshopCounterRepository
 from taller.workorders.domain.entities import LineKind, WorkOrder, WorkOrderLine
 from taller.workorders.domain.errors import (
+    InvalidStatusTransition,
     ItemNotFoundForLine,
     WorkOrderIdConflict,
     WorkOrderLineIdConflict,
@@ -25,7 +28,8 @@ from taller.workorders.domain.errors import (
     WorkOrderLocked,
     WorkOrderNotFound,
 )
-from taller.workorders.domain.status import EDITABLE, WorkOrderStatus
+from taller.workorders.domain.status import CONSUMING, EDITABLE, TRANSITIONS, WorkOrderStatus
+from taller.workorders.domain.stock import plan_reconciliation
 
 #: The named counter `create_work_order` bumps for every new order
 #: (`design.md`'s AD-6). One counter per workshop, keyed by this name.
@@ -34,6 +38,17 @@ ORDER_COUNTER_NAME = "work_order"
 #: `GET /work-orders`'s `limit` query parameter is capped at this value
 #: regardless of what the caller asks for.
 MAX_LIST_LIMIT = 100
+
+#: The order field that records when each status was entered (`design.md`'s
+#: "Data model per phase -> Phase 2" table). `quote` is unreachable as a
+#: target (no edge in `TRANSITIONS` leads into it), so it has no entry.
+_STATUS_TIMESTAMP_FIELD: Final[dict[WorkOrderStatus, str]] = {
+    WorkOrderStatus.approved: "approved_at",
+    WorkOrderStatus.in_progress: "started_at",
+    WorkOrderStatus.completed: "completed_at",
+    WorkOrderStatus.delivered: "delivered_at",
+    WorkOrderStatus.cancelled: "cancelled_at",
+}
 
 _OPEN_STATUSES = frozenset(
     {
@@ -92,6 +107,104 @@ def _line_fields_match(
         and line.quantity == quantity
         and line.unit_price_cents == unit_price_cents
     )
+
+
+def _reconcile_stock(
+    order: WorkOrder,
+    *,
+    status: WorkOrderStatus,
+    now: datetime,
+    created_by: uuid.UUID,
+    item_repo: ItemRepository,
+    movement_repo: MovementRepository,
+) -> None:
+    """Run `plan_reconciliation` for `status` against `order.lines`, and
+    post every planned movement through inventory's `record_movement`
+    (`design.md`'s AD-2), sharing the caller's transaction so a failure
+    partway through rolls back everything already posted by this call.
+
+    Advances each affected line's `stock_posted_quantity`/`stock_revision`
+    in place (AD-4's invariant); the caller still has to persist the order
+    (and its lines) afterward. `status` is passed explicitly rather than
+    read from `order.status`, because `change_status` must plan against
+    the *target* status before the order's own status field is updated.
+    """
+    plan = plan_reconciliation(order.id, status, order.lines)
+    lines_by_id = {line.id: line for line in order.lines}
+    for planned in plan:
+        record_movement(
+            workshop_id=order.workshop_id,
+            movement_id=planned.movement_id,
+            item_id=planned.item_id,
+            kind=planned.kind,
+            quantity=planned.quantity,
+            note=None,
+            occurred_at=now,
+            created_by=created_by,
+            item_repo=item_repo,
+            movement_repo=movement_repo,
+            order_id=order.id,
+            order_line_id=planned.line_id,
+        )
+        line = lines_by_id[planned.line_id]
+        line.stock_posted_quantity = planned.new_posted
+        line.stock_revision = planned.new_revision
+        line.updated_at = now
+
+
+def change_status(
+    *,
+    workshop_id: uuid.UUID,
+    order_id: uuid.UUID,
+    target: WorkOrderStatus,
+    created_by: uuid.UUID,
+    order_repo: WorkOrderRepository,
+    item_repo: ItemRepository,
+    movement_repo: MovementRepository,
+) -> WorkOrder:
+    """Idempotently `PUT` the order's status to `target` (`design.md`'s
+    AD-7, over the acyclic machine in `taller.workorders.domain.status`).
+
+    Locks the order row first (AD-5's lock order, step 1), which also
+    serializes this transition against a concurrent line edit. A same-
+    status request is a no-op; a `target` unreachable from the order's
+    current status raises `InvalidStatusTransition`. Otherwise this runs
+    the same `plan_reconciliation` call every status/line change finishes
+    with (AD-4) -- planned against `target`, before the order's own status
+    field moves -- then advances the status and the matching timestamp.
+
+    Raises:
+        WorkOrderNotFound: no such order in this workshop.
+        InvalidStatusTransition: `target` is not in
+            `TRANSITIONS[order.status]`.
+        MovementIdConflict / StockOutOfRange: re-raised unchanged from
+            `record_movement` (a movement id planted by a client, or a
+            resulting stock outside PostgreSQL's `integer` range).
+    """
+    order = order_repo.get_for_update(workshop_id=workshop_id, order_id=order_id)
+    if order is None:
+        raise WorkOrderNotFound(order_id)
+
+    if order.status == target:
+        return order
+    if target not in TRANSITIONS[order.status]:
+        raise InvalidStatusTransition(current=order.status.value, target=target.value)
+
+    now = datetime.now(UTC)
+    _reconcile_stock(
+        order,
+        status=target,
+        now=now,
+        created_by=created_by,
+        item_repo=item_repo,
+        movement_repo=movement_repo,
+    )
+
+    order.status = target
+    setattr(order, _STATUS_TIMESTAMP_FIELD[target], now)
+    order.updated_at = now
+    order_repo.save(order)
+    return order
 
 
 def create_work_order(
@@ -250,17 +363,19 @@ def add_line(
     description: str,
     quantity: int,
     unit_price_cents: int,
+    created_by: uuid.UUID,
     order_repo: WorkOrderRepository,
     item_repo: ItemRepository,
+    movement_repo: MovementRepository,
 ) -> tuple[WorkOrder, bool]:
     """Add a quote line, or replay an idempotent add.
 
-    This slice never posts a movement from adding a line: every order it
-    can reach is still in ``quote`` (the only status creatable without
-    Slice 3's status endpoint), which is outside ``CONSUMING``. Posting
-    for a line added while already consuming arrives with Slice 3's
-    ``change_status``, through the same ``plan_reconciliation`` call every
-    status/line change finishes with.
+    When the order's current status is in ``CONSUMING``, a new inventory
+    part line is reconciled (and therefore consumes stock) immediately,
+    through the same ``plan_reconciliation`` call every status/line
+    change finishes with (``design.md``'s AD-4). A replayed add is a
+    no-op and never re-runs reconciliation: the first call already posted
+    whatever this line's addition required.
 
     Raises:
         WorkOrderNotFound: no such order in this workshop.
@@ -316,6 +431,21 @@ def add_line(
     )
     order.lines.append(line)
     order.updated_at = now
+    if order.status in CONSUMING:
+        # The new line's own row must exist before a posted movement can
+        # reference it (`inventory_movements`'s FK to `work_order_lines`),
+        # so persist it first; reconciliation below then updates its
+        # `stock_posted_quantity`/`stock_revision` in memory, and the
+        # final `save` below persists that.
+        order_repo.save(order)
+        _reconcile_stock(
+            order,
+            status=order.status,
+            now=now,
+            created_by=created_by,
+            item_repo=item_repo,
+            movement_repo=movement_repo,
+        )
     order_repo.save(order)
     return order, True
 
@@ -326,15 +456,20 @@ def update_line(
     order_id: uuid.UUID,
     line_id: uuid.UUID,
     fields: dict,
+    created_by: uuid.UUID,
     order_repo: WorkOrderRepository,
+    item_repo: ItemRepository,
+    movement_repo: MovementRepository,
 ) -> WorkOrder:
     """Edit a line's own fields (``description``, ``quantity``,
     ``unit_price_cents``). ``kind`` and ``item_id`` are immutable (the
     ``work-orders`` spec: to change the part, remove the line and add a
     new one).
 
-    This slice posts no movement for a quantity edit: stock reconciliation
-    while consuming arrives with Slice 3.
+    When the order's current status is in ``CONSUMING`` and this edit
+    changes a part line's quantity, reconciliation posts only the delta
+    (``design.md``'s AD-4): a retried edit with the same quantity finds
+    ``target == posted`` already and posts nothing.
 
     Raises:
         WorkOrderNotFound: no such order in this workshop.
@@ -363,6 +498,15 @@ def update_line(
     now = datetime.now(UTC)
     line.updated_at = now
     order.updated_at = now
+    if order.status in CONSUMING:
+        _reconcile_stock(
+            order,
+            status=order.status,
+            now=now,
+            created_by=created_by,
+            item_repo=item_repo,
+            movement_repo=movement_repo,
+        )
     order_repo.save(order)
     return order
 
@@ -372,16 +516,20 @@ def remove_line(
     workshop_id: uuid.UUID,
     order_id: uuid.UUID,
     line_id: uuid.UUID,
+    created_by: uuid.UUID,
     order_repo: WorkOrderRepository,
+    item_repo: ItemRepository,
+    movement_repo: MovementRepository,
 ) -> WorkOrder:
     """Soft-remove a line, or replay an idempotent remove (removing an
     already-removed line is a no-op: the ``work-orders`` spec's
     "idempotent soft removal").
 
-    This slice posts no reversal movement: a removed line that had
-    already consumed stock is reconciled by Slice 3's
-    ``change_status``/line-edit wiring, which both finish with the same
-    ``plan_reconciliation`` call.
+    When the order's current status is in ``CONSUMING`` and the removed
+    line had posted consumption, reconciliation returns it (AD-4: a
+    removed line's target drops to 0). An already-removed line returns
+    early and never re-runs reconciliation, so a retried remove posts no
+    second reversal.
 
     Raises:
         WorkOrderNotFound: no such order in this workshop.
@@ -407,5 +555,14 @@ def remove_line(
     line.removed_at = now
     line.updated_at = now
     order.updated_at = now
+    if order.status in CONSUMING:
+        _reconcile_stock(
+            order,
+            status=order.status,
+            now=now,
+            created_by=created_by,
+            item_repo=item_repo,
+            movement_repo=movement_repo,
+        )
     order_repo.save(order)
     return order

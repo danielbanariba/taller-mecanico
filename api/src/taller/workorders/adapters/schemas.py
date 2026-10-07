@@ -40,6 +40,14 @@ class WorkOrderUpdateRequest(BaseModel):
     notes: str | None = None
 
 
+class WorkOrderStatusUpdateRequest(BaseModel):
+    """`PUT /work-orders/{id}/status` body (`design.md`'s AD-7): an
+    idempotent `PUT` of a target status over the acyclic machine.
+    """
+
+    status: WorkOrderStatus
+
+
 class WorkOrderLineCreateRequest(BaseModel):
     id: uuid.UUID
     kind: Literal["labor", "inventory_part", "external_part"]

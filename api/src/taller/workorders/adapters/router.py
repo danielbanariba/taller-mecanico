@@ -22,7 +22,11 @@ from taller.customers.domain.entities import Customer, Vehicle
 from taller.customers.domain.errors import VehicleNotFound
 from taller.identity.adapters.dependencies import get_current_user, get_current_workshop_id
 from taller.identity.domain.entities import User
-from taller.inventory.adapters.repositories import SqlAlchemyItemRepository
+from taller.inventory.adapters.repositories import (
+    SqlAlchemyItemRepository,
+    SqlAlchemyMovementRepository,
+)
+from taller.inventory.domain.errors import MovementIdConflict, StockOutOfRange
 from taller.shared.db import get_db
 from taller.workorders.adapters.repositories import (
     SqlAlchemyWorkOrderRepository,
@@ -33,11 +37,13 @@ from taller.workorders.adapters.schemas import (
     WorkOrderLineCreateRequest,
     WorkOrderLineUpdateRequest,
     WorkOrderOut,
+    WorkOrderStatusUpdateRequest,
     WorkOrderSummaryOut,
     WorkOrderUpdateRequest,
 )
 from taller.workorders.application.use_cases import (
     add_line,
+    change_status,
     create_work_order,
     get_work_order,
     list_work_orders,
@@ -47,6 +53,7 @@ from taller.workorders.application.use_cases import (
 )
 from taller.workorders.domain.entities import LineKind, WorkOrder
 from taller.workorders.domain.errors import (
+    InvalidStatusTransition,
     ItemNotFoundForLine,
     WorkOrderIdConflict,
     WorkOrderLineIdConflict,
@@ -262,6 +269,49 @@ def update_work_order_route(
     )
 
 
+@work_orders_router.put("/work-orders/{order_id}/status", response_model=WorkOrderOut)
+def change_status_route(
+    order_id: uuid.UUID,
+    payload: WorkOrderStatusUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    workshop_id: uuid.UUID = Depends(get_current_workshop_id),
+    db: Session = Depends(get_db),
+) -> WorkOrderOut:
+    order_repo = SqlAlchemyWorkOrderRepository(db)
+    item_repo = SqlAlchemyItemRepository(db)
+    movement_repo = SqlAlchemyMovementRepository(db)
+    vehicle_repo = SqlAlchemyVehicleRepository(db)
+    customer_repo = SqlAlchemyCustomerRepository(db)
+    try:
+        order = change_status(
+            workshop_id=workshop_id,
+            order_id=order_id,
+            target=payload.status,
+            created_by=current_user.id,
+            order_repo=order_repo,
+            item_repo=item_repo,
+            movement_repo=movement_repo,
+        )
+        db.commit()
+    except WorkOrderNotFound as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="work_order_not_found") from exc
+    except InvalidStatusTransition as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="invalid_status_transition") from exc
+    except MovementIdConflict as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="movement_id_conflict") from exc
+    except StockOutOfRange as exc:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="stock_out_of_range"
+        ) from exc
+    return _to_out(
+        order, workshop_id=workshop_id, vehicle_repo=vehicle_repo, customer_repo=customer_repo
+    )
+
+
 @work_orders_router.post(
     "/work-orders/{order_id}/lines",
     response_model=WorkOrderOut,
@@ -271,11 +321,13 @@ def add_line_route(
     order_id: uuid.UUID,
     payload: WorkOrderLineCreateRequest,
     response: Response,
+    current_user: User = Depends(get_current_user),
     workshop_id: uuid.UUID = Depends(get_current_workshop_id),
     db: Session = Depends(get_db),
 ) -> WorkOrderOut:
     order_repo = SqlAlchemyWorkOrderRepository(db)
     item_repo = SqlAlchemyItemRepository(db)
+    movement_repo = SqlAlchemyMovementRepository(db)
     vehicle_repo = SqlAlchemyVehicleRepository(db)
     customer_repo = SqlAlchemyCustomerRepository(db)
     try:
@@ -288,8 +340,10 @@ def add_line_route(
             description=payload.description,
             quantity=payload.quantity,
             unit_price_cents=payload.unit_price_cents,
+            created_by=current_user.id,
             order_repo=order_repo,
             item_repo=item_repo,
+            movement_repo=movement_repo,
         )
         db.commit()
     except WorkOrderNotFound as exc:
@@ -304,6 +358,14 @@ def add_line_route(
     except ItemNotFoundForLine as exc:
         db.rollback()
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="item_not_found") from exc
+    except MovementIdConflict as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="movement_id_conflict") from exc
+    except StockOutOfRange as exc:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="stock_out_of_range"
+        ) from exc
     if not is_new:
         response.status_code = status.HTTP_200_OK
     return _to_out(
@@ -316,10 +378,13 @@ def update_line_route(
     order_id: uuid.UUID,
     line_id: uuid.UUID,
     payload: WorkOrderLineUpdateRequest,
+    current_user: User = Depends(get_current_user),
     workshop_id: uuid.UUID = Depends(get_current_workshop_id),
     db: Session = Depends(get_db),
 ) -> WorkOrderOut:
     order_repo = SqlAlchemyWorkOrderRepository(db)
+    item_repo = SqlAlchemyItemRepository(db)
+    movement_repo = SqlAlchemyMovementRepository(db)
     vehicle_repo = SqlAlchemyVehicleRepository(db)
     customer_repo = SqlAlchemyCustomerRepository(db)
     fields = payload.model_dump(exclude_unset=True)
@@ -329,7 +394,10 @@ def update_line_route(
             order_id=order_id,
             line_id=line_id,
             fields=fields,
+            created_by=current_user.id,
             order_repo=order_repo,
+            item_repo=item_repo,
+            movement_repo=movement_repo,
         )
         db.commit()
     except WorkOrderNotFound as exc:
@@ -341,6 +409,14 @@ def update_line_route(
     except WorkOrderLocked as exc:
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, detail="work_order_locked") from exc
+    except MovementIdConflict as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="movement_id_conflict") from exc
+    except StockOutOfRange as exc:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="stock_out_of_range"
+        ) from exc
     return _to_out(
         order, workshop_id=workshop_id, vehicle_repo=vehicle_repo, customer_repo=customer_repo
     )
@@ -350,15 +426,24 @@ def update_line_route(
 def remove_line_route(
     order_id: uuid.UUID,
     line_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     workshop_id: uuid.UUID = Depends(get_current_workshop_id),
     db: Session = Depends(get_db),
 ) -> WorkOrderOut:
     order_repo = SqlAlchemyWorkOrderRepository(db)
+    item_repo = SqlAlchemyItemRepository(db)
+    movement_repo = SqlAlchemyMovementRepository(db)
     vehicle_repo = SqlAlchemyVehicleRepository(db)
     customer_repo = SqlAlchemyCustomerRepository(db)
     try:
         order = remove_line(
-            workshop_id=workshop_id, order_id=order_id, line_id=line_id, order_repo=order_repo
+            workshop_id=workshop_id,
+            order_id=order_id,
+            line_id=line_id,
+            created_by=current_user.id,
+            order_repo=order_repo,
+            item_repo=item_repo,
+            movement_repo=movement_repo,
         )
         db.commit()
     except WorkOrderNotFound as exc:
@@ -370,6 +455,14 @@ def remove_line_route(
     except WorkOrderLocked as exc:
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, detail="work_order_locked") from exc
+    except MovementIdConflict as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="movement_id_conflict") from exc
+    except StockOutOfRange as exc:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="stock_out_of_range"
+        ) from exc
     return _to_out(
         order, workshop_id=workshop_id, vehicle_repo=vehicle_repo, customer_repo=customer_repo
     )
