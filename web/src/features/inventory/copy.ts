@@ -66,6 +66,7 @@ export const inventoryCopy = {
     archiveConfirmCancel: "Cancelar",
     historyTitle: "Historial de movimientos",
     historyEmpty: "Todavía no hay movimientos.",
+    orderLink: (number: number) => `Orden #${number}`,
   },
   units: ["unidad", "galón", "litro", "juego", "par", "caja"],
   offline: {

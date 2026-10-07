@@ -22,7 +22,9 @@ import { defaultOutbox, type Outbox } from "./outbox";
  * drops it. `workshopId` is undefined only before the session resolves,
  * when every inventory query is disabled.
  */
-const inventoryQueryKey = (workshopId: string | undefined) => [...workshopQueryKey(workshopId), "inventory"] as const;
+/** Exported so a status change or a consuming order's line edit (`workorders/hooks.ts`) can invalidate every inventory query after moving stock. */
+export const inventoryQueryKey = (workshopId: string | undefined) =>
+  [...workshopQueryKey(workshopId), "inventory"] as const;
 const itemsQueryBase = (workshopId: string | undefined) => [...inventoryQueryKey(workshopId), "items"] as const;
 
 export const itemsQueryKey = (workshopId: string | undefined, params: ListItemsParams = {}) =>

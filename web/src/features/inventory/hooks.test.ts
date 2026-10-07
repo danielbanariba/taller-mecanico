@@ -107,6 +107,9 @@ describe("fetchItemFolded", () => {
           occurred_at: "2026-01-01T00:05:00.000Z",
           recorded_at: "2026-01-01T00:05:01.000Z",
           created_by: "u1",
+          order_id: null,
+          order_line_id: null,
+          order_number: null,
         },
         item: { id: "item-1", stock: serverStock, needs_review: false, is_low: false },
       };

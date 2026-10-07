@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+
 import type { MovementOut } from "./api";
 import { formatDateTime } from "./format";
 import { inventoryCopy, movementLabel } from "./copy";
@@ -20,7 +22,14 @@ export function MovementHistory({ movements }: MovementHistoryProps) {
           className="flex items-center justify-between rounded-xl border border-brand-border bg-brand-card px-4 py-3"
         >
           <span className="text-base font-semibold text-brand-foreground">{movementLabel(movement)}</span>
-          <span className="text-sm text-brand-muted-foreground">{formatDateTime(movement.occurred_at)}</span>
+          <span className="flex flex-col items-end gap-0.5">
+            {movement.order_number != null && movement.order_id != null ? (
+              <Link to={`/ordenes/${movement.order_id}`} className="text-sm font-medium text-brand-primary">
+                {inventoryCopy.detail.orderLink(movement.order_number)}
+              </Link>
+            ) : null}
+            <span className="text-sm text-brand-muted-foreground">{formatDateTime(movement.occurred_at)}</span>
+          </span>
         </li>
       ))}
     </ul>
