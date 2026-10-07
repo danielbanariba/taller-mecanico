@@ -471,9 +471,21 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
 
 - [x] **P2.S7.T7** Run the full phase-2 verification suite: API (`ruff check`, `ruff format --check`, `pytest`); Web (`lint`, `typecheck`, `test -- --run`, `build`); migration round-trip (T6). **Result:** API — `ruff check` clean, `ruff format --check` clean (94 files), `pytest` 190 passed. Web — `eslint .` clean, `tsc -b --noEmit` clean, `vitest --run` 142 passed (33 files), `vite build` succeeded. Migration round-trip: see T6.
 
-- [ ] **P2.S7.T8** Deploy phase 2 to the demo and re-run the seed script.
+- [x] **P2.S7.T8** Deploy phase 2 to the demo and re-run the seed script. **Evidence:** `alembic upgrade` applied `8db9fb7d17ef` to the demo database cleanly. The first seed run created 6 orders, 10 lines and 11 status changes. Two more runs created nothing, and the ledger stayed identical before and after the third run: 13 movements, one order per status, total stock 47.
 
-- [ ] **P2.S7.T9** Real-browser check at **390×844** against the deployed demo, covering phase 2's success criteria: sequential numbering with no skip on a double-submit; a 3-line-kind order's total; `in_progress` lowering linked stock with the history link, edited quantity posting only the delta, cancellation restoring stock, retries not double-applying; WhatsApp share opening with a prefilled summary for a mobile customer and being absent for a landline/phoneless one; vehicle detail listing its orders; the seeded demo showing orders in several states with the in-progress stock effect visible. Plus a manual **Android Chrome** check of photo sharing (per `design.md`'s testing-strategy note).
+- [x] **P2.S7.T9** Real-browser check at **390×844** against the deployed demo, covering phase 2's success criteria: sequential numbering with no skip on a double-submit; a 3-line-kind order's total; `in_progress` lowering linked stock with the history link, edited quantity posting only the delta, cancellation restoring stock, retries not double-applying; WhatsApp share opening with a prefilled summary for a mobile customer and being absent for a landline/phoneless one; vehicle detail listing its orders; the seeded demo showing orders in several states with the in-progress stock effect visible. Plus a manual **Android Chrome** check of photo sharing (per `design.md`'s testing-strategy note). **Evidence (390×844, public demo):**
+  - The six seeded orders list with number, customer/vehicle and a lempira total.
+  - New order #7 has labor L 200 + Bujía NGK ×2 (L 240) + external part L 360, for a total of L 800.
+  - Approve → start dropped Bujía NGK from 16 to 14, with "Salida −2" linked to "Orden #7" in the item history. Cancel restored it to 16, with "Entrada +2" linked to the order.
+  - The WhatsApp link is `https://wa.me/504` + 8 digits with a URL-encoded summary for a mobile customer, and absent for a landline customer.
+  - Customer and vehicle details list their orders.
+  - Each screen has one `<main>` and one `<h1>`, at full width.
+  - Offline, the cached list renders and every write is disabled with its Spanish message.
+  - The console was clean apart from the expected pre-login 401.
+  - The check exposed a one-tap irreversible "Cancelar orden", which rendered first because the API sorts `allowed_transitions` alphabetically. Fixed in `b94f6d8` (forward actions first, a confirmation dialog) and re-checked on the demo: dismissing sends no status request.
+  - Numbering under double-submit, delta posting on edits and retry idempotency were not repeated in the browser; the API concurrency and stock tests cover them.
+
+- [ ] **P2.S7.T9b** Manual **Android Chrome** check of photo sharing via the Web Share API with files. **Pending:** needs a real Android phone; it cannot be emulated in desktop Chromium.
 
 - [x] **P2.S7.T10** Work-unit commit: `:sparkles: feat(workorders): show order history on customer and vehicle detail` (covers T1–T2) followed by `:hammer: chore(deploy): seed phase 2 work orders, document stock consumption` (covers T3–T5). **Result:** `7757b39` and `b2ef6fb` on `feat/workshop-core-work-orders`.
 
