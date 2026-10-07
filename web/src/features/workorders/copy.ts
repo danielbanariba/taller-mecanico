@@ -57,6 +57,13 @@ export const workOrdersCopy = {
     delivered: "Marcar como entregada",
     cancelled: "Cancelar orden",
   },
+  cancelConfirm: {
+    title: "Cancelar orden",
+    body: "Una orden cancelada no se puede volver a abrir.",
+    bodyInProgress: "Los repuestos que ya consumió esta orden se devolverán al inventario.",
+    keep: "No cancelar",
+    confirm: "Sí, cancelar orden",
+  },
   share: {
     shareButton: "Compartir por WhatsApp",
     dialogTitle: "Compartir por WhatsApp",

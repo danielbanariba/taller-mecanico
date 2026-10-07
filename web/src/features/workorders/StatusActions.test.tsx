@@ -100,6 +100,55 @@ describe("StatusActions", () => {
     });
   });
 
+  it("requires confirmation before cancelling, and confirming sends exactly one cancel request", async () => {
+    // Defect this catches: a single accidental tap on "Cancelar orden"
+    // irreversibly cancelling an in-progress order and reversing its
+    // already-consumed stock, with no chance to back out.
+    mockSession();
+    let cancelRequests = 0;
+    server.use(
+      http.put("/api/work-orders/order-1/status", async ({ request }) => {
+        cancelRequests += 1;
+        await expect(request.json()).resolves.toEqual({ status: "cancelled" });
+        return HttpResponse.json(order({ status: "cancelled", allowed_transitions: [] }));
+      }),
+    );
+    const user = userEvent.setup();
+    renderStatusActions(order({ status: "in_progress", allowed_transitions: ["completed", "cancelled"] }));
+
+    await user.click(screen.getByRole("button", { name: statusActionLabel("cancelled") }));
+    expect(cancelRequests).toBe(0);
+    expect(screen.getByText(workOrdersCopy.cancelConfirm.bodyInProgress)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: workOrdersCopy.cancelConfirm.confirm }));
+
+    await waitFor(() => {
+      expect(cancelRequests).toBe(1);
+    });
+  });
+
+  it("sends nothing and leaves the order unchanged when the cancellation is dismissed", async () => {
+    // Defect this catches: dismissing the confirmation still cancelling
+    // the order, or the dialog leaking a request after it closes.
+    mockSession();
+    let cancelRequests = 0;
+    server.use(
+      http.put("/api/work-orders/order-1/status", () => {
+        cancelRequests += 1;
+        return HttpResponse.json(order({ status: "cancelled", allowed_transitions: [] }));
+      }),
+    );
+    const user = userEvent.setup();
+    renderStatusActions(order());
+
+    await user.click(screen.getByRole("button", { name: statusActionLabel("cancelled") }));
+    await user.click(screen.getByRole("button", { name: workOrdersCopy.cancelConfirm.keep }));
+
+    expect(screen.queryByText(workOrdersCopy.cancelConfirm.body)).not.toBeInTheDocument();
+    expect(cancelRequests).toBe(0);
+    expect(screen.getByRole("button", { name: statusActionLabel("in_progress") })).toBeInTheDocument();
+  });
+
   it("disables every status button offline, with the Spanish explanation", () => {
     // Defect this catches: an offline tap reaching the API -- AD-17's
     // write-requires-connection rule, which every other mutation in this
