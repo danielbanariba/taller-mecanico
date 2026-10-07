@@ -37,19 +37,19 @@ export function CustomerDetailPage() {
   if (isNotFound || !customer.data) {
     const errorCode = customer.error instanceof ApiError ? customer.error.code : "customer_not_found";
     return (
-      <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 py-8">
+      <div className="flex flex-col gap-4">
         <Alert variant="error">{getCustomersErrorMessage(errorCode)}</Alert>
         <LinkButton to="/clientes" variant="secondary">
           {customersCopy.detail.backToList}
         </LinkButton>
-      </main>
+      </div>
     );
   }
 
   const data = customer.data;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-4 py-8">
+    <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold text-brand-primary">{data.full_name}</h1>
         {data.phone ? (
@@ -84,6 +84,6 @@ export function CustomerDetailPage() {
           />
         )}
       </section>
-    </main>
+    </div>
   );
 }

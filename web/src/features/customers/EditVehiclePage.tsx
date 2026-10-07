@@ -71,12 +71,12 @@ export function EditVehiclePage() {
   if (isNotFound || !vehicle.data) {
     const errorCode = vehicle.error instanceof ApiError ? vehicle.error.code : "vehicle_not_found";
     return (
-      <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 py-8">
+      <div className="flex flex-col gap-4">
         <Alert variant="error">{getCustomersErrorMessage(errorCode)}</Alert>
         <LinkButton to={`/clientes/${customerId}`} variant="secondary">
           {customersCopy.vehicles.edit.backToDetail}
         </LinkButton>
-      </main>
+      </div>
     );
   }
 
@@ -99,7 +99,7 @@ export function EditVehiclePage() {
     updateVehicle.error instanceof ApiError ? getCustomersErrorMessage(updateVehicle.error.code) : undefined;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-4 py-8">
+    <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold text-brand-primary">{customersCopy.vehicles.edit.title}</h1>
       <VehicleForm
         mode="edit"
@@ -149,6 +149,6 @@ export function EditVehiclePage() {
           </div>
         </div>
       </Dialog>
-    </main>
+    </div>
   );
 }

@@ -39,7 +39,7 @@ export function NewVehiclePage() {
     createVehicle.error instanceof ApiError ? getCustomersErrorMessage(createVehicle.error.code) : undefined;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-4 py-8">
+    <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold text-brand-primary">{customersCopy.vehicles.create.title}</h1>
       <VehicleForm
         mode="create"
@@ -50,6 +50,6 @@ export function NewVehiclePage() {
         submitPendingLabel={customersCopy.vehicles.create.submitPending}
         offline={isOffline}
       />
-    </main>
+    </div>
   );
 }

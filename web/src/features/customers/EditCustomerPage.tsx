@@ -58,12 +58,12 @@ export function EditCustomerPage() {
   if (isNotFound || !customer.data) {
     const errorCode = customer.error instanceof ApiError ? customer.error.code : "customer_not_found";
     return (
-      <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 py-8">
+      <div className="flex flex-col gap-4">
         <Alert variant="error">{getCustomersErrorMessage(errorCode)}</Alert>
         <LinkButton to="/clientes" variant="secondary">
           {customersCopy.edit.backToList}
         </LinkButton>
-      </main>
+      </div>
     );
   }
 
@@ -86,7 +86,7 @@ export function EditCustomerPage() {
     updateCustomer.error instanceof ApiError ? getCustomersErrorMessage(updateCustomer.error.code) : undefined;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-4 py-8">
+    <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold text-brand-primary">{customersCopy.edit.title}</h1>
       <CustomerForm
         mode="edit"
@@ -124,6 +124,6 @@ export function EditCustomerPage() {
           </div>
         </div>
       </Dialog>
-    </main>
+    </div>
   );
 }

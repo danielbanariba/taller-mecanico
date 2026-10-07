@@ -32,7 +32,7 @@ export function NewCustomerPage() {
     createCustomer.error instanceof ApiError ? getCustomersErrorMessage(createCustomer.error.code) : undefined;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-4 py-8">
+    <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold text-brand-primary">{customersCopy.create.title}</h1>
       <CustomerForm
         mode="create"
@@ -43,6 +43,6 @@ export function NewCustomerPage() {
         submitPendingLabel={customersCopy.create.submitPending}
         offline={isOffline}
       />
-    </main>
+    </div>
   );
 }

@@ -50,12 +50,12 @@ export function ItemDetailPage() {
   if (isNotFound || !item.data) {
     const errorCode = item.error instanceof ApiError ? item.error.code : "item_not_found";
     return (
-      <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 py-8">
+      <div className="flex flex-col gap-4">
         <Alert variant="error">{getInventoryErrorMessage(errorCode)}</Alert>
         <LinkButton to="/inventario" variant="secondary">
           {inventoryCopy.detail.backToList}
         </LinkButton>
-      </main>
+      </div>
     );
   }
 
@@ -96,7 +96,7 @@ export function ItemDetailPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-4 py-8">
+    <div className="flex flex-col gap-6">
       <header>
         <h1 className="text-2xl font-bold text-brand-primary">{data.name}</h1>
         <p className="text-sm text-brand-muted-foreground">
@@ -200,6 +200,6 @@ export function ItemDetailPage() {
           </div>
         </div>
       </Dialog>
-    </main>
+    </div>
   );
 }
