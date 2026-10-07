@@ -18,7 +18,7 @@ const workOrdersQueryBase = (workshopId: string | undefined) =>
 
 export const workOrdersListQueryKey = (
   workshopId: string | undefined,
-  params: { statusGroup: StatusGroup; limit: number },
+  params: { statusGroup: StatusGroup; limit: number; vehicleId?: string; customerId?: string },
 ) => [...workOrdersQueryBase(workshopId), "list", params] as const;
 
 export const workOrderQueryKey = (workshopId: string | undefined, id: string) =>
@@ -56,6 +56,35 @@ export function useWorkOrder(id: string) {
     queryKey: workOrderQueryKey(workshopId, id),
     queryFn: () => workOrdersApi.getWorkOrder(id),
     enabled: workshopId !== undefined,
+  });
+}
+
+/**
+ * One vehicle's service history for its detail screen, newest number first
+ * (the API's own order, across every status). Not paginated: `DEFAULT_LIMIT`
+ * already covers far more orders than one vehicle realistically accumulates.
+ * The query key shares `workOrdersQueryBase`'s "list" prefix, so it is
+ * already covered by every existing order/line/status mutation's
+ * invalidation above -- no extra wiring needed.
+ */
+export function useWorkOrdersForVehicle(vehicleId: string) {
+  const workshopId = useWorkshopId();
+  const params = { statusGroup: "all" as StatusGroup, limit: DEFAULT_LIMIT, vehicleId };
+  return useQuery({
+    queryKey: workOrdersListQueryKey(workshopId, params),
+    queryFn: () => workOrdersApi.listWorkOrders({ statusGroup: "all", limit: DEFAULT_LIMIT, vehicleId }),
+    enabled: workshopId !== undefined && vehicleId !== "",
+  });
+}
+
+/** Same as {@link useWorkOrdersForVehicle}, scoped to a customer across every one of their vehicles, for the customer detail screen. */
+export function useWorkOrdersForCustomer(customerId: string) {
+  const workshopId = useWorkshopId();
+  const params = { statusGroup: "all" as StatusGroup, limit: DEFAULT_LIMIT, customerId };
+  return useQuery({
+    queryKey: workOrdersListQueryKey(workshopId, params),
+    queryFn: () => workOrdersApi.listWorkOrders({ statusGroup: "all", limit: DEFAULT_LIMIT, customerId }),
+    enabled: workshopId !== undefined && customerId !== "",
   });
 }
 

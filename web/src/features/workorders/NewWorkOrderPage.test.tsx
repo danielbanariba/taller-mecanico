@@ -77,15 +77,42 @@ function mockSessionCustomerAndVehicle() {
   );
 }
 
-function renderNewWorkOrderPage() {
+function renderNewWorkOrderPage(initialEntry: string = "/ordenes/nueva") {
   return renderWithQueryClient(
-    <MemoryRouter initialEntries={["/ordenes/nueva"]}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/ordenes/nueva" element={<NewWorkOrderPage />} />
         <Route path="/ordenes/:orderId" element={<div>Detalle de orden</div>} />
       </Routes>
     </MemoryRouter>,
   );
+}
+
+function vehicleWithOwnerResponse() {
+  return {
+    id: "v1",
+    customer_id: "c1",
+    vehicle_type: "car",
+    make: "Toyota",
+    model: "Corolla",
+    year: 2015,
+    color: null,
+    plate: "HAB1234",
+    notes: null,
+    archived_at: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    owner: {
+      id: "c1",
+      full_name: "María Hernández",
+      phone: "98765432",
+      phone_is_mobile: true,
+      notes: null,
+      archived_at: null,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+    },
+  };
 }
 
 async function pickCustomerAndVehicle(user: ReturnType<typeof userEvent.setup>) {
@@ -126,6 +153,41 @@ describe("NewWorkOrderPage", () => {
     expect(capturedIds).toHaveLength(2);
     expect(capturedIds[0]).toBe(capturedIds[1]);
     expect(capturedIds[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  });
+
+  it("skips the customer and vehicle pickers when opened with a ?vehiculo= preselection", async () => {
+    // Defect this catches: the vehicle detail screen's "Nueva orden" action
+    // links to `/ordenes/nueva?vehiculo=<id>` precisely so the mechanic
+    // never has to re-search for the customer and vehicle they just came
+    // from. Without reading the query param, this screen would always
+    // start at the customer search step and ignore which vehicle it was
+    // opened for.
+    //
+    // Must run before "disables creation ..." below: that test overrides
+    // `navigator.onLine` with no restore (see its own comment), and this
+    // one needs the default online state to submit.
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
+      http.get("/api/vehicles/v1", () => HttpResponse.json(vehicleWithOwnerResponse())),
+      // `useCustomers` fires in the background regardless of which step is
+      // shown (its `enabled` only checks the session, not the step), so an
+      // unmocked request here would fail under MSW's `onUnhandledFrame`.
+      http.get("/api/customers", () => HttpResponse.json([])),
+      http.post("/api/work-orders", async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(orderResponse(body.id as string, body.vehicle_id as string), { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderNewWorkOrderPage("/ordenes/nueva?vehiculo=v1");
+
+    expect(await screen.findByText("María Hernández")).toBeInTheDocument();
+    expect(screen.getByText(/Toyota Corolla/)).toBeInTheDocument();
+    expect(screen.queryByText(/buscar cliente/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /cambiar vehículo/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /crear orden/i }));
+    expect(await screen.findByText("Detalle de orden")).toBeInTheDocument();
   });
 
   it("disables creation and explains why when offline, without calling the API", async () => {

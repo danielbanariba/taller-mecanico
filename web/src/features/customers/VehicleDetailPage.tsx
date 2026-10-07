@@ -1,22 +1,28 @@
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 
 import { ApiError } from "../../shared/api/http";
 import { Alert } from "../../shared/ui/Alert";
+import { Button } from "../../shared/ui/Button";
 import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
 import { customersCopy, getCustomersErrorMessage } from "./copy";
 import { useVehicle } from "./hooks";
+import { useWorkOrdersForVehicle } from "../workorders/hooks";
+import { WorkOrderList } from "../workorders/WorkOrderList";
 
 /**
- * Container: a single vehicle's detail screen, showing its owner. Service
- * orders join this page in phase 2. Reads come from the persisted query
- * cache, so a previously visited vehicle still renders offline.
+ * Container: a single vehicle's detail screen, showing its owner and its
+ * service history (every work order ever opened for it, newest first), plus
+ * a shortcut to start a new one. Reads come from the persisted query cache,
+ * so a previously visited vehicle still renders offline.
  */
 export function VehicleDetailPage() {
   const { vehicleId: id } = useParams<{ vehicleId: string }>();
   const vehicleId = id ?? "";
+  const navigate = useNavigate();
 
   const vehicle = useVehicle(vehicleId);
+  const orders = useWorkOrdersForVehicle(vehicleId);
 
   if (vehicle.isPending) {
     return (
@@ -66,6 +72,22 @@ export function VehicleDetailPage() {
       </LinkButton>
 
       {data.notes ? <p className="text-base text-brand-foreground">{data.notes}</p> : null}
+
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold text-brand-foreground">{customersCopy.vehicles.detail.ordersTitle}</h2>
+          <Button onClick={() => navigate(`/ordenes/nueva?vehiculo=${vehicleId}`)} className="w-auto px-4">
+            {customersCopy.vehicles.detail.newOrder}
+          </Button>
+        </div>
+        {orders.isPending ? (
+          <div className="flex justify-center py-8">
+            <Spinner />
+          </div>
+        ) : (
+          <WorkOrderList orders={orders.data ?? []} onOpen={(order) => navigate(`/ordenes/${order.id}`)} />
+        )}
+      </section>
     </div>
   );
 }
