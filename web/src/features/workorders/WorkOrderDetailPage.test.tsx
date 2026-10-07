@@ -223,6 +223,23 @@ describe("WorkOrderDetailPage", () => {
     expect(paymentRequestWasSent).toBe(false);
   });
 
+  it("shows the void-payment offline message without requiring the disabled Anular trigger to open the dialog", async () => {
+    // Defect this catches: the "Anular" trigger disables itself offline,
+    // but the Spanish explanation ("Conéctese a internet para anular un
+    // pago.") only rendered inside the confirm dialog that trigger is the
+    // only way to open -- so an offline mechanic saw a greyed-out button
+    // with no explanation anywhere on screen (the `payments` spec's
+    // "Voiding Requires A Live Connection" scenario).
+    mockSessionAndOrder(PAYABLE_ORDER);
+    renderDetailPage();
+
+    await screen.findByRole("heading", { name: "Orden #42" });
+    goOffline();
+
+    expect(screen.getByText("Conéctese a internet para anular un pago.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Anular" })).toBeDisabled();
+  });
+
   it("maps a 409 payment_exceeds_balance to its own Spanish message, not the generic fallback", async () => {
     // Defect this catches: a payment-specific error code falling through
     // to "Ocurrió un error. Intente de nuevo." instead of a message the

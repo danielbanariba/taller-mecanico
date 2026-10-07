@@ -153,6 +153,29 @@ describe("StatusActions", () => {
     expect(screen.getByRole("button", { name: statusActionLabel("in_progress") })).toBeInTheDocument();
   });
 
+  it("maps a 409 work_order_has_payments to its own Spanish message, not the generic fallback", async () => {
+    // Defect this catches: the cancel guard's `work_order_has_payments`
+    // 409 (the `payments` spec's "Cancelling An Order Counts Only Its
+    // Non-Voided Payments") had no entry in `copy.ts`'s `ERROR_MESSAGES`,
+    // so a mechanic saw "Ocurrió un error. Intente de nuevo." with no way
+    // to understand that an unvoided payment is blocking cancellation.
+    mockSession();
+    server.use(
+      http.put("/api/work-orders/order-1/status", () =>
+        HttpResponse.json({ detail: "work_order_has_payments" }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderStatusActions(order({ status: "in_progress", allowed_transitions: ["completed", "cancelled"] }));
+
+    await user.click(screen.getByRole("button", { name: statusActionLabel("cancelled") }));
+    await user.click(screen.getByRole("button", { name: workOrdersCopy.cancelConfirm.confirm }));
+
+    expect(
+      await screen.findByText("No se puede cancelar una orden con pagos registrados. Anule los pagos primero."),
+    ).toBeInTheDocument();
+  });
+
   it("disables every status button offline, with the Spanish explanation", () => {
     // Defect this catches: an offline tap reaching the API -- AD-17's
     // write-requires-connection rule, which every other mutation in this

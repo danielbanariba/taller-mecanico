@@ -61,6 +61,7 @@ export function PaymentList({ orderId, payments }: PaymentListProps) {
 
   return (
     <div className="flex flex-col gap-3">
+      {isOffline ? <Alert variant="info">{workOrdersCopy.offline.voidPaymentDisabled}</Alert> : null}
       {payments.map((payment) => (
         <div
           key={payment.id}
