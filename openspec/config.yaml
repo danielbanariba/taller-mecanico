@@ -1,0 +1,83 @@
+# openspec/config.yaml
+schema: spec-driven
+
+context: |
+  Tech stack: API — Python 3.13, FastAPI, SQLAlchemy 2.x, Alembic, Postgres 17 (uv-managed).
+  Web — React 19, TypeScript 6.0.x, Vite 7, TanStack Query, Router 7, PWA (vite-plugin-pwa).
+  Architecture: hexagonal per feature on the API (domain/application/adapters);
+  container/presentational + shared UI kit on the web. Multi-tenant (workshop_id),
+  stock as an append-only movement ledger, idempotent client-generated ids, offline
+  outbox + Web Locks mutex on the web client.
+  Testing: pytest (API, needs docker compose db) + vitest/RTL/MSW (web). No single
+  workspace-wide command runs both; strict_tdd stays project-scoped (see below).
+  Style: English code/comments; Spanish UI copy and README (product's market language).
+
+strict_tdd: false
+# Resolution: two independent projects (api/, web/), no package-manager workspace,
+# no root Makefile/justfile/turbo, and no CI workflow that runs both suites with
+# one command. No explicit workspace-level test command covers every in-scope
+# project, so this falls closed to false per the sdd-init decision gates — this
+# is an automation-coverage fallback, not a statement that the team skips TDD.
+# The repo's existing convention IS test-first (RED -> GREEN) and the Test Value
+# Gate (every test must name the production defect it catches); sdd-apply MUST
+# honor each project's own command below when implementing in that project.
+
+projects:
+  - path: api
+    stack: "Python 3.13, FastAPI, SQLAlchemy, Alembic (uv)"
+    test_command: "uv run pytest"
+    test_command_prereq: "docker compose up -d db"
+    single_test_command: "uv run pytest tests/path/test_file.py::test_name"
+    lint_command: "uv run ruff check ."
+    format_command: "uv run ruff format --check ."
+    type_check_command: null
+    layers:
+      unit: true          # pure domain tests, e.g. test_phone_number.py, test_stock_domain.py
+      integration: true   # FastAPI TestClient + real Postgres via SAVEPOINT rollback
+      e2e: false
+    coverage_command: null
+  - path: web
+    stack: "React 19, TypeScript 6.0.x, Vite 7, TanStack Query"
+    test_command: "npm test -- --run"
+    single_test_command: "npm test -- --run src/path/to/File.test.tsx"
+    lint_command: "npm run lint"
+    type_check_command: "npm run typecheck"
+    build_command: "npm run build"
+    format_command: null
+    layers:
+      unit: true           # vitest + @testing-library/react
+      integration: true    # MSW-mocked API boundary (web/src/test/handlers.ts)
+      e2e: false            # playwright-best-practices skill installed, no config/suite yet
+    coverage_command: null
+
+rules:
+  proposal:
+    - Include a rollback plan for risky changes (schema migrations, tenancy, offline sync).
+    - Note which project(s) — api, web, or both — the change touches.
+  specs:
+    - Use Given/When/Then for scenarios.
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY).
+    - Call out tenancy (workshop_id scoping) and idempotency implications explicitly.
+  design:
+    - Include sequence diagrams for flows crossing api/web or touching the offline outbox.
+    - Document architecture decisions with rationale; respect hexagonal boundaries on the API
+      and container/presentational separation on the web.
+  tasks:
+    - Group by phase and by project (api / web); keep tasks completable in one session.
+    - For each new test, name in one sentence the production defect it would catch
+      (Test Value Gate) before adding it to a task.
+  apply:
+    guidelines:
+      - Follow existing code patterns (hexagonal per feature on the API; container/presentational
+        on the web; copy.ts is the only place Spanish user-facing strings live).
+      - Run `docker compose up -d db` before any api/ test or migration task.
+      - When a project has a runnable test with a clear expected outcome, observe RED before
+        implementing, then GREEN, per that project's test_command above (not a workspace command).
+    tdd: false   # see strict_tdd resolution above; per-project RED->GREEN still applies when applicable
+    test_command: ""
+  verify:
+    test_command: ""
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas (schema/migration removals, tenancy changes).
