@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { act, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -57,6 +58,20 @@ function mockSessionAndOrder() {
     http.get("/api/work-orders/order-1", () => HttpResponse.json(ORDER)),
   );
 }
+
+/** What a real browser does when the connection drops: `navigator.onLine` turns false and `offline` fires. */
+function goOffline() {
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  act(() => {
+    window.dispatchEvent(new Event("offline"));
+  });
+}
+
+afterEach(() => {
+  // Drops the own-property override from `goOffline`, so jsdom's own
+  // `navigator.onLine` getter (always true) applies to the next test.
+  Reflect.deleteProperty(window.navigator, "onLine");
+});
 
 function renderDetailPage() {
   return renderWithQueryClient(
@@ -120,5 +135,38 @@ describe("WorkOrderDetailPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Orden #42" })).toBeInTheDocument();
     expect(screen.queryByText("No se encontró la orden.")).not.toBeInTheDocument();
+  });
+
+  it("disables the line editor's submit with its offline message once the connection drops while it is open, and sends no request", async () => {
+    // Defect this catches: the line editor dialog (`LineEditorDialog`), once
+    // already open through this real container, keeps "Guardar línea"
+    // enabled after the connection drops -- the add-line mutation would
+    // then hang on a `network_error` instead of the dialog disabling
+    // submit the moment `useOnlineStatus()` flips, matching every other
+    // write screen's offline convention (`design.md`'s AD-17).
+    mockSessionAndOrder();
+    let lineRequestWasSent = false;
+    server.use(
+      http.post("/api/work-orders/order-1/lines", () => {
+        lineRequestWasSent = true;
+        return HttpResponse.json({ detail: "unexpected" }, { status: 500 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetailPage();
+
+    await user.click(await screen.findByRole("button", { name: "Agregar línea" }));
+    const dialog = await screen.findByRole("dialog", { name: "Agregar línea" });
+
+    goOffline();
+
+    expect(
+      within(dialog).getByText("Conéctese a internet para editar líneas."),
+    ).toBeInTheDocument();
+    const saveButton = within(dialog).getByRole("button", { name: "Guardar línea" });
+    expect(saveButton).toBeDisabled();
+
+    await user.click(saveButton);
+    expect(lineRequestWasSent).toBe(false);
   });
 });
