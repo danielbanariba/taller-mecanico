@@ -77,7 +77,7 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
 
 ### Slice P1.S1 — API: customers data layer, domain, use cases, router (+tests)
 
-- [ ] **P1.S1.T1** Verify unconfirmed identifiers before writing any phase-1 code (no production change; this task's output gates every later task in this document). Confirmed this session via CodeGraph — re-confirm with one `Read` only if `git log` shows these files changed since:
+- [x] **P1.S1.T1** Verify unconfirmed identifiers before writing any phase-1 code (no production change; this task's output gates every later task in this document). Confirmed this session via CodeGraph — re-confirm with one `Read` only if `git log` shows these files changed since:
   - `get_clock` is defined in `api/src/taller/identity/adapters/dependencies.py` and imported from there (e.g. `from taller.identity.adapters.dependencies import get_clock` in `api/src/taller/identity/adapters/router.py`).
   - **Identity has no reusable `invalid_phone` string code.** `RegisterRequest`/`LoginRequest` in `api/src/taller/identity/adapters/schemas.py` validate phone through a Pydantic `field_validator` (`_validate_phone`) that raises a plain `ValueError`; FastAPI turns that into a generic 422 whose `detail` is a list of validation issues, not the string `"invalid_phone"`. **Consequence:** `taller/customers` MUST mint its own `detail: "invalid_phone"` mapping in its own use case/router (catch `InvalidPhoneNumber` from `api/src/taller/identity/domain/errors.py` directly) — there is nothing to "reuse" at the HTTP layer, only the `PhoneNumber` value object itself (AD-8 still holds for the value object; its "reuse the code" hope does not).
   - `api/migrations/env.py` registers ORM metadata through side-effecting module imports: `import taller.identity.adapters.models` and `import taller.inventory.adapters.models` (both `# noqa: F401,E402`), and declares `MIGRATION_ONLY_INDEXES = frozenset({"ix_inventory_items_active_name"})`, checked in `include_object`. This slice adds `import taller.customers.adapters.models` to that same block; `MIGRATION_ONLY_INDEXES` is unchanged unless the fallback in `design.md` ("Migration-check fallback") is triggered.
@@ -86,25 +86,25 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
   - No item mutation in `web/src/features/inventory/hooks.ts` (`useCreateItem`, `useUpdateItem`) sets an explicit `networkMode` — they rely on TanStack Query's default `"online"` mode, paired with a UI-level `useOnlineStatus()` check disabling submit in `NewItemPage.tsx`/`EditItemPage.tsx`. New customers/vehicles mutations follow the same convention (no explicit `networkMode` override).
   - **Still open, confirm directly from `api/src/taller/inventory/adapters/router.py`'s `record_movement_route` with one bounded `Read` before Phase 2 Slice 1 (the first place these are reused):** the exact HTTP status codes `record_movement_route` maps `MovementIdConflict` and `StockOutOfRange` to. `design.md`'s API-surface tables already state 409 and 422 respectively (consistent with `ItemIdConflict`→409 and other bound violations→422 elsewhere in the same router); a CodeGraph caching quirk blocked re-reading the literal handler lines this session, so this is "very likely confirmed, re-check once" rather than unknown.
 
-- [ ] **P1.S1.T2** Create the package skeleton: `api/src/taller/customers/__init__.py`, `domain/__init__.py`, `application/__init__.py`, `adapters/__init__.py`.
+- [x] **P1.S1.T2** Create the package skeleton: `api/src/taller/customers/__init__.py`, `domain/__init__.py`, `application/__init__.py`, `adapters/__init__.py`.
 
-- [ ] **P1.S1.T3** Create `api/src/taller/customers/domain/entities.py`: `Customer` (with the `phone_is_mobile` property — `None` with no phone, else `phone[0] != "2"`, per AD-8), `Vehicle`, `VehicleType` (`car`, `motorcycle`, `other`). Both entities are declared now because the phase-1 migration (T6) creates both tables together; `Vehicle`'s own use cases land in Slice 2.
+- [x] **P1.S1.T3** Create `api/src/taller/customers/domain/entities.py`: `Customer` (with the `phone_is_mobile` property — `None` with no phone, else `phone[0] != "2"`, per AD-8), `Vehicle`, `VehicleType` (`car`, `motorcycle`, `other`). Both entities are declared now because the phase-1 migration (T6) creates both tables together; `Vehicle`'s own use cases land in Slice 2.
 
-- [ ] **P1.S1.T4** Create `api/src/taller/customers/domain/errors.py`: `CustomerNotFound`, `CustomerIdConflict`, `VehicleNotFound`, `VehicleIdConflict`, `PlateTaken`, `InvalidPlate` (all six declared now; the vehicle-specific ones are raised starting Slice 2).
+- [x] **P1.S1.T4** Create `api/src/taller/customers/domain/errors.py`: `CustomerNotFound`, `CustomerIdConflict`, `VehicleNotFound`, `VehicleIdConflict`, `PlateTaken`, `InvalidPlate` (all six declared now; the vehicle-specific ones are raised starting Slice 2).
 
-- [ ] **P1.S1.T5** Create `api/src/taller/customers/application/ports.py`: `CustomerRepository` and `VehicleRepository` (Protocols; `VehicleRepository` includes `get_many` for phase 2's `describe_vehicles`, per AD-12, even though it has no implementation yet).
+- [x] **P1.S1.T5** Create `api/src/taller/customers/application/ports.py`: `CustomerRepository` and `VehicleRepository` (Protocols; `VehicleRepository` includes `get_many` for phase 2's `describe_vehicles`, per AD-12, even though it has no implementation yet).
 
-- [ ] **P1.S1.T6** Create the phase-1 migration `api/migrations/versions/<rev>_customers_and_vehicles.py`: `customers` and `vehicles` tables exactly as specified in `design.md`'s "Data model per phase → Phase 1" (columns, `ix_customers_workshop_id`, `ix_vehicles_workshop_id`, `ix_vehicles_customer_id`, `ck_vehicles_vehicle_type`, and the partial unique index `uq_vehicles_workshop_plate_active ON vehicles (workshop_id, plate) WHERE archived_at IS NULL AND plate IS NOT NULL`), with a working `downgrade()` (drop `vehicles` then `customers`). Add `import taller.customers.adapters.models` to `api/migrations/env.py` per T1.
+- [x] **P1.S1.T6** Create the phase-1 migration `api/migrations/versions/<rev>_customers_and_vehicles.py`: `customers` and `vehicles` tables exactly as specified in `design.md`'s "Data model per phase → Phase 1" (columns, `ix_customers_workshop_id`, `ix_vehicles_workshop_id`, `ix_vehicles_customer_id`, `ck_vehicles_vehicle_type`, and the partial unique index `uq_vehicles_workshop_plate_active ON vehicles (workshop_id, plate) WHERE archived_at IS NULL AND plate IS NOT NULL`), with a working `downgrade()` (drop `vehicles` then `customers`). Add `import taller.customers.adapters.models` to `api/migrations/env.py` per T1.
 
-- [ ] **P1.S1.T7** Create `api/src/taller/customers/adapters/models.py`: `CustomerModel` and `VehicleModel` (both ORM models, matching T6's schema exactly, including the partial index declared with `postgresql_where` so `alembic check` sees it).
+- [x] **P1.S1.T7** Create `api/src/taller/customers/adapters/models.py`: `CustomerModel` and `VehicleModel` (both ORM models, matching T6's schema exactly, including the partial index declared with `postgresql_where` so `alembic check` sees it).
 
-- [ ] **P1.S1.T8 (RED)** Write `api/tests/customers/test_customers_domain.py`:
+- [x] **P1.S1.T8 (RED)** Write `api/tests/customers/test_customers_domain.py`:
   - `phone_is_mobile` is `False` for `22345678`, `True` for `98765432`, `None` with no phone. **Defect it catches:** WhatsApp is offered to a landline, or the app crashes on a phoneless customer (phase 2 depends on this being right).
   Confirm these fail (no `Customer`/`phone_is_mobile` implementation satisfies them yet beyond T3's property — if T3 is already correct this test should pass immediately; if so, write it before T3 lands in version control history, i.e. run it once against a stash of T3 reverted, or accept GREEN-on-first-run only if T3 was written test-first in the same commit).
 
-- [ ] **P1.S1.T9 (GREEN)** Confirm T8 passes against T3's `Customer.phone_is_mobile` implementation; add any missing edge case T8 revealed.
+- [x] **P1.S1.T9 (GREEN)** Confirm T8 passes against T3's `Customer.phone_is_mobile` implementation; add any missing edge case T8 revealed.
 
-- [ ] **P1.S1.T10 (RED)** Write `api/tests/customers/test_customers_api.py` covering, before any use case/router exists:
+- [x] **P1.S1.T10 (RED)** Write `api/tests/customers/test_customers_api.py` covering, before any use case/router exists:
   - Create with phone `+504 2234-5678` → stored `22345678`, `phone_is_mobile` `false`; a 7-digit phone or one starting with `1` → HTTP 422 `invalid_phone`. **Defect it catches:** the customer path skips `PhoneNumber` normalization, or invalid phones are persisted.
   - Create with no phone → saved, `phone_is_mobile` `null`. **Defect it catches:** an empty phone is rejected or crashes normalization.
   - Replaying an identical create (same id, same payload) → HTTP 200, one row; the same id with a different `full_name` → HTTP 409 `customer_id_conflict`, original unchanged. **Defect it catches:** a retry duplicates customers, or a conflicting replay silently overwrites data.
@@ -113,19 +113,19 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
   - `q=maria` finds `María`; `q=9876` finds `98765432`; `q=50%` matches the literal string `50%` (not a wildcard). **Defect it catches:** accent/case-sensitive search, the phone fragment not searched, or unescaped `LIKE` wildcards.
   - Workshop B's GET/PATCH/archive of workshop A's customer id → HTTP 404 `customer_not_found`, A's data unchanged. **Defect it catches:** a missing `workshop_id` filter leaks or mutates another tenant's data.
 
-- [ ] **P1.S1.T11 (GREEN)** Create `api/src/taller/customers/application/use_cases.py`: `create_customer` (idempotent by client id, replay-before-conflict per the codebase's existing item-create idiom; catches `InvalidPhoneNumber` and raises the customers-domain-owned `invalid_phone` mapping per T1), `update_customer`, `archive_customer` (sets `archived_at`; idempotent — Slice 2 extends this to cascade to vehicles), `get_customer`, `list_customers` (accent-insensitive search via `taller_unaccent_lower`, matching name OR phone fragment; the plate-fragment match is added in Slice 2 once vehicles exist).
+- [x] **P1.S1.T11 (GREEN)** Create `api/src/taller/customers/application/use_cases.py`: `create_customer` (idempotent by client id, replay-before-conflict per the codebase's existing item-create idiom; catches `InvalidPhoneNumber` and raises the customers-domain-owned `invalid_phone` mapping per T1), `update_customer`, `archive_customer` (sets `archived_at`; idempotent — Slice 2 extends this to cascade to vehicles), `get_customer`, `list_customers` (accent-insensitive search via `taller_unaccent_lower`, matching name OR phone fragment; the plate-fragment match is added in Slice 2 once vehicles exist).
 
-- [ ] **P1.S1.T12 (GREEN)** Create `api/src/taller/customers/adapters/repositories.py`: `SqlAlchemyCustomerRepository` implementing `CustomerRepository` against `CustomerModel`.
+- [x] **P1.S1.T12 (GREEN)** Create `api/src/taller/customers/adapters/repositories.py`: `SqlAlchemyCustomerRepository` implementing `CustomerRepository` against `CustomerModel`.
 
-- [ ] **P1.S1.T13 (GREEN)** Create `api/src/taller/customers/adapters/schemas.py`: `CustomerCreateRequest`, `CustomerUpdateRequest`, `CustomerOut` (`{id, full_name, phone, phone_is_mobile, notes, archived_at, created_at, updated_at}`), replay comparison on `{full_name, phone, notes}`.
+- [x] **P1.S1.T13 (GREEN)** Create `api/src/taller/customers/adapters/schemas.py`: `CustomerCreateRequest`, `CustomerUpdateRequest`, `CustomerOut` (`{id, full_name, phone, phone_is_mobile, notes, archived_at, created_at, updated_at}`), replay comparison on `{full_name, phone, notes}`.
 
-- [ ] **P1.S1.T14 (GREEN)** Create `api/src/taller/customers/adapters/router.py`: `customers_router` with `POST /customers`, `GET /customers?q=&include_archived=`, `GET /customers/{id}`, `PATCH /customers/{id}`, `POST /customers/{id}/archive`, each scoped by `get_current_workshop_id`, mapping `InvalidPhoneNumber` → 422 `invalid_phone`, `CustomerIdConflict` → 409, `CustomerNotFound` → 404. Run T10 and confirm it is green.
+- [x] **P1.S1.T14 (GREEN)** Create `api/src/taller/customers/adapters/router.py`: `customers_router` with `POST /customers`, `GET /customers?q=&include_archived=`, `GET /customers/{id}`, `PATCH /customers/{id}`, `POST /customers/{id}/archive`, each scoped by `get_current_workshop_id`, mapping `InvalidPhoneNumber` → 422 `invalid_phone`, `CustomerIdConflict` → 409, `CustomerNotFound` → 404. Run T10 and confirm it is green.
 
-- [ ] **P1.S1.T15 (GREEN)** Modify `api/src/taller/main.py`: mount `customers_router` under `/api`.
+- [x] **P1.S1.T15 (GREEN)** Modify `api/src/taller/main.py`: mount `customers_router` under `/api`.
 
-- [ ] **P1.S1.T16** Run this slice's verification: `docker compose up -d db`; `cd api && uv run ruff check . && uv run ruff format --check . && uv run pytest`. Fix any failure before proceeding.
+- [x] **P1.S1.T16** Run this slice's verification: `docker compose up -d db`; `cd api && uv run ruff check . && uv run ruff format --check . && uv run pytest`. Fix any failure before proceeding.
 
-- [ ] **P1.S1.T17** Work-unit commit on `feat/workshop-core-customers`: `:sparkles: feat(customers): add customer records with search and archive` (body: what/why, referencing `customers` capability spec).
+- [x] **P1.S1.T17** Work-unit commit on `feat/workshop-core-customers`: `:sparkles: feat(customers): add customer records with search and archive` (body: what/why, referencing `customers` capability spec).
 
 ### Slice P1.S2 — API: vehicles (plate normalization, uniqueness race, cascade archive) + tests
 
