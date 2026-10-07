@@ -23,13 +23,20 @@ Defects these catch:
   `initial_stock` returning 200 and silently dropping the difference,
   instead of a 409;
 - a search `q` that is used as a raw `LIKE` pattern, letting `%`/`_` act as
-  wildcards instead of matching literally.
+  wildcards instead of matching literally;
+- a PATCH that reports any database integrity error as `item_name_taken`,
+  hiding a real bug behind a misleading "name already used" message, or
+  that no longer maps a rename losing the race to a concurrent one to 409.
 """
 
 import uuid
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
+
+from taller.inventory.adapters.repositories import SqlAlchemyItemRepository
 
 
 def _create_item(client: TestClient, **overrides: object) -> dict:
@@ -179,6 +186,44 @@ def test_patch_updates_fields_but_never_stock(authenticated_client: TestClient) 
     assert body["name"] == "Llave de cruz 4 puntas"
     assert body["min_stock"] == 1
     assert body["stock"] == 2
+
+
+def test_patch_that_loses_a_rename_race_reports_the_name_as_taken(
+    authenticated_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _create_item(authenticated_client, name="Faja de tiempo")
+    item = _create_item(authenticated_client, name="Faja de alternador")
+    # A concurrent rename committed after the pre-check ran: the pre-check
+    # sees no collision, so only the database's unique index catches it.
+    monkeypatch.setattr(SqlAlchemyItemRepository, "get_active_by_name", lambda *a, **kw: None)
+
+    response = authenticated_client.patch(
+        f"/api/inventory/items/{item['id']}", json={"name": "Faja de tiempo"}
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "item_name_taken"
+
+
+def test_patch_does_not_report_an_unrelated_integrity_error_as_a_taken_name(
+    authenticated_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    item = _create_item(authenticated_client, name="Retenedor")
+    original_save = SqlAlchemyItemRepository.save
+
+    def save_breaking_the_workshop_foreign_key(self: SqlAlchemyItemRepository, item) -> None:
+        original_save(self, item)
+        self._session.execute(
+            text("UPDATE inventory_items SET workshop_id = :bogus WHERE id = :id"),
+            {"bogus": uuid.uuid4(), "id": item.id},
+        )
+
+    monkeypatch.setattr(SqlAlchemyItemRepository, "save", save_breaking_the_workshop_foreign_key)
+
+    # TestClient re-raises unhandled server errors: reaching here means the
+    # route let the error surface (a 500) instead of answering 409.
+    with pytest.raises(IntegrityError, match="inventory_items_workshop_id_fkey"):
+        authenticated_client.patch(f"/api/inventory/items/{item['id']}", json={"notes": "x"})
 
 
 @pytest.mark.parametrize(

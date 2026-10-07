@@ -51,6 +51,10 @@ router = APIRouter(prefix="/inventory", tags=["inventory"])
 _ITEM_PK_CONSTRAINT = "inventory_items_pkey"
 _MOVEMENT_PK_CONSTRAINT = "inventory_movements_pkey"
 
+#: The partial unique index on active item names (created in the inventory
+#: migration with raw SQL, hence no SQLAlchemy-generated name to import).
+_ACTIVE_NAME_INDEX = "ix_inventory_items_active_name"
+
 
 def _violated_constraint(exc: IntegrityError) -> str | None:
     """Mirrors `taller.identity.adapters.router._violated_constraint`."""
@@ -183,6 +187,11 @@ def update_item_route(
         raise HTTPException(status.HTTP_409_CONFLICT, detail="item_name_taken") from exc
     except IntegrityError as exc:
         db.rollback()
+        # A concurrent rename committed the same name after our pre-check:
+        # the unique index is the real guarantee. Any other integrity error
+        # is a bug and must not be reported as a taken name.
+        if _violated_constraint(exc) != _ACTIVE_NAME_INDEX:
+            raise
         raise HTTPException(status.HTTP_409_CONFLICT, detail="item_name_taken") from exc
     return ItemOut.from_domain(item)
 
@@ -272,6 +281,9 @@ def record_movement_route(
         # as a replay or a precise conflict.
         try:
             movement, item, is_new = _attempt()
+        except ItemNotFound as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="item_not_found") from exc
         except MovementIdConflict as exc:
             db.rollback()
             raise HTTPException(status.HTTP_409_CONFLICT, detail="movement_id_conflict") from exc
