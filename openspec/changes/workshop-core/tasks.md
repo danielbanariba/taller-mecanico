@@ -129,16 +129,16 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
 
 ### Slice P1.S2 — API: vehicles (plate normalization, uniqueness race, cascade archive) + tests
 
-- [ ] **P1.S2.T1** Create `api/src/taller/customers/domain/plate.py`: `normalize_plate(raw) -> str | None` — strip, uppercase, remove whitespace/`-`/`.`/`/`; empty result → `None`; result must match `^[A-Z0-9]{1,12}$` or raise `InvalidPlate` (AD-9).
+- [x] **P1.S2.T1** Create `api/src/taller/customers/domain/plate.py`: `normalize_plate(raw) -> str | None` — strip, uppercase, remove whitespace/`-`/`.`/`/`; empty result → `None`; result must match `^[A-Z0-9]{1,12}$` or raise `InvalidPlate` (AD-9).
 
-- [ ] **P1.S2.T2 (RED)** Write `api/tests/customers/test_customers_domain.py` additions (plate unit tests):
+- [x] **P1.S2.T2 (RED)** Write `api/tests/customers/test_customers_domain.py` additions (plate unit tests):
   - `normalize_plate("hab-1234") == "HAB1234"`. **Defect it catches:** a separator or lowercase variant bypasses the uniqueness index.
   - `normalize_plate("  ")` is `None`. **Defect it catches:** a whitespace-only plate is stored as `""`, which would collide with a second unplated vehicle against the partial index.
   - `normalize_plate("HAB#1")` raises `InvalidPlate`. **Defect it catches:** an invalid character is silently accepted and stored.
 
-- [ ] **P1.S2.T3 (GREEN)** Confirm T2 passes against T1's `normalize_plate`.
+- [x] **P1.S2.T3 (GREEN)** Confirm T2 passes against T1's `normalize_plate`.
 
-- [ ] **P1.S2.T4 (RED)** Write `api/tests/customers/test_vehicles_api.py` covering, before vehicle use cases/router exist:
+- [x] **P1.S2.T4 (RED)** Write `api/tests/customers/test_vehicles_api.py` covering, before vehicle use cases/router exist:
   - Create referencing an active customer of the workshop → saved with that owner. **Defect it catches:** the owner reference is dropped or unchecked.
   - Create referencing a nonexistent, foreign, or **archived** customer id → HTTP 404 `customer_not_found`, no vehicle created. **Defect it catches:** an archived customer's id is still accepted for new links (AD-14).
   - An edit payload including a different `customer_id` does not reassign the owner; the edit endpoint does not accept `customer_id`. **Defect it catches:** a vehicle can be reassigned to a different customer after creation.
@@ -153,19 +153,19 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
   - Workshop B's GET/PATCH/archive of workshop A's vehicle id → HTTP 404 `vehicle_not_found`; workshop B creating a vehicle under workshop A's customer id → HTTP 404 `customer_not_found`. **Defect it catches:** a missing `workshop_id` filter leaks or mutates another tenant's data.
   - Listing a customer's vehicles without `include_archived` returns only active ones.
 
-- [ ] **P1.S2.T5 (GREEN)** Modify `api/src/taller/customers/application/use_cases.py`: `create_vehicle` (idempotent, rejects archived/foreign/nonexistent customer, replay-before-uniqueness-check per AD-14), `update_vehicle` (no `customer_id` in the editable payload), `archive_vehicle`, `get_vehicle`, `list_vehicles_for_customer`. Modify `archive_customer` to cascade: stamp `archived_at` on the customer and every one of its active vehicles in one transaction, same timestamp. Modify `list_customers`'s search to also match a normalized plate fragment of the customer's active vehicles.
+- [x] **P1.S2.T5 (GREEN)** Modify `api/src/taller/customers/application/use_cases.py`: `create_vehicle` (idempotent, rejects archived/foreign/nonexistent customer, replay-before-uniqueness-check per AD-14), `update_vehicle` (no `customer_id` in the editable payload), `archive_vehicle`, `get_vehicle`, `list_vehicles_for_customer`. Modify `archive_customer` to cascade: stamp `archived_at` on the customer and every one of its active vehicles in one transaction, same timestamp. Modify `list_customers`'s search to also match a normalized plate fragment of the customer's active vehicles.
 
-- [ ] **P1.S2.T6 (GREEN)** Modify `api/src/taller/customers/adapters/repositories.py`: `SqlAlchemyVehicleRepository` implementing `VehicleRepository` (including `get_many`), and extend the customer search query with the vehicle-plate join.
+- [x] **P1.S2.T6 (GREEN)** Modify `api/src/taller/customers/adapters/repositories.py`: `SqlAlchemyVehicleRepository` implementing `VehicleRepository` (including `get_many`), and extend the customer search query with the vehicle-plate join.
 
-- [ ] **P1.S2.T7 (GREEN)** Modify `api/src/taller/customers/adapters/schemas.py`: `VehicleCreateRequest`, `VehicleUpdateRequest`, `VehicleOut`, `VehicleDetailOut` (`VehicleOut` plus `owner: CustomerOut`); replay comparison on `{customer_id, vehicle_type, make, model, year, color, plate, notes}`.
+- [x] **P1.S2.T7 (GREEN)** Modify `api/src/taller/customers/adapters/schemas.py`: `VehicleCreateRequest`, `VehicleUpdateRequest`, `VehicleOut`, `VehicleDetailOut` (`VehicleOut` plus `owner: CustomerOut`); replay comparison on `{customer_id, vehicle_type, make, model, year, color, plate, notes}`.
 
-- [ ] **P1.S2.T8 (GREEN)** Modify `api/src/taller/customers/adapters/router.py`: add `vehicles_router` with `POST /vehicles`, `GET /customers/{id}/vehicles`, `GET /vehicles/{id}`, `PATCH /vehicles/{id}`, `POST /vehicles/{id}/archive`; map `PlateTaken` → 409, `InvalidPlate` → 422, `VehicleNotFound`/`CustomerNotFound` → 404, `VehicleIdConflict` → 409. Run T4 and confirm it is green.
+- [x] **P1.S2.T8 (GREEN)** Modify `api/src/taller/customers/adapters/router.py`: add `vehicles_router` with `POST /vehicles`, `GET /customers/{id}/vehicles`, `GET /vehicles/{id}`, `PATCH /vehicles/{id}`, `POST /vehicles/{id}/archive`; map `PlateTaken` → 409, `InvalidPlate` → 422, `VehicleNotFound`/`CustomerNotFound` → 404, `VehicleIdConflict` → 409. Run T4 and confirm it is green.
 
-- [ ] **P1.S2.T9 (GREEN)** Modify `api/src/taller/main.py`: mount `vehicles_router`.
+- [x] **P1.S2.T9 (GREEN)** Modify `api/src/taller/main.py`: mount `vehicles_router`.
 
-- [ ] **P1.S2.T10** Run this slice's verification: `uv run ruff check . && uv run ruff format --check . && uv run pytest` (api).
+- [x] **P1.S2.T10** Run this slice's verification: `uv run ruff check . && uv run ruff format --check . && uv run pytest` (api).
 
-- [ ] **P1.S2.T11** Work-unit commit: `:sparkles: feat(customers): add vehicles with plate normalization and cascade archive`.
+- [x] **P1.S2.T11** Work-unit commit: `:sparkles: feat(customers): add vehicles with plate normalization and cascade archive`.
 
 ### Slice P1.S3 — Web: app shell, bottom nav, router restructure, Órdenes placeholder
 

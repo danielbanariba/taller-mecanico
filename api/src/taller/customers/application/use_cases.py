@@ -1,15 +1,18 @@
-"""Use cases for the customers feature: customer records.
-
-Vehicle use cases land in slice 2, once `VehicleRepository` has a real
-implementation.
-"""
+"""Use cases for the customers feature: customers and their vehicles."""
 
 import uuid
 from datetime import UTC, datetime
 
-from taller.customers.application.ports import CustomerRepository
-from taller.customers.domain.entities import Customer
-from taller.customers.domain.errors import CustomerIdConflict, CustomerNotFound
+from taller.customers.application.ports import CustomerRepository, VehicleRepository
+from taller.customers.domain.entities import Customer, Vehicle, VehicleType
+from taller.customers.domain.errors import (
+    CustomerIdConflict,
+    CustomerNotFound,
+    PlateTaken,
+    VehicleIdConflict,
+    VehicleNotFound,
+)
+from taller.customers.domain.plate import normalize_plate
 from taller.identity.domain.phone_number import PhoneNumber
 
 
@@ -144,12 +147,18 @@ def update_customer(
 
 
 def archive_customer(
-    *, workshop_id: uuid.UUID, customer_id: uuid.UUID, customer_repo: CustomerRepository
+    *,
+    workshop_id: uuid.UUID,
+    customer_id: uuid.UUID,
+    customer_repo: CustomerRepository,
+    vehicle_repo: VehicleRepository,
 ) -> None:
     """Raises: CustomerNotFound: no such customer in this workshop.
 
-    Slice 2 extends this to also cascade to the customer's active vehicles
-    (AD-15); this slice only archives the customer itself.
+    Cascades to every active vehicle owned by the customer, stamped with
+    the customer's own `archived_at` timestamp (AD-15), which frees each
+    of those vehicles' plates for reuse. An already-archived vehicle is
+    left untouched.
     """
     customer = customer_repo.get_by_id(workshop_id=workshop_id, customer_id=customer_id)
     if customer is None:
@@ -159,3 +168,213 @@ def archive_customer(
         customer.archived_at = now
         customer.updated_at = now
         customer_repo.save(customer)
+        for vehicle in vehicle_repo.list_for_customer(
+            workshop_id=workshop_id, customer_id=customer_id, include_archived=False
+        ):
+            vehicle.archived_at = now
+            vehicle.updated_at = now
+            vehicle_repo.save(vehicle)
+
+
+def _vehicle_fields_match(
+    vehicle: Vehicle,
+    *,
+    customer_id: uuid.UUID,
+    vehicle_type: VehicleType,
+    make: str,
+    model: str | None,
+    year: int | None,
+    color: str | None,
+    plate: str | None,
+    notes: str | None,
+) -> bool:
+    return (
+        vehicle.customer_id == customer_id
+        and vehicle.vehicle_type == vehicle_type
+        and vehicle.make == make
+        and vehicle.model == model
+        and vehicle.year == year
+        and vehicle.color == color
+        and vehicle.plate == plate
+        and vehicle.notes == notes
+    )
+
+
+def create_vehicle(
+    *,
+    workshop_id: uuid.UUID,
+    vehicle_id: uuid.UUID | None,
+    customer_id: uuid.UUID,
+    vehicle_type: VehicleType,
+    make: str,
+    model: str | None,
+    year: int | None,
+    color: str | None,
+    plate: str | None,
+    notes: str | None,
+    customer_repo: CustomerRepository,
+    vehicle_repo: VehicleRepository,
+) -> tuple[Vehicle, bool]:
+    """Create a vehicle, or replay an idempotent create.
+
+    Replay detection runs before the owner check and the plate-uniqueness
+    check (AD-14): a replayed plated vehicle must not re-trigger
+    `PlateTaken` against itself.
+
+    Returns ``(vehicle, is_new)``: ``is_new`` is False when ``vehicle_id``
+    already existed with identical fields (the caller should respond 200,
+    not 201).
+
+    Raises:
+        InvalidPlate: ``plate`` is present but does not normalize to a
+            valid plate.
+        VehicleIdConflict: ``vehicle_id`` already exists with different
+            fields.
+        CustomerNotFound: no active customer ``customer_id`` in this
+            workshop (also raised for an archived customer: new links to
+            an archived customer are refused).
+        PlateTaken: another active vehicle in the workshop already has
+            this normalized plate.
+    """
+    normalized_make = make.strip()
+    normalized_model = _normalize_optional_text(model)
+    normalized_color = _normalize_optional_text(color)
+    normalized_plate = normalize_plate(plate)
+    normalized_notes = _normalize_optional_text(notes)
+
+    if vehicle_id is not None:
+        existing = vehicle_repo.get_by_id(workshop_id=workshop_id, vehicle_id=vehicle_id)
+        if existing is not None:
+            if not _vehicle_fields_match(
+                existing,
+                customer_id=customer_id,
+                vehicle_type=vehicle_type,
+                make=normalized_make,
+                model=normalized_model,
+                year=year,
+                color=normalized_color,
+                plate=normalized_plate,
+                notes=normalized_notes,
+            ):
+                raise VehicleIdConflict(vehicle_id)
+            return existing, False
+
+    owner = customer_repo.get_by_id(workshop_id=workshop_id, customer_id=customer_id)
+    if owner is None or owner.archived_at is not None:
+        raise CustomerNotFound(customer_id)
+
+    if normalized_plate is not None:
+        collision = vehicle_repo.get_active_by_plate(
+            workshop_id=workshop_id, plate=normalized_plate
+        )
+        if collision is not None:
+            raise PlateTaken(normalized_plate)
+
+    now = datetime.now(UTC)
+    vehicle = Vehicle(
+        id=vehicle_id if vehicle_id is not None else uuid.uuid4(),
+        workshop_id=workshop_id,
+        customer_id=customer_id,
+        vehicle_type=vehicle_type,
+        make=normalized_make,
+        model=normalized_model,
+        year=year,
+        color=normalized_color,
+        plate=normalized_plate,
+        notes=normalized_notes,
+        archived_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    vehicle_repo.add(vehicle)
+    return vehicle, True
+
+
+def get_vehicle(
+    *, workshop_id: uuid.UUID, vehicle_id: uuid.UUID, vehicle_repo: VehicleRepository
+) -> Vehicle:
+    """Raises: VehicleNotFound: no such vehicle in this workshop."""
+    vehicle = vehicle_repo.get_by_id(workshop_id=workshop_id, vehicle_id=vehicle_id)
+    if vehicle is None:
+        raise VehicleNotFound(vehicle_id)
+    return vehicle
+
+
+def list_vehicles_for_customer(
+    *,
+    workshop_id: uuid.UUID,
+    customer_id: uuid.UUID,
+    include_archived: bool,
+    customer_repo: CustomerRepository,
+    vehicle_repo: VehicleRepository,
+) -> list[Vehicle]:
+    """Raises: CustomerNotFound: no such customer in this workshop."""
+    customer = customer_repo.get_by_id(workshop_id=workshop_id, customer_id=customer_id)
+    if customer is None:
+        raise CustomerNotFound(customer_id)
+    return vehicle_repo.list_for_customer(
+        workshop_id=workshop_id, customer_id=customer_id, include_archived=include_archived
+    )
+
+
+def update_vehicle(
+    *,
+    workshop_id: uuid.UUID,
+    vehicle_id: uuid.UUID,
+    fields: dict,
+    vehicle_repo: VehicleRepository,
+) -> Vehicle:
+    """Update any editable vehicle field present in ``fields``.
+
+    ``customer_id`` is never one of ``fields``: the HTTP schema layer does
+    not expose it, because a vehicle's owner is immutable after creation.
+
+    Raises:
+        VehicleNotFound: no such vehicle in this workshop.
+        InvalidPlate: ``fields["plate"]`` is present but invalid.
+        PlateTaken: the new normalized plate collides with another active
+            vehicle in the workshop.
+    """
+    vehicle = vehicle_repo.get_by_id(workshop_id=workshop_id, vehicle_id=vehicle_id)
+    if vehicle is None:
+        raise VehicleNotFound(vehicle_id)
+
+    if "vehicle_type" in fields:
+        vehicle.vehicle_type = fields["vehicle_type"]
+    if "make" in fields:
+        vehicle.make = fields["make"].strip()
+    if "model" in fields:
+        vehicle.model = _normalize_optional_text(fields["model"])
+    if "year" in fields:
+        vehicle.year = fields["year"]
+    if "color" in fields:
+        vehicle.color = _normalize_optional_text(fields["color"])
+    if "plate" in fields:
+        new_plate = normalize_plate(fields["plate"])
+        if new_plate != vehicle.plate and new_plate is not None:
+            collision = vehicle_repo.get_active_by_plate(
+                workshop_id=workshop_id, plate=new_plate, exclude_id=vehicle.id
+            )
+            if collision is not None:
+                raise PlateTaken(new_plate)
+        vehicle.plate = new_plate
+    if "notes" in fields:
+        vehicle.notes = _normalize_optional_text(fields["notes"])
+
+    vehicle.updated_at = datetime.now(UTC)
+    vehicle_repo.save(vehicle)
+    return vehicle
+
+
+def archive_vehicle(
+    *, workshop_id: uuid.UUID, vehicle_id: uuid.UUID, vehicle_repo: VehicleRepository
+) -> None:
+    """Raises: VehicleNotFound: no such vehicle in this workshop."""
+    vehicle = vehicle_repo.get_by_id(workshop_id=workshop_id, vehicle_id=vehicle_id)
+    if vehicle is None:
+        raise VehicleNotFound(vehicle_id)
+    if vehicle.archived_at is None:
+        now = datetime.now(UTC)
+        vehicle.archived_at = now
+        vehicle.updated_at = now
+        vehicle_repo.save(vehicle)
