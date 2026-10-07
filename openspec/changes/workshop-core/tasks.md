@@ -314,27 +314,28 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
 
 ### Slice P2.S2 — API: work-order domain, numbering, non-consuming lines, list
 
-- [ ] **P2.S2.T1 (RED)** Write `api/tests/workorders/test_reconciliation_plan.py` (pure, no DB) against `plan_reconciliation`, before it exists:
+- [x] **P2.S2.T1 (RED)** Write `api/tests/workorders/test_reconciliation_plan.py` (pure, no DB) against `plan_reconciliation`, before it exists:
   - In `in_progress`, an inventory-part line not yet posted plans `out qty` at revision 1. **Defect it catches:** the initial consumption is skipped or posts the wrong quantity.
   - Posted 2 → target 5 plans `out 3`; posted 5 → target 2 plans `in 3`. **Defect it catches:** an edit re-posts the full new quantity instead of only the delta, double-counting consumption.
   - A removed line (posted `qty`, target `0`) plans `in qty`. **Defect it catches:** removing a consuming line leaves its stock taken.
   - In `cancelled`, every previously-posted line plans `in posted`. **Defect it catches:** cancellation reverses only some lines, or reverses a line that never consumed.
   - Labor and external-part lines never appear in the plan, in any status. **Defect it catches:** a non-part line accidentally touches stock.
   - The plan is sorted by `(item_id, line_id)`. **Defect it catches:** an unsorted plan, which is the deadlock AD-5 exists to prevent.
+  **Result (RED):** stashed `status.py`/`stock.py`/`money.py`/`entities.py`/`errors.py` (keeping the test file), ran the suite: `ModuleNotFoundError: No module named 'taller.workorders.domain.entities'` on collection. Restored the stash (GREEN): 7 passed.
 
-- [ ] **P2.S2.T2 (GREEN)** Create `api/src/taller/workorders/domain/status.py`: `WorkOrderStatus` (`StrEnum`), `TRANSITIONS`, `CONSUMING`, `EDITABLE`, exactly as in `design.md`'s "Interfaces / Contracts" snippet (`PAYABLE` is added in phase 3).
+- [x] **P2.S2.T2 (GREEN)** Create `api/src/taller/workorders/domain/status.py`: `WorkOrderStatus` (`StrEnum`), `TRANSITIONS`, `CONSUMING`, `EDITABLE`, exactly as in `design.md`'s "Interfaces / Contracts" snippet (`PAYABLE` is added in phase 3).
 
-- [ ] **P2.S2.T3 (GREEN)** Create `api/src/taller/workorders/domain/stock.py`: `WORK_ORDER_STOCK_NAMESPACE` (a fixed literal `uuid.UUID`, generated once and never changed), `movement_id_for(order_id, line_id, revision)`, `PlannedMovement`, `plan_reconciliation(order_id, status, lines)` (pure). Run T1 and confirm it is green.
+- [x] **P2.S2.T3 (GREEN)** Create `api/src/taller/workorders/domain/stock.py`: `WORK_ORDER_STOCK_NAMESPACE` (a fixed literal `uuid.UUID`, generated once and never changed), `movement_id_for(order_id, line_id, revision)`, `PlannedMovement`, `plan_reconciliation(order_id, status, lines)` (pure). Run T1 and confirm it is green. **Deviation:** `WORK_ORDER_STOCK_NAMESPACE` is `uuid.uuid5(uuid.NAMESPACE_URL, "https://taller-mecanico.invalid/workorders/stock-consumption")` rather than a hand-picked random literal — a pure function of a constant input is exactly as fixed/never-changing as a literal, and it mirrors the codebase's own existing idiom (`_INITIAL_STOCK_NAMESPACE` in `inventory/application/use_cases.py`) instead of introducing a second, unexplained convention.
 
-- [ ] **P2.S2.T4 (GREEN)** Create `api/src/taller/workorders/domain/money.py`: line subtotal (`quantity * unit_price_cents`) and order total (sum over non-removed lines) helpers, cents-only, no floats.
+- [x] **P2.S2.T4 (GREEN)** Create `api/src/taller/workorders/domain/money.py`: line subtotal (`quantity * unit_price_cents`) and order total (sum over non-removed lines) helpers, cents-only, no floats.
 
-- [ ] **P2.S2.T5 (GREEN)** Create `api/src/taller/workorders/domain/entities.py`: `WorkOrder`, `WorkOrderLine` aggregates (fields per the "Data model per phase → Phase 2" tables, including `stock_posted_quantity`/`stock_revision` on the line).
+- [x] **P2.S2.T5 (GREEN)** Create `api/src/taller/workorders/domain/entities.py`: `WorkOrder`, `WorkOrderLine` aggregates (fields per the "Data model per phase → Phase 2" tables, including `stock_posted_quantity`/`stock_revision` on the line). Also adds `LineKind` (`StrEnum`), mirroring `VehicleType`'s existing convention for a line's `kind`.
 
-- [ ] **P2.S2.T6 (GREEN)** Create `api/src/taller/workorders/domain/errors.py`: `WorkOrderNotFound`, `WorkOrderIdConflict`, `InvalidStatusTransition`, `WorkOrderLocked`, `WorkOrderLineNotFound`, `WorkOrderLineIdConflict`, `ItemNotFoundForLine`.
+- [x] **P2.S2.T6 (GREEN)** Create `api/src/taller/workorders/domain/errors.py`: `WorkOrderNotFound`, `WorkOrderIdConflict`, `InvalidStatusTransition`, `WorkOrderLocked`, `WorkOrderLineNotFound`, `WorkOrderLineIdConflict`, `ItemNotFoundForLine`. `InvalidStatusTransition` is declared now and used starting Slice 3.
 
-- [ ] **P2.S2.T7 (GREEN)** Modify `api/src/taller/customers/application/use_cases.py`: add `get_active_vehicle(workshop_id, vehicle_id)` (404-equivalent domain error for a missing/foreign/archived vehicle) and `describe_vehicles(workshop_id, vehicle_ids)` (batched, one query per table) per AD-12.
+- [x] **P2.S2.T7 (GREEN)** Modify `api/src/taller/customers/application/use_cases.py`: add `get_active_vehicle(workshop_id, vehicle_id)` (404-equivalent domain error for a missing/foreign/archived vehicle) and `describe_vehicles(workshop_id, vehicle_ids)` (batched, one query per table) per AD-12. **Deviation (minimal, necessary):** AD-12 says "batches one query per table" (plural) — resolving owners too needs a second batched lookup beyond the already-declared `VehicleRepository.get_many`, so `CustomerRepository` gained the same `get_many(workshop_id, customer_ids)` method (ports.py + `SqlAlchemyCustomerRepository`), mirroring `VehicleRepository.get_many`'s existing shape exactly. **Gotcha:** `get_many` had to be placed *before* `CustomerRepository.list(...)` in both the Protocol and its SQLAlchemy implementation — a method named `list` inside a class body shadows the builtin `list` for every annotation evaluated afterward in that same class, breaking `customer_ids: list[uuid.UUID]` on any method defined below it (`TypeError: 'function' object is not subscriptable`); caught immediately via `import taller.main`.
 
-- [ ] **P2.S2.T8 (RED)** Write `api/tests/workorders/test_work_orders_api.py` and `api/tests/workorders/test_work_order_lines_api.py`, before the use cases/router exist:
+- [x] **P2.S2.T8 (RED)** Write `api/tests/workorders/test_work_orders_api.py` and `api/tests/workorders/test_work_order_lines_api.py`, before the use cases/router exist:
   - Create referencing an existing active vehicle → saved with that vehicle; a nonexistent/foreign vehicle id → HTTP 404 `vehicle_not_found`, no order created. **Defect it catches:** the vehicle reference is dropped, or tenancy on the referenced vehicle is unchecked.
   - A workshop's last number `42` → the next create gets `43`. **Defect it catches:** numbering starts over or reads a stale counter.
   - Replaying an identical create (same id, same payload) → HTTP 200, still numbered `43`, counter not incremented again; the same id with a different `vehicle_id` → HTTP 409 `work_order_id_conflict`. **Defect it catches:** a retry burns a number, or a conflicting replay overwrites the order.
@@ -342,26 +343,28 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
   - An inventory-part line referencing a nonexistent/foreign item id → HTTP 404 `item_not_found`, no line added. **Defect it catches:** a part line accepts a cross-tenant or made-up item id.
   - Replaying an identical line add → HTTP 200, one line; the same line id with a different payload → HTTP 409 `work_order_line_id_conflict`; editing/removing a line id that doesn't exist on the order (or belongs to another order) → HTTP 404 `work_order_line_not_found`. **Defect it catches:** line replay/conflict/not-found semantics are missing.
   - `GET /work-orders?status_group=open|closed|all` filters correctly; `limit` is capped at 100.
+  **Also added (same Test Value Gate):** archived-vehicle/archived-item rejection, a second workshop numbering independently from 1, idempotent double-removal of a line, and tenant isolation on `GET`/`PATCH /work-orders/{id}` (the `work-orders` spec's own "Work Order Data Is Isolated Per Workshop" requirement, exercised in the same slice that introduces the resource, matching how customers/vehicles tenant isolation landed in their own introducing slice in Phase 1). **Result (GREEN against T11–T14):** 26 passed.
 
-- [ ] **P2.S2.T9 (RED)** Write `api/tests/workorders/test_work_order_concurrency.py`:
+- [x] **P2.S2.T9 (RED)** Write `api/tests/workorders/test_work_order_concurrency.py`:
   - Two threads creating orders for one workshop concurrently → two distinct, sequential numbers, no gap. **Defect it catches:** a read-then-write numbering scheme races under concurrent creates.
   - Two threads submitting the **same** client id concurrently → exactly one order persists, one request sees 201 and the other 200, and the counter is not bumped twice. **Defect it catches:** a rolled-back duplicate insert leaves a gap in the sequence (AD-6's retry-on-`IntegrityError` path).
+  **Implementation note:** calls `create_work_order` directly against two real `Session(test_engine)` connections (not through HTTP/`TestClient`), the same way `test_login_throttle_repository.py`'s two-session pattern works below the router — the per-test SAVEPOINT fixture (`db_session`/`client`) is invisible across connections, so a genuine row-lock race needs data committed outside it. A `committed_workshop` fixture commits a workshop/user/customer/vehicle on a separate connection (flushed one dependency level at a time — the same cross-model flush-ordering gotcha from P2.S1) and deletes them afterward. **Result:** 2 passed, re-run 5× with no flake.
 
-- [ ] **P2.S2.T10 (GREEN)** Create `api/src/taller/workorders/application/ports.py`: `WorkshopCounterRepository.next_value`, `WorkOrderRepository` (`get_by_id`, `get_for_update`, `add`, `save`, `list`, `totals`), per `design.md`'s "Interfaces / Contracts" snippet.
+- [x] **P2.S2.T10 (GREEN)** Create `api/src/taller/workorders/application/ports.py`: `WorkshopCounterRepository.next_value`, `WorkOrderRepository` (`get_by_id`, `get_for_update`, `add`, `save`, `list`, `totals`), per `design.md`'s "Interfaces / Contracts" snippet.
 
-- [ ] **P2.S2.T11 (GREEN)** Create `api/src/taller/workorders/application/use_cases.py`: `create_work_order` (AD-6's exact sequencing — replay check first, resolve the vehicle, bump the counter via the upsert, insert, retry once on a `work_orders_pkey` `IntegrityError`), `add_line`, `update_line`, `remove_line` (all idempotent by client id, and in this slice only handling non-consuming statuses — consuming-state reconciliation is Slice 3), `update_work_order` (PATCH), `get_work_order`, `list_work_orders`.
+- [x] **P2.S2.T11 (GREEN)** Create `api/src/taller/workorders/application/use_cases.py`: `create_work_order` (AD-6's exact sequencing — replay check first, resolve the vehicle, bump the counter via the upsert, insert, retry once on a `work_orders_pkey` `IntegrityError`), `add_line`, `update_line`, `remove_line` (all idempotent by client id, and in this slice only handling non-consuming statuses — consuming-state reconciliation is Slice 3), `update_work_order` (PATCH), `get_work_order`, `list_work_orders`.
 
-- [ ] **P2.S2.T12 (GREEN)** Create `api/src/taller/workorders/adapters/repositories.py`: `SqlAlchemyWorkshopCounterRepository.next_value` (the `INSERT … ON CONFLICT DO UPDATE … RETURNING value` upsert from AD-6), `SqlAlchemyWorkOrderRepository`.
+- [x] **P2.S2.T12 (GREEN)** Create `api/src/taller/workorders/adapters/repositories.py`: `SqlAlchemyWorkshopCounterRepository.next_value` (the `INSERT … ON CONFLICT DO UPDATE … RETURNING value` upsert from AD-6), `SqlAlchemyWorkOrderRepository`. `WorkOrderRepository.save`/`add`/`get_by_id`/`get_for_update` load and reconcile the `work_order_lines` collection through explicit queries (no ORM `relationship()`, matching every other model in this codebase).
 
-- [ ] **P2.S2.T13 (GREEN)** Create `api/src/taller/workorders/adapters/schemas.py`: `WorkOrderCreateRequest`, `WorkOrderOut`, `WorkOrderSummaryOut`, `WorkOrderLineOut`, line create/update requests, per `design.md`'s "API surface per phase → Phase 2" shapes (payment fields added phase 3).
+- [x] **P2.S2.T13 (GREEN)** Create `api/src/taller/workorders/adapters/schemas.py`: `WorkOrderCreateRequest`, `WorkOrderOut`, `WorkOrderSummaryOut`, `WorkOrderLineOut`, line create/update requests, per `design.md`'s "API surface per phase → Phase 2" shapes (payment fields added phase 3). Line/order update requests reject an explicit `null` on their non-nullable fields (`description`/`quantity`/`unit_price_cents`), mirroring `CustomerUpdateRequest`'s guard from Phase 1.
 
-- [ ] **P2.S2.T14 (GREEN)** Create `api/src/taller/workorders/adapters/router.py`: `work_orders_router` with `POST /work-orders`, `GET /work-orders`, `GET /work-orders/{id}`, `PATCH /work-orders/{id}`, `POST /work-orders/{id}/lines`, `PATCH /work-orders/{id}/lines/{line_id}`, `DELETE /work-orders/{id}/lines/{line_id}` (the `PUT .../status` endpoint is added in Slice 3). Run T8 and T9, confirm both are green.
+- [x] **P2.S2.T14 (GREEN)** Create `api/src/taller/workorders/adapters/router.py`: `work_orders_router` with `POST /work-orders`, `GET /work-orders`, `GET /work-orders/{id}`, `PATCH /work-orders/{id}`, `POST /work-orders/{id}/lines`, `PATCH /work-orders/{id}/lines/{line_id}`, `DELETE /work-orders/{id}/lines/{line_id}` (the `PUT .../status` endpoint is added in Slice 3). Run T8 and T9, confirm both are green. As composition root, it calls `describe_vehicles` (customers' application layer) to embed `vehicle`/`customer` on every single-order and list response.
 
-- [ ] **P2.S2.T15 (GREEN)** Modify `api/src/taller/main.py`: mount `work_orders_router`.
+- [x] **P2.S2.T15 (GREEN)** Modify `api/src/taller/main.py`: mount `work_orders_router`.
 
-- [ ] **P2.S2.T16** Run this slice's verification: `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
+- [x] **P2.S2.T16** Run this slice's verification: `uv run ruff check . && uv run ruff format --check . && uv run pytest`. **Result:** ruff check clean; ruff format clean (93 files); pytest 180 passed (152 existing + 28 new: 7 reconciliation-plan + 14 order-level + 12 line-level + 2 concurrency, minus overlap already counted — see commit for the exact new-file list).
 
-- [ ] **P2.S2.T17** Work-unit commit: `:sparkles: feat(workorders): add work orders with atomic numbering and quote lines`.
+- [x] **P2.S2.T17** Work-unit commit: `:sparkles: feat(workorders): add work orders with atomic numbering and quote lines`.
 
 ### Slice P2.S3 — API: `change_status` and consuming-state reconciliation
 
