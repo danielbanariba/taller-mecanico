@@ -56,6 +56,25 @@ describe("LoginPage", () => {
     expect(await screen.findByText("Teléfono o contraseña incorrectos.")).toBeInTheDocument();
   });
 
+  it("tells the user to wait, not that the password is wrong, when the phone is locked out", async () => {
+    server.use(
+      http.post("/api/auth/login", () =>
+        HttpResponse.json(
+          { detail: "too_many_login_attempts" },
+          { status: 429, headers: { "Retry-After": "900" } },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await fillAndSubmit(user, "password123");
+
+    expect(
+      await screen.findByText("Demasiados intentos fallidos. Espere unos minutos e intente de nuevo."),
+    ).toBeInTheDocument();
+  });
+
   it("disables the submit button while the login request is pending", async () => {
     server.use(http.post("/api/auth/login", () => new Promise<Response>(() => {})));
     const user = userEvent.setup();

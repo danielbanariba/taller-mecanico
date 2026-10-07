@@ -44,6 +44,7 @@ export const authCopy = {
 const ERROR_MESSAGES: Record<string, string> = {
   phone_already_registered: "Ese número de teléfono ya está registrado.",
   invalid_credentials: "Teléfono o contraseña incorrectos.",
+  too_many_login_attempts: "Demasiados intentos fallidos. Espere unos minutos e intente de nuevo.",
   not_authenticated: "Debe iniciar sesión para continuar.",
   network_error: "No se pudo conectar. Verifique su conexión e intente de nuevo.",
 };
