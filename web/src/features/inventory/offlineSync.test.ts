@@ -132,6 +132,30 @@ describe("flushOutboxOnce", () => {
     expect(await outbox.list()).toHaveLength(1);
   });
 
+  it("keeps the entry queued and stops the pass on a 401, without reporting a definitive rejection", async () => {
+    // Defect this catches: treating a stale-session 401 as a definitive
+    // rejection would drop the queued movement for good instead of
+    // leaving it to retry once the user's session is valid again.
+    const outbox = freshOutbox();
+    await outbox.add(entry({ id: "stale-session" }));
+    await outbox.add(entry({ id: "behind-it" }));
+
+    server.use(
+      http.put("/api/inventory/movements/:id", () =>
+        HttpResponse.json({ detail: "not_authenticated" }, { status: 401 }),
+      ),
+    );
+
+    const result = await flushOutboxOnce({ outbox, workshopId: "workshop-1" });
+
+    expect(result.sent).toHaveLength(0);
+    expect(result.removedWithError).toHaveLength(0);
+    const remaining = await outbox.list();
+    expect(remaining.map((item) => item.id)).toEqual(["stale-session", "behind-it"]);
+    expect(remaining[0]?.attempts).toBe(1);
+    expect(remaining[1]?.attempts).toBe(0);
+  });
+
   it("never has two PUTs in flight at once, even when two flush calls overlap", async () => {
     // Defect this catches: concurrent flush passes could send two
     // movements for the same item in parallel, letting a fast second

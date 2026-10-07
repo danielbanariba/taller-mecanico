@@ -163,7 +163,24 @@ const FLUSH_LOCK_NAME = "taller-outbox-flush";
 /** In-tab fallback mutex for environments without the Web Locks API (e.g. the test runner). */
 let inTabChain: Promise<void> = Promise.resolve();
 
-async function withFlushLock<T>(run: () => Promise<T>): Promise<T> {
+/**
+ * Serializes `run` against every other `withFlushLock` call (same tab via
+ * the in-tab fallback, or another tab via Web Locks): `flushOutboxOnce`
+ * uses this for every flush pass, and `hooks.ts` uses it to wrap the
+ * item/items query functions' fetch-plus-outbox-read, so a read can never
+ * land in the window between a flush pass's PUT succeeding and it removing
+ * the entry -- either the flush hasn't started (entry pending, server not
+ * yet applied) or it has fully finished (entry gone, server applied).
+ *
+ * Trade-off: a read now waits behind whatever flush pass currently holds
+ * the lock, including one stuck retrying a slow or offline connection (up
+ * to `PUT_TIMEOUT_MS` per queued entry). That is an acceptable cost here:
+ * reads are otherwise cheap and the outbox is usually empty or flushes in
+ * well under a second, while a stale double-counted stock figure is a
+ * correctness bug the UI has no way to self-correct from until the next
+ * successful fetch.
+ */
+export async function withFlushLock<T>(run: () => Promise<T>): Promise<T> {
   const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
   if (locks?.request) {
     // No `ifAvailable`: this *queues* behind any other holder (same tab or

@@ -1,4 +1,4 @@
-import { createStore, del, entries, get, set, type UseStore } from "idb-keyval";
+import { createStore, del, entries, get, promisifyRequest, set, type UseStore } from "idb-keyval";
 
 import type { MovementKind } from "./api";
 
@@ -43,22 +43,46 @@ const DEFAULT_STORE = createStore("taller-outbox", "movements");
  * default, or an isolated one per test -- see `outbox.test.ts`).
  */
 export function createOutbox(store: UseStore = DEFAULT_STORE): Outbox {
-  async function nextSeq(): Promise<number> {
-    const all = await entries<string, OutboxEntry>(store);
-    return all.reduce((max, [, value]) => Math.max(max, value.seq), 0) + 1;
-  }
-
   async function list(): Promise<OutboxEntry[]> {
     const all = await entries<string, OutboxEntry>(store);
     return all.map(([, value]) => value).sort((a, b) => a.seq - b.seq);
   }
 
   return {
-    async add(entry) {
-      const seq = await nextSeq();
-      const stored: OutboxEntry = { ...entry, attempts: 0, seq };
-      await set(stored.id, stored, store);
-      return stored;
+    /**
+     * Reads the current max `seq` and writes the new entry inside one
+     * `readwrite` IndexedDB transaction. Two concurrent `add()` calls (e.g.
+     * two tabs) each open their own transaction on the same object store;
+     * IndexedDB queues same-store `readwrite` transactions instead of
+     * interleaving them, so the second call's read can only observe the
+     * first call's write once it has fully committed -- unlike a separate
+     * read-then-write (the previous `nextSeq()` + `set()` shape), which let
+     * two calls both read the same max and collide on the same `seq`.
+     *
+     * Chained via raw request callbacks (not `await`ed promises) because
+     * promise-chaining inside an IndexedDB transaction callback can let the
+     * transaction auto-commit early in engines without native promise
+     * support for it -- the same reason `idb-keyval`'s own `update()`
+     * avoids `await` here (see `node_modules/idb-keyval/dist/index.cjs`).
+     */
+    add(entry) {
+      return store("readwrite", (objectStore) =>
+        new Promise<OutboxEntry>((resolve, reject) => {
+          const getAllRequest = objectStore.getAll();
+          getAllRequest.onsuccess = () => {
+            try {
+              const all = getAllRequest.result as OutboxEntry[];
+              const seq = all.reduce((max, value) => Math.max(max, value.seq), 0) + 1;
+              const stored: OutboxEntry = { ...entry, attempts: 0, seq };
+              objectStore.put(stored, stored.id);
+              resolve(promisifyRequest<undefined>(objectStore.transaction).then(() => stored));
+            } catch (error) {
+              reject(error);
+            }
+          };
+          getAllRequest.onerror = () => reject(getAllRequest.error);
+        }),
+      );
     },
 
     async remove(id) {

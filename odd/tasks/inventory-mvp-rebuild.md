@@ -38,6 +38,7 @@ Replace the university project (Reflex 0.4.8 frontend talking directly to Oracle
 - **Language:** code, identifiers, comments and CLAUDE.md in English; UI copy and README in Spanish (product market).
 - **Local ports** (5432–5434 and 8000–8001 are taken on the dev machine): Postgres `5440`, API `8010`, web dev `5173`.
 - **Review mode:** RDD disabled for this clone (user decision, 2026-10-06) after two `lens_context_budget_exceeded` stops caused by generated lockfiles (`api/uv.lock` was 903 of 1653 lines). Replacement: per-task checks, an independent verifier for high-risk tasks per `gentle-ai review assess`, and one independent review of all code (lockfiles excluded) before the PR.
+- **Offline read consistency (T6b):** item fetch + outbox fold run inside the flush lock, so a read never interleaves with a flush pass; trade-off: a read can wait behind a slow pass (bounded by the 20 s per-request timeout).
 - **Delivery strategy:** `single-pr` (user policy: one task = one branch = one PR, atomic commits). If the final size is unreasonable for one review, agree a cut with the user before splitting.
 
 ## Tasks
@@ -53,7 +54,7 @@ Route per task: delegated direct (one bounded writer) unless stated. Trigger evi
 - [x] **T5** Inventory UI: list + search, +/- stepper, add/edit item, item detail with history, low-stock view, physical count.
 - [x] **T5b** Inventory UI fixes from the T5 verifier: accept thousands-grouped lempira amounts with `format.ts` tests, client-side upper bounds with Spanish messages, no `<button>` nested in `<a>` on the detail page, a 404 detail test. Runs after T6 (single writer).
 - [x] **T6** Offline: persisted query cache, movement outbox in IndexedDB with sync on reconnect, online/offline indicator.
-- [ ] **T6b** Offline fixes from the T6 verifier: a refetch landing between a successful PUT and the outbox removal double-counts the movement (fetch + fold must not interleave with a flush); `nextSeq()` read-then-write is not atomic across tabs; add a flush-time 401 test. Runs after T5b (single writer).
+- [x] **T6b** Offline fixes from the T6 verifier: a refetch landing between a successful PUT and the outbox removal double-counts the movement (fetch + fold must not interleave with a flush); `nextSeq()` read-then-write is not atomic across tabs; add a flush-time 401 test. Runs after T5b (single writer).
 - [ ] **T7** Remove legacy code; rewrite README (Spanish) and CLAUDE.md for the new architecture.
 - [ ] **T8** End-to-end check in a real browser (register, add item, move stock, offline queue + sync).
 
@@ -84,6 +85,7 @@ Route per task: delegated direct (one bounded writer) unless stated. Trigger evi
 | T5 | delegated (writer; 2+ non-trivial files) | see next commit (`feat(web): add inventory screens...`) | lint, typecheck clean; vitest 24 passed; build ok; smoke via proxy: register 201, item initial 3, in +1, stock 4; parent spot check vitest 24 passed. Test-first exception: writer wrote most code and tests together; RED proven retroactively for 7 behaviors by reverting each fix | high (auth signal from RegisterForm); independent verifier: pass with follow-ups: out-of-order reconciliation of concurrent taps (sent to the T6 writer, same code); thousands-grouped prices rejected, missing client upper bounds, Button nested in Link, no 404/format tests → T5b |
 | T6 | delegated (writer; 2+ non-trivial files) | see next commit (`feat(web): work offline...`) | lint, typecheck clean; vitest 50 passed (stable x3); build: sw.js routes `/api/` NetworkOnly, shell precached; RED observed before implementing each module, plus the reverse-order taps regression test failing on the old transport; parent spot check vitest 50 passed | high (auth signal); independent verifier: pass with follow-ups → T6b |
 | T5b | delegated (writer) | see next commit (`fix(web): accept grouped...`) | lint, typecheck clean; vitest 72 passed; build ok; RED observed per item before fixing; parent spot check vitest | follow-up of a verified high-risk task; fixes only |
+| T6b | delegated (writer) | see next commit (`fix(web): serialize inventory reads...`) | lint, typecheck clean; vitest 76 passed x3; build ok; RED reproduced by reverting each fix (double count 12 vs 11, seq [1,1,1]); 401 test passed without code change; parent spot check vitest | follow-up of a verified high-risk task; fixes only |
 
 T6 decisions: creating/editing items requires a connection (disabled offline with a message); the outbox is the only movement transport (FIFO, one at a time, Web Locks + in-tab mutex, 20 s timeout) so responses cannot reconcile out of order; pending outbox entries are folded onto fetched/persisted item data so a refetch never hides a queued tap; persisted query cache max age 7 days, busted by app version, cleared on logout; outbox entries carry the workshop id and only flush for the matching session.
 
@@ -91,4 +93,4 @@ T3 decisions: quantities are integers; movement replay compares `{item_id, kind,
 
 ## Next step
 
-T5b (UI fixes), then T7 (legacy removal + docs), then T8 (browser check).
+T7 (legacy removal + docs) and T8 (browser check) in parallel; then the final independent review of all code before the PR.

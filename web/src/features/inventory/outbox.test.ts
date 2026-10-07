@@ -92,4 +92,21 @@ describe("outbox", () => {
 
     expect(entries.map((item) => item.id)).toEqual(["mine"]);
   });
+
+  it("assigns distinct, increasing sequence numbers to concurrent add() calls, preserving call order", async () => {
+    // Defect this catches: nextSeq() computed `max(seq) + 1` as a read
+    // separate from add()'s write, so two concurrent add() calls (e.g. two
+    // browser tabs) could both read the same max and be assigned the same
+    // seq, losing FIFO determinism between them.
+    const outbox = createOutbox(freshStore());
+
+    const [a, b, c] = await Promise.all([
+      outbox.add(entry({ id: "a" })),
+      outbox.add(entry({ id: "b" })),
+      outbox.add(entry({ id: "c" })),
+    ]);
+
+    expect([a.seq, b.seq, c.seq]).toEqual([1, 2, 3]);
+    expect((await outbox.list()).map((item) => item.id)).toEqual(["a", "b", "c"]);
+  });
 });

@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router";
 import { ApiError } from "../../shared/api/http";
 import { useOnlineStatus } from "../../shared/offline/useOnlineStatus";
 import { Alert } from "../../shared/ui/Alert";
+import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
 import { getInventoryErrorMessage, inventoryCopy } from "./copy";
 import { centsToPlainAmount } from "./format";
@@ -73,6 +74,9 @@ export function EditItemPage() {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 py-8">
         <Alert variant="error">{getInventoryErrorMessage("item_not_found")}</Alert>
+        <LinkButton to="/inventario" variant="secondary">
+          {inventoryCopy.detail.backToList}
+        </LinkButton>
       </main>
     );
   }

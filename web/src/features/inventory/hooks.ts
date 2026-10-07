@@ -12,8 +12,8 @@ import {
 } from "./api";
 import { applyMovementToItem, applyPendingOutboxEntries, recordMovement, type RecordMovementInput } from "./commands";
 import { getInventoryErrorMessage } from "./copy";
-import { flushOutboxOnce, subscribeOutboxChange } from "./offlineSync";
-import { defaultOutbox } from "./outbox";
+import { flushOutboxOnce, subscribeOutboxChange, withFlushLock } from "./offlineSync";
+import { defaultOutbox, type Outbox } from "./outbox";
 
 const ITEMS_QUERY_BASE = ["inventory", "items"] as const;
 const INVENTORY_QUERY_BASE = ["inventory"] as const;
@@ -40,21 +40,73 @@ function useWorkshopId(): string | undefined {
   return session.data?.workshop.id;
 }
 
+interface FetchItemsFoldedDeps {
+  outbox?: Outbox;
+  listItems?: typeof inventoryApi.listItems;
+}
+
+/**
+ * Fetches the item list and folds any still-queued outbox entries onto it,
+ * with the fetch and the outbox read serialized against every flush pass
+ * through `withFlushLock` (see `offlineSync.ts`): this is what keeps a
+ * refetch (e.g. TanStack Query's refetch-on-window-focus) from landing in
+ * the narrow window between a flush pass's PUT succeeding and it removing
+ * the entry, which would otherwise fold that movement a second time onto
+ * server data that already includes it. Dependencies are injectable so
+ * tests can control the fetch and the outbox without touching the network
+ * or IndexedDB.
+ */
+export function fetchItemsFolded(
+  params: ListItemsParams,
+  workshopId: string | undefined,
+  deps: FetchItemsFoldedDeps = {},
+): Promise<ItemOut[]> {
+  const outbox = deps.outbox ?? defaultOutbox;
+  const listItems = deps.listItems ?? inventoryApi.listItems;
+  return withFlushLock(async () => {
+    const items = await listItems(params);
+    if (!workshopId) {
+      return items;
+    }
+    const pending = await outbox.listForWorkshop(workshopId);
+    if (pending.length === 0) {
+      return items;
+    }
+    return items.map((item) => applyPendingOutboxEntries(item, pending));
+  });
+}
+
+interface FetchItemFoldedDeps {
+  outbox?: Outbox;
+  getItem?: typeof inventoryApi.getItem;
+}
+
+/** Single-item equivalent of `fetchItemsFolded`; see its docstring. */
+export function fetchItemFolded(
+  id: string,
+  workshopId: string | undefined,
+  deps: FetchItemFoldedDeps = {},
+): Promise<ItemOut> {
+  const outbox = deps.outbox ?? defaultOutbox;
+  const getItem = deps.getItem ?? inventoryApi.getItem;
+  return withFlushLock(async () => {
+    const item = await getItem(id);
+    if (!workshopId) {
+      return item;
+    }
+    const pending = await outbox.listForWorkshop(workshopId);
+    if (pending.length === 0) {
+      return item;
+    }
+    return applyPendingOutboxEntries(item, pending);
+  });
+}
+
 export function useItems(params: ListItemsParams = {}) {
   const workshopId = useWorkshopId();
   return useQuery({
     queryKey: itemsQueryKey(params),
-    queryFn: async () => {
-      const items = await inventoryApi.listItems(params);
-      if (!workshopId) {
-        return items;
-      }
-      const pending = await defaultOutbox.listForWorkshop(workshopId);
-      if (pending.length === 0) {
-        return items;
-      }
-      return items.map((item) => applyPendingOutboxEntries(item, pending));
-    },
+    queryFn: () => fetchItemsFolded(params, workshopId),
   });
 }
 
@@ -62,17 +114,7 @@ export function useItem(id: string) {
   const workshopId = useWorkshopId();
   return useQuery({
     queryKey: itemQueryKey(id),
-    queryFn: async () => {
-      const item = await inventoryApi.getItem(id);
-      if (!workshopId) {
-        return item;
-      }
-      const pending = await defaultOutbox.listForWorkshop(workshopId);
-      if (pending.length === 0) {
-        return item;
-      }
-      return applyPendingOutboxEntries(item, pending);
-    },
+    queryFn: () => fetchItemFolded(id, workshopId),
   });
 }
 
