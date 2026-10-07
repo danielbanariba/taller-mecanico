@@ -102,6 +102,16 @@ The service worker (`vite-plugin-pwa`, configured in `vite.config.ts`) precaches
 - Commit messages follow `templates/commit-template.en.git.txt`: Gitmoji + Conventional Commits, in English. Title `<gitmoji> <type>(<scope>): <description>` (for example `:sparkles: feat(inventory): add a physical count`), imperative, lowercase, no trailing period, at most 72 characters; the body explains what changed and why, wrapped at 72 characters.
 - Pull requests use `.github/pull_request_template.md` (GitHub pre-fills it): a description readable in one minute whose first line follows the commit format, then the verification checklist for this stack.
 
+## Agent skills
+
+Shared project skills live in `.agents/skills/` (tracked, pinned in `skills-lock.json`): `vercel-react-best-practices`, `tanstack-query-best-practices`, `vite`, `vitest`, `playwright-best-practices`, `postgresql-best-practices`. Each was audited before install (documentation only: no scripts, no network calls, nothing that overrides repository rules). Claude Code reads them through symlinks in `.claude/skills/`, which is personal and git-ignored; after cloning, create the links with:
+
+```sh
+mkdir -p .claude/skills && for s in .agents/skills/*/; do n=$(basename "$s"); ln -sfn "../../.agents/skills/$n" ".claude/skills/$n"; done
+```
+
+Add or update a skill with `DO_NOT_TRACK=1 npx skills add <owner/repo> --skill <name> --agent claude-code codex --yes` (or `npx skills update -p`), audit the new content before committing, and keep the list above in sync.
+
 ## Planning and history
 
 - `odd/tasks/` — feature documents: objective, decisions, task-by-task progress and verification evidence for each feature.

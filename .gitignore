@@ -6,6 +6,9 @@ __pycache__/
 .codegraph/
 .atl/
 
+# Claude Code settings and skill links are personal; shared skills live in .agents/skills
+.claude/
+
 # Python (api/)
 .venv/
 *.egg-info/
