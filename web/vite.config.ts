@@ -55,9 +55,14 @@ export default defineConfig({
         // source, so API responses stay network-only (NetworkOnly never
         // caches), and a stale cached API response can never win a race
         // against the real backend.
+        //
+        // A match callback on the pathname, not a RegExp: Workbox tests a
+        // RegExp against the full URL (`https://host/api/...`), so
+        // `/^\/api\//` never matched any request. Same-origin only, since
+        // that is the only origin the session cookie and the API live on.
         runtimeCaching: [
           {
-            urlPattern: /^\/api\//,
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith("/api/"),
             handler: "NetworkOnly",
           },
         ],
