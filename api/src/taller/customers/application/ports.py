@@ -9,6 +9,16 @@ from taller.customers.domain.entities import Customer, Vehicle
 class CustomerRepository(Protocol):
     def get_by_id(self, *, workshop_id: uuid.UUID, customer_id: uuid.UUID) -> Customer | None: ...
 
+    def get_for_update(self, *, workshop_id: uuid.UUID, customer_id: uuid.UUID) -> Customer | None:
+        """Like :meth:`get_by_id`, but locks the row (``SELECT ... FOR
+        UPDATE``) so archiving a customer and creating a vehicle for that
+        same customer serialize instead of racing: whichever transaction
+        gets there first holds the lock until it commits, so the other
+        always re-reads the committed `archived_at` state (mirrors
+        `taller.inventory.application.ports.ItemRepository.get_for_update`).
+        """
+        ...
+
     def add(self, customer: Customer) -> None: ...
 
     def save(self, customer: Customer) -> None:

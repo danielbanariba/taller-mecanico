@@ -49,6 +49,15 @@ class SqlAlchemyCustomerRepository:
         )
         return _customer_from_model(model) if model is not None else None
 
+    def get_for_update(self, *, workshop_id: uuid.UUID, customer_id: uuid.UUID) -> Customer | None:
+        model = (
+            self._session.query(CustomerModel)
+            .filter(CustomerModel.id == customer_id, CustomerModel.workshop_id == workshop_id)
+            .with_for_update()
+            .one_or_none()
+        )
+        return _customer_from_model(model) if model is not None else None
+
     def add(self, customer: Customer) -> None:
         self._session.add(
             CustomerModel(

@@ -7,7 +7,9 @@ Defects these catch:
 - a vehicle can be reassigned to a different customer after creation;
 - a retry of `POST /vehicles` with the same id and payload duplicates the
   vehicle, or a conflicting replay silently overwrites the original;
-- plate normalization is skipped at the API boundary;
+- plate normalization is skipped at the API boundary, on create or on edit;
+- the duplicate-active-plate check is skipped on the edit path, letting an
+  edit collide with another active vehicle's plate in the same workshop;
 - the per-workshop active-plate uniqueness index is missing, not partial
   (so an archived vehicle's plate still blocks reuse), not workshop-scoped,
   or compares unnormalized plates;
@@ -217,6 +219,35 @@ def test_a_duplicate_active_plate_in_the_same_workshop_is_rejected(
             "make": "Kia",
             "plate": "HAB 1234",
         },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "plate_taken"
+
+
+def test_a_plate_is_normalized_on_edit(authenticated_client: TestClient) -> None:
+    customer = _create_customer(authenticated_client)
+    vehicle = _create_vehicle(authenticated_client, customer_id=customer["id"])
+
+    response = authenticated_client.patch(
+        f"/api/vehicles/{vehicle['id']}", json={"plate": "hab-1234"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["plate"] == "HAB1234"
+    stored = authenticated_client.get(f"/api/vehicles/{vehicle['id']}")
+    assert stored.json()["plate"] == "HAB1234"
+
+
+def test_editing_a_plate_to_another_vehicles_active_plate_is_rejected(
+    authenticated_client: TestClient,
+) -> None:
+    customer = _create_customer(authenticated_client)
+    _create_vehicle(authenticated_client, customer_id=customer["id"], plate="HAB1234")
+    other_vehicle = _create_vehicle(authenticated_client, customer_id=customer["id"], make="Kia")
+
+    response = authenticated_client.patch(
+        f"/api/vehicles/{other_vehicle['id']}", json={"plate": "HAB 1234"}
     )
 
     assert response.status_code == 409

@@ -159,8 +159,13 @@ def archive_customer(
     the customer's own `archived_at` timestamp (AD-15), which frees each
     of those vehicles' plates for reuse. An already-archived vehicle is
     left untouched.
+
+    Locks the customer row (`get_for_update`) before checking and changing
+    its state, so a concurrent `create_vehicle` for the same customer can't
+    interleave between this archive's check and its write and leave a new
+    vehicle active under a customer that is (or is about to be) archived.
     """
-    customer = customer_repo.get_by_id(workshop_id=workshop_id, customer_id=customer_id)
+    customer = customer_repo.get_for_update(workshop_id=workshop_id, customer_id=customer_id)
     if customer is None:
         raise CustomerNotFound(customer_id)
     if customer.archived_at is None:
@@ -259,7 +264,11 @@ def create_vehicle(
                 raise VehicleIdConflict(vehicle_id)
             return existing, False
 
-    owner = customer_repo.get_by_id(workshop_id=workshop_id, customer_id=customer_id)
+    # Locks the owner row (`get_for_update`) before checking it is active,
+    # so a concurrent `archive_customer` for the same customer can't
+    # interleave between this check and the vehicle insert and leave a new
+    # vehicle active under a customer that is being archived right now.
+    owner = customer_repo.get_for_update(workshop_id=workshop_id, customer_id=customer_id)
     if owner is None or owner.archived_at is not None:
         raise CustomerNotFound(customer_id)
 
