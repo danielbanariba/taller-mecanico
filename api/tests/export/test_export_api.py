@@ -8,6 +8,7 @@ Defects these catch:
   is non-deterministic absent writes.
 """
 
+import csv
 import io
 import uuid
 import zipfile
@@ -128,3 +129,80 @@ def test_two_consecutive_exports_yield_the_same_rows_with_no_side_effects(
     after = _row_counts(db_session)
     assert first == second
     assert before == after
+
+
+def _create_vehicle(client: TestClient, *, customer_id: str, **overrides: object) -> dict:
+    payload = {"customer_id": customer_id, "vehicle_type": "car", "make": "Toyota"}
+    payload.update(overrides)
+    response = client.post("/api/vehicles", json=payload)
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def _create_order(client: TestClient, *, vehicle_id: str) -> dict:
+    response = client.post(
+        "/api/work-orders", json={"id": str(uuid.uuid4()), "vehicle_id": vehicle_id}
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def _voided_payment_order(client: TestClient) -> dict:
+    """A work order with exactly one payment that has since been voided."""
+    customer = _create_customer(client)
+    vehicle = _create_vehicle(client, customer_id=customer["id"])
+    order = _create_order(client, vehicle_id=vehicle["id"])
+    line = client.post(
+        f"/api/work-orders/{order['id']}/lines",
+        json={
+            "id": str(uuid.uuid4()),
+            "kind": "labor",
+            "description": "Cambio de aceite",
+            "quantity": 1,
+            "unit_price_cents": 50000,
+        },
+    )
+    assert line.status_code == 201, line.text
+    approve = client.put(f"/api/work-orders/{order['id']}/status", json={"status": "approved"})
+    assert approve.status_code == 200, approve.text
+
+    payment_id = str(uuid.uuid4())
+    created = client.post(
+        f"/api/work-orders/{order['id']}/payments",
+        json={"id": payment_id, "amount_cents": 50000, "method": "cash"},
+    )
+    assert created.status_code == 201, created.text
+    voided = client.post(
+        f"/api/work-orders/{order['id']}/payments/{payment_id}/void", json={"reason": "duplicado"}
+    )
+    assert voided.status_code == 200, voided.text
+    return order
+
+
+def _read_csv_rows(archive: zipfile.ZipFile, filename: str) -> list[dict[str, str]]:
+    text_content = archive.read(filename).decode("utf-8-sig")
+    return list(csv.DictReader(io.StringIO(text_content)))
+
+
+def test_a_voided_payment_is_exported_with_its_void_columns(
+    authenticated_client: TestClient,
+) -> None:
+    """Defect this catches: `payments.csv` dropping `voided_at`/`void_reason`
+    makes a voided row indistinguishable from a real one. `work_orders.csv`'s
+    own `paid_hnl` already excludes voided payments (per the `payments` spec's
+    non-voided-only paid total), so without these columns summing
+    `payments.csv` in Excel overstates recorded revenue by every voided
+    amount, and the two CSVs in the same ZIP cannot be reconciled.
+    """
+    order = _voided_payment_order(authenticated_client)
+
+    archive = zipfile.ZipFile(io.BytesIO(_export(authenticated_client)))
+    payments_rows = _read_csv_rows(archive, "payments.csv")
+    work_orders_rows = _read_csv_rows(archive, "work_orders.csv")
+
+    assert len(payments_rows) == 1
+    assert payments_rows[0]["order_id"] == order["id"]
+    assert payments_rows[0]["voided_at"] != ""
+    assert payments_rows[0]["void_reason"] == "duplicado"
+    assert len(work_orders_rows) == 1
+    assert work_orders_rows[0]["paid_hnl"] == "0.00"

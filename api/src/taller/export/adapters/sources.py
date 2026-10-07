@@ -97,7 +97,16 @@ WORK_ORDER_LINES_HEADERS = [
     "removed_at",
     "created_at",
 ]
-PAYMENTS_HEADERS = ["id", "order_id", "amount_hnl", "method", "note", "paid_at"]
+PAYMENTS_HEADERS = [
+    "id",
+    "order_id",
+    "amount_hnl",
+    "method",
+    "note",
+    "paid_at",
+    "voided_at",
+    "void_reason",
+]
 
 
 def _optional_str(value: uuid.UUID | None) -> str | None:
@@ -301,6 +310,12 @@ def work_order_lines_rows(session: Session, workshop_id: uuid.UUID) -> list[Sequ
 
 
 def payments_rows(session: Session, workshop_id: uuid.UUID) -> list[Sequence[CellValue]]:
+    """Every payment, voided or not (a voided payment's record is never
+    deleted, per the `payments` spec). `voided_at`/`void_reason` mark a
+    voided row so it stays reconcilable against `work_orders.csv`'s
+    `paid_hnl` and `payments_rows`' own total, both of which exclude voided
+    payments (see `_paid_totals_by_order`).
+    """
     models = (
         session.query(PaymentModel)
         .filter(PaymentModel.workshop_id == workshop_id)
@@ -315,6 +330,8 @@ def payments_rows(session: Session, workshop_id: uuid.UUID) -> list[Sequence[Cel
             model.method,
             model.note,
             format_local_timestamp(model.paid_at),
+            format_local_timestamp(model.voided_at),
+            model.void_reason,
         ]
         for model in models
     ]
