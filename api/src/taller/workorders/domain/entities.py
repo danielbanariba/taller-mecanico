@@ -75,3 +75,39 @@ class WorkOrder:
     created_at: datetime
     updated_at: datetime
     lines: list[WorkOrderLine] = field(default_factory=list)
+
+
+class PaymentMethod(StrEnum):
+    """One of the four wire values the `payments` spec allows. English,
+    like every other wire value in this change; `copy.ts` holds the
+    Spanish labels ("Efectivo", "Transferencia", "Tarjeta", "Otro").
+    """
+
+    cash = "cash"
+    transfer = "transfer"
+    card = "card"
+    other = "other"
+
+
+@dataclass(slots=True)
+class Payment:
+    """One payment recorded against a work order, in one of four methods.
+
+    Append-only in spirit: once voided, the record is kept rather than
+    deleted (`design.md`'s "Resolved Questions"). `voided_at`/`void_reason`
+    are both `None` until voided, and voiding is idempotent -- `voided_at`
+    never changes once set. A voided payment is excluded from the order's
+    paid total, its balance, and the daily cash summary.
+    """
+
+    id: uuid.UUID
+    workshop_id: uuid.UUID
+    order_id: uuid.UUID
+    amount_cents: int
+    method: PaymentMethod
+    note: str | None
+    paid_at: datetime
+    voided_at: datetime | None
+    void_reason: str | None
+    created_by: uuid.UUID
+    created_at: datetime

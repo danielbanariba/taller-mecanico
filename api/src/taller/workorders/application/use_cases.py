@@ -17,18 +17,40 @@ from taller.customers.application.ports import VehicleRepository
 from taller.customers.application.use_cases import get_active_vehicle
 from taller.inventory.application.ports import ItemRepository, MovementRepository
 from taller.inventory.application.use_cases import record_movement
-from taller.workorders.application.ports import WorkOrderRepository, WorkshopCounterRepository
-from taller.workorders.domain.entities import LineKind, WorkOrder, WorkOrderLine
+from taller.workorders.application.ports import (
+    PaymentRepository,
+    WorkOrderRepository,
+    WorkshopCounterRepository,
+)
+from taller.workorders.domain.entities import (
+    LineKind,
+    Payment,
+    PaymentMethod,
+    WorkOrder,
+    WorkOrderLine,
+)
 from taller.workorders.domain.errors import (
     InvalidStatusTransition,
     ItemNotFoundForLine,
+    PaymentExceedsBalance,
+    PaymentIdConflict,
+    PaymentNotFound,
+    WorkOrderHasPayments,
     WorkOrderIdConflict,
     WorkOrderLineIdConflict,
     WorkOrderLineNotFound,
     WorkOrderLocked,
     WorkOrderNotFound,
+    WorkOrderNotPayable,
 )
-from taller.workorders.domain.status import CONSUMING, EDITABLE, TRANSITIONS, WorkOrderStatus
+from taller.workorders.domain.money import balance_cents
+from taller.workorders.domain.status import (
+    CONSUMING,
+    EDITABLE,
+    PAYABLE,
+    TRANSITIONS,
+    WorkOrderStatus,
+)
 from taller.workorders.domain.stock import plan_reconciliation
 
 #: The named counter `create_work_order` bumps for every new order
@@ -89,6 +111,14 @@ def _find_line(order: WorkOrder, line_id: uuid.UUID) -> WorkOrderLine | None:
         if line.id == line_id:
             return line
     return None
+
+
+def _payment_fields_match(
+    payment: Payment, *, amount_cents: int, method: PaymentMethod, note: str | None
+) -> bool:
+    return (
+        payment.amount_cents == amount_cents and payment.method == method and payment.note == note
+    )
 
 
 def _line_fields_match(
@@ -161,22 +191,28 @@ def change_status(
     order_repo: WorkOrderRepository,
     item_repo: ItemRepository,
     movement_repo: MovementRepository,
+    payment_repo: PaymentRepository,
 ) -> WorkOrder:
     """Idempotently `PUT` the order's status to `target` (`design.md`'s
     AD-7, over the acyclic machine in `taller.workorders.domain.status`).
 
     Locks the order row first (AD-5's lock order, step 1), which also
-    serializes this transition against a concurrent line edit. A same-
-    status request is a no-op; a `target` unreachable from the order's
-    current status raises `InvalidStatusTransition`. Otherwise this runs
-    the same `plan_reconciliation` call every status/line change finishes
-    with (AD-4) -- planned against `target`, before the order's own status
-    field moves -- then advances the status and the matching timestamp.
+    serializes this transition against a concurrent line edit or payment.
+    A same-status request is a no-op; a `target` unreachable from the
+    order's current status raises `InvalidStatusTransition`. Cancelling an
+    order with one or more non-voided payments raises `WorkOrderHasPayments`
+    (phase 3's guard, `design.md`'s AD-11 and the `payments` spec's "Cancelling
+    An Order Counts Only Its Non-Voided Payments"). Otherwise this runs the
+    same `plan_reconciliation` call every status/line change finishes with
+    (AD-4) -- planned against `target`, before the order's own status field
+    moves -- then advances the status and the matching timestamp.
 
     Raises:
         WorkOrderNotFound: no such order in this workshop.
         InvalidStatusTransition: `target` is not in
             `TRANSITIONS[order.status]`.
+        WorkOrderHasPayments: `target` is `cancelled` and the order has at
+            least one non-voided payment.
         MovementIdConflict / StockOutOfRange: re-raised unchanged from
             `record_movement` (a movement id planted by a client, or a
             resulting stock outside PostgreSQL's `integer` range).
@@ -189,6 +225,11 @@ def change_status(
         return order
     if target not in TRANSITIONS[order.status]:
         raise InvalidStatusTransition(current=order.status.value, target=target.value)
+
+    if target == WorkOrderStatus.cancelled:
+        payments = payment_repo.list_for_order(workshop_id=workshop_id, order_id=order_id)
+        if any(payment.voided_at is None for payment in payments):
+            raise WorkOrderHasPayments(order_id)
 
     now = datetime.now(UTC)
     _reconcile_stock(
@@ -571,3 +612,120 @@ def remove_line(
         )
     order_repo.save(order)
     return order
+
+
+def record_payment(
+    *,
+    workshop_id: uuid.UUID,
+    order_id: uuid.UUID,
+    payment_id: uuid.UUID,
+    amount_cents: int,
+    method: PaymentMethod,
+    note: str | None,
+    created_by: uuid.UUID,
+    order_repo: WorkOrderRepository,
+    payment_repo: PaymentRepository,
+) -> tuple[Payment, bool]:
+    """Record a payment against a work order, or replay an idempotent
+    create.
+
+    Follows ``design.md``'s AD-11 exact ordering: lock the order row first
+    (AD-5's lock order step 1, which also serializes this against a
+    concurrent payment or a concurrent cancellation), then the replay
+    check (so replaying the exact payment that already settled the order
+    is a no-op rather than ``PaymentExceedsBalance`` -- AD-14's ordering
+    rule), then the status-in-``PAYABLE`` check, then the balance check,
+    then the insert.
+
+    Raises:
+        WorkOrderNotFound: no such order in this workshop.
+        PaymentIdConflict: ``payment_id`` already exists with different
+            fields.
+        WorkOrderNotPayable: the order's status is not in ``PAYABLE``.
+        PaymentExceedsBalance: ``amount_cents`` is more than the order's
+            current balance due (total minus its non-voided payments).
+    """
+    order = order_repo.get_for_update(workshop_id=workshop_id, order_id=order_id)
+    if order is None:
+        raise WorkOrderNotFound(order_id)
+
+    normalized_note = _normalize_optional_text(note)
+
+    existing = payment_repo.get_by_id(
+        workshop_id=workshop_id, order_id=order_id, payment_id=payment_id
+    )
+    if existing is not None:
+        if not _payment_fields_match(
+            existing, amount_cents=amount_cents, method=method, note=normalized_note
+        ):
+            raise PaymentIdConflict(payment_id)
+        return existing, False
+
+    if order.status not in PAYABLE:
+        raise WorkOrderNotPayable(order_id)
+
+    payments = payment_repo.list_for_order(workshop_id=workshop_id, order_id=order_id)
+    if amount_cents > balance_cents(order.lines, payments):
+        raise PaymentExceedsBalance(order_id)
+
+    now = datetime.now(UTC)
+    payment = Payment(
+        id=payment_id,
+        workshop_id=workshop_id,
+        order_id=order_id,
+        amount_cents=amount_cents,
+        method=method,
+        note=normalized_note,
+        paid_at=now,
+        voided_at=None,
+        void_reason=None,
+        created_by=created_by,
+        created_at=now,
+    )
+    payment_repo.add(payment)
+    return payment, True
+
+
+def void_payment(
+    *,
+    workshop_id: uuid.UUID,
+    order_id: uuid.UUID,
+    payment_id: uuid.UUID,
+    reason: str,
+    order_repo: WorkOrderRepository,
+    payment_repo: PaymentRepository,
+) -> Payment:
+    """Void a recorded payment, or replay an idempotent void.
+
+    Voiding is idempotent (the ``payments`` spec): a second void, with any
+    reason, succeeds and returns the payment unchanged, keeping the first
+    ``voided_at``. Locks the order row first (``design.md``'s AD-5), even
+    though this call never writes the order itself: it serializes against
+    a concurrent payment or cancellation reading the same payment list to
+    compute a balance or the "has payments" guard.
+
+    Raises:
+        WorkOrderNotFound: no such order in this workshop (also covers a
+            cross-workshop order id, so tenant isolation never leaks
+            whether the order exists).
+        PaymentNotFound: no payment ``payment_id`` on this order --
+            nonexistent, or recorded against a different order (the spec
+            delta from ``tasks.md``'s P3.S1.T1).
+    """
+    order = order_repo.get_for_update(workshop_id=workshop_id, order_id=order_id)
+    if order is None:
+        raise WorkOrderNotFound(order_id)
+
+    payment = payment_repo.get_by_id(
+        workshop_id=workshop_id, order_id=order_id, payment_id=payment_id
+    )
+    if payment is None:
+        raise PaymentNotFound(payment_id)
+
+    if payment.voided_at is not None:
+        return payment
+
+    payment.voided_at = datetime.now(UTC)
+    payment.void_reason = reason
+    payment_repo.save(payment)
+    return payment

@@ -7,9 +7,14 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from taller.customers.domain.entities import Customer, Vehicle, VehicleType
-from taller.workorders.domain.entities import LineKind, WorkOrder, WorkOrderLine
-from taller.workorders.domain.money import line_subtotal_cents, order_total_cents
-from taller.workorders.domain.status import EDITABLE, TRANSITIONS, WorkOrderStatus
+from taller.workorders.domain.entities import LineKind, Payment, WorkOrder, WorkOrderLine
+from taller.workorders.domain.money import (
+    balance_cents,
+    line_subtotal_cents,
+    order_total_cents,
+    paid_cents,
+)
+from taller.workorders.domain.status import EDITABLE, PAYABLE, TRANSITIONS, WorkOrderStatus
 
 #: Design's bound for `odometer_km`.
 MAX_ODOMETER_KM = 2_000_000
@@ -101,6 +106,58 @@ class WorkOrderLineUpdateRequest(BaseModel):
         if value is None:
             raise ValueError("unit_price_cents cannot be null")
         return value
+
+
+class PaymentCreateRequest(BaseModel):
+    """`id` is required, like every other create in this feature (an order
+    without a client id cannot be made retry-safe, `design.md`'s AD-14).
+    `method` is a closed `Literal`, so an unsupported value (the Spanish
+    label, or any other string) is rejected as a standard 422 -- the
+    `payments` spec's own requirement, with nothing further to validate.
+    """
+
+    id: uuid.UUID
+    amount_cents: int = Field(gt=0)
+    method: Literal["cash", "transfer", "card", "other"]
+    note: str | None = Field(default=None, max_length=200)
+
+
+class VoidPaymentRequest(BaseModel):
+    """`reason` is required (not optional/nullable): an explicit `null` or
+    a missing field are both rejected as a standard 422, per the
+    `payments` spec's "Voiding a payment requires a reason".
+    """
+
+    reason: str = Field(min_length=1, max_length=200)
+
+
+class PaymentOut(BaseModel):
+    """`voided_at`/`void_reason` are not in `design.md`'s original
+    `PaymentOut` shape, which predates the voiding resolved question (the
+    same delta `tasks.md`'s P3.S1.T3 applies to the `payments` table): the
+    web needs them to render a voided payment struck through, with its
+    reason.
+    """
+
+    id: uuid.UUID
+    amount_cents: int
+    method: Literal["cash", "transfer", "card", "other"]
+    note: str | None
+    paid_at: datetime
+    voided_at: datetime | None
+    void_reason: str | None
+
+    @classmethod
+    def from_domain(cls, payment: Payment) -> "PaymentOut":
+        return cls(
+            id=payment.id,
+            amount_cents=payment.amount_cents,
+            method=payment.method,
+            note=payment.note,
+            paid_at=payment.paid_at,
+            voided_at=payment.voided_at,
+            void_reason=payment.void_reason,
+        )
 
 
 class WorkOrderVehicleOut(BaseModel):
@@ -213,6 +270,10 @@ class WorkOrderOut(BaseModel):
     total_cents: int
     allowed_transitions: list[WorkOrderStatus]
     lines_editable: bool
+    payments: list[PaymentOut]
+    paid_cents: int
+    balance_cents: int
+    accepts_payments: bool
     created_at: datetime
     updated_at: datetime
     approved_at: datetime | None
@@ -223,7 +284,12 @@ class WorkOrderOut(BaseModel):
 
     @classmethod
     def from_domain(
-        cls, order: WorkOrder, *, vehicle: Vehicle, customer: Customer
+        cls,
+        order: WorkOrder,
+        *,
+        vehicle: Vehicle,
+        customer: Customer,
+        payments: list[Payment],
     ) -> "WorkOrderOut":
         return cls(
             id=order.id,
@@ -242,6 +308,10 @@ class WorkOrderOut(BaseModel):
             total_cents=order_total_cents(order.lines),
             allowed_transitions=sorted(TRANSITIONS[order.status]),
             lines_editable=order.status in EDITABLE,
+            payments=[PaymentOut.from_domain(payment) for payment in payments],
+            paid_cents=paid_cents(payments),
+            balance_cents=balance_cents(order.lines, payments),
+            accepts_payments=order.status in PAYABLE,
             created_at=order.created_at,
             updated_at=order.updated_at,
             approved_at=order.approved_at,

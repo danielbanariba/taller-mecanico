@@ -58,3 +58,16 @@ EDITABLE: Final[frozenset[WorkOrderStatus]] = frozenset(
         WorkOrderStatus.completed,
     }
 )
+
+#: Statuses in which a work order accepts a payment (`design.md`'s AD-11
+#: and the `payments` spec): a deposit is allowed once approved, and every
+#: later status up to delivery keeps accepting payments (the `payments`
+#: spec's own "Resolved Questions": deposits in `approved` are accepted).
+PAYABLE: Final[frozenset[WorkOrderStatus]] = frozenset(
+    {
+        WorkOrderStatus.approved,
+        WorkOrderStatus.in_progress,
+        WorkOrderStatus.completed,
+        WorkOrderStatus.delivered,
+    }
+)

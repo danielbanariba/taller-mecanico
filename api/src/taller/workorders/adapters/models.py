@@ -13,9 +13,11 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -133,3 +135,36 @@ class WorkOrderLineModel(Base):
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class PaymentModel(Base):
+    """One payment recorded against a work order (``design.md``'s "Data
+    model per phase -> Phase 3").
+
+    ``voided_at``/``void_reason`` support the Resolved-Questions voiding
+    feature and are not part of ``design.md``'s original table, which
+    predates that resolved question (``tasks.md``'s P3.S1.T3).
+    """
+
+    __tablename__ = "payments"
+    __table_args__ = (
+        CheckConstraint("amount_cents > 0", name="ck_payments_amount_positive"),
+        CheckConstraint(
+            "method IN ('cash', 'transfer', 'card', 'other')", name="ck_payments_method"
+        ),
+        Index("ix_payments_workshop_paid_at", "workshop_id", "paid_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    workshop_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workshops.id"), nullable=False)
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("work_orders.id"), nullable=False, index=True
+    )
+    amount_cents: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    method: Mapped[str] = mapped_column(String(16), nullable=False)
+    note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    paid_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    void_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
