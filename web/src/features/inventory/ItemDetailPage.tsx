@@ -165,7 +165,6 @@ export function ItemDetailPage() {
             onChange={(event) => setCountText(event.target.value)}
             onBlur={() => setCountTouched(true)}
             error={countTouched && countInvalid ? inventoryCopy.create.stockRangeInvalid : undefined}
-            autoFocus
           />
           <div className="flex gap-3">
             <Button variant="secondary" onClick={() => setCountOpen(false)}>
