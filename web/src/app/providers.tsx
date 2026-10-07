@@ -41,6 +41,14 @@ export function AppProviders({ children }: { children: ReactNode }) {
         // dehydrated shape may not match this build's query keys/shapes.
         buster: __APP_VERSION__,
         dehydrateOptions: {
+          // Keep every query that still holds data, including one whose
+          // latest refetch failed. The default keeps only status
+          // "success", and the whole snapshot is rewritten on every cache
+          // change, so a single failed refetch offline (or on a connection
+          // that reports online but drops requests) erased the cached
+          // session and inventory from IndexedDB while the open page kept
+          // working -- the next reload then found nothing to show.
+          shouldDehydrateQuery: (query) => query.state.data !== undefined,
           // The IndexedDB outbox is the only durable transport for stock
           // movements. A paused mutation restored from this cache has no
           // mutationFn to resume with (no `setMutationDefaults`), so

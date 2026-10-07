@@ -1,20 +1,40 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { ApiError } from "../../shared/api/http";
 import { idbPersister } from "../../shared/offline/idbPersister";
 import { authApi, type LoginPayload, type Me, type RegisterPayload } from "./api";
 
 export const sessionQueryKey = ["auth", "session"] as const;
 
 /**
+ * A 401 is the server's definitive answer "not logged in", not a failure,
+ * so it resolves to `null` instead of throwing. As data it replaces any
+ * cached session (a persisted one included) rather than sitting next to it
+ * as an error, which is what lets `RequireSession` tell "logged out" apart
+ * from "can't reach the server" even while a cached session exists.
+ */
+async function fetchSession(): Promise<Me | null> {
+  try {
+    return await authApi.me();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
  * The current session, resolved from the httpOnly cookie via `GET
- * /api/auth/me`. `retry: false` matters here: a 401 means "not logged in",
- * not a transient failure, so retrying would only delay the redirect that
- * `RequireSession` performs on error.
+ * /api/auth/me`: a `Me`, or `null` once the server says it is not logged
+ * in (see `fetchSession`). `retry: false` matters here: a network failure
+ * should leave the cached session in place right away instead of keeping
+ * `RequireSession` waiting out retries.
  */
 export function useSession() {
   return useQuery({
     queryKey: sessionQueryKey,
-    queryFn: authApi.me,
+    queryFn: fetchSession,
     retry: false,
   });
 }

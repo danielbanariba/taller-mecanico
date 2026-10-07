@@ -35,10 +35,14 @@ export function ItemDetailPage() {
     );
   }
 
-  if (item.isError || !item.data) {
+  // A failed refetch keeps the cached item in `item.data` (e.g. after a
+  // reload offline); only the server saying the item is gone replaces it.
+  const isNotFound = item.error instanceof ApiError && item.error.status === 404;
+  if (isNotFound || !item.data) {
+    const errorCode = item.error instanceof ApiError ? item.error.code : "item_not_found";
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 py-8">
-        <Alert variant="error">{getInventoryErrorMessage("item_not_found")}</Alert>
+        <Alert variant="error">{getInventoryErrorMessage(errorCode)}</Alert>
         <LinkButton to="/inventario" variant="secondary">
           {inventoryCopy.detail.backToList}
         </LinkButton>

@@ -1,12 +1,43 @@
 import { describe, expect, it } from "vitest";
-import { screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
 
+import { sessionQueryKey } from "../auth/hooks";
 import { server } from "../../test/server";
 import { renderWithQueryClient } from "../../test/render";
 import { EditItemPage } from "./EditItemPage";
+import { itemQueryKey, useItem } from "./hooks";
+import type { ItemOut } from "./api";
+
+const ITEM: ItemOut = {
+  id: "item-1",
+  name: "Filtro de aceite",
+  category: "Filtros",
+  unit: "unidad",
+  min_stock: 0,
+  sale_price_cents: null,
+  notes: null,
+  stock: 10,
+  needs_review: false,
+  is_low: false,
+  archived_at: null,
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+};
+
+const SESSION = {
+  user: { id: "u1", full_name: "Ana Pérez", phone: "99998888", role: "owner" },
+  workshop: { id: "w1", name: "Taller Ana" },
+};
+
+/** Exposes the item query's status, so a test knows the page has rendered the failed refetch. */
+function ItemQueryStatus() {
+  const item = useItem("item-1");
+  return <span data-testid="item-query-status">{item.status}</span>;
+}
 
 function renderEditPage() {
   return renderWithQueryClient(
@@ -48,5 +79,35 @@ describe("EditItemPage", () => {
     const user = userEvent.setup();
     await user.click(backLink);
     expect(await screen.findByText("Pantalla de inventario")).toBeInTheDocument();
+  });
+
+  it("keeps showing the cached item's form when refetching it fails for lack of connection", async () => {
+    // Defect this catches: same as on the detail page -- a failed refetch
+    // over a cached item showed "No se encontró el repuesto." instead of
+    // the item, after a reload offline.
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.error()),
+      http.get("/api/inventory/items/item-1", () => HttpResponse.error()),
+      http.get("/api/inventory/items", () => HttpResponse.error()),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(sessionQueryKey, SESSION);
+    queryClient.setQueryData(itemQueryKey("item-1"), ITEM);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/inventario/item-1/editar"]}>
+          <ItemQueryStatus />
+          <Routes>
+            <Route path="/inventario/:id/editar" element={<EditItemPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("item-query-status")).toHaveTextContent("error"));
+
+    expect(screen.getByLabelText(/^nombre$/i)).toHaveValue("Filtro de aceite");
+    expect(screen.queryByText("No se encontró el repuesto.")).not.toBeInTheDocument();
   });
 });

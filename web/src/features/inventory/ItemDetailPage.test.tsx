@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
 
+import { sessionQueryKey } from "../auth/hooks";
 import { server } from "../../test/server";
 import { renderWithQueryClient } from "../../test/render";
+import { itemQueryKey, useItem } from "./hooks";
 import { ItemDetailPage } from "./ItemDetailPage";
 import { OfflineStatusBanner } from "./OfflineStatusBanner";
 import { defaultOutbox } from "./outbox";
@@ -78,6 +81,42 @@ function renderDetailPageWithBanner() {
         <Route path="/inventario/:id" element={<ItemDetailPage />} />
       </Routes>
     </MemoryRouter>,
+  );
+}
+
+/** Exposes the item query's status, so a test knows the page has rendered the failed refetch. */
+function ItemQueryStatus() {
+  const item = useItem("item-1");
+  return <span data-testid="item-query-status">{item.status}</span>;
+}
+
+/**
+ * Renders the page over a cache that already holds the session and the
+ * item -- what a reload restores from IndexedDB -- while every request
+ * fails as it does without a connection.
+ */
+function renderDetailPageFromCacheWithoutConnection() {
+  server.use(
+    http.get("/api/auth/me", () => HttpResponse.error()),
+    http.get("/api/inventory/items/item-1", () => HttpResponse.error()),
+    http.get("/api/inventory/items/item-1/movements", () => HttpResponse.error()),
+  );
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(sessionQueryKey, {
+    user: { id: "u1", full_name: "Ana Pérez", phone: "99998888", role: "owner" },
+    workshop: { id: "w1", name: "Taller Ana" },
+  });
+  queryClient.setQueryData(itemQueryKey("item-1"), ITEM);
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={["/inventario/item-1"]}>
+        <ItemQueryStatus />
+        <Routes>
+          <Route path="/inventario/:id" element={<ItemDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -247,5 +286,19 @@ describe("ItemDetailPage offline", () => {
     await user.click(increment);
     expect(await screen.findByText("3 cambios por enviar")).toBeInTheDocument();
     expect(screen.getByText("Sin conexión. Los cambios se guardan en el teléfono.")).toBeInTheDocument();
+  });
+
+  it("keeps showing the cached item when refetching it fails for lack of connection", async () => {
+    // Defect this catches: a failed refetch flips the item query to
+    // "error" while it still holds the cached item, and the page checked
+    // `isError` first -- so after a reload offline the mechanic saw "No se
+    // encontró el repuesto." instead of the item they had open.
+    renderDetailPageFromCacheWithoutConnection();
+
+    await waitFor(() => expect(screen.getByTestId("item-query-status")).toHaveTextContent("error"));
+
+    expect(screen.getByRole("heading", { name: "Filtro de aceite" })).toBeInTheDocument();
+    expect(screen.getByText("10")).toBeInTheDocument();
+    expect(screen.queryByText("No se encontró el repuesto.")).not.toBeInTheDocument();
   });
 });
