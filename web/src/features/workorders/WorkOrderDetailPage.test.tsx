@@ -94,11 +94,11 @@ function renderDetailPageFromCacheWithoutConnection() {
 }
 
 describe("WorkOrderDetailPage", () => {
-  it("renders the order's number, vehicle, lines and total, with no status actions yet", async () => {
+  it("renders the order's number, vehicle, lines, total, status actions and the WhatsApp share link", async () => {
     // Defect this catches: the read-only detail screen failing to render
-    // the order it just fetched, or a line's price/total mis-mapped
-    // from WorkOrderLineOut. No status button exists yet in this slice
-    // (S6 wires them from `allowed_transitions`), so none is asserted.
+    // the order it just fetched, a line's price/total mis-mapped from
+    // WorkOrderLineOut, or the status/share actions added this slice
+    // never being wired into the page at all.
     mockSessionAndOrder();
     renderDetailPage();
 
@@ -106,6 +106,9 @@ describe("WorkOrderDetailPage", () => {
     expect(screen.getByText("Cambio de aceite")).toBeInTheDocument();
     expect(screen.getByText("María Hernández")).toBeInTheDocument();
     expect(screen.getByText("Total").closest("p")).toHaveTextContent("L 500.00");
+    expect(screen.getByRole("button", { name: "Aprobar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancelar orden" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Compartir por WhatsApp" })).toBeInTheDocument();
   });
 
   it("keeps showing the cached order when refetching it fails for lack of connection", async () => {

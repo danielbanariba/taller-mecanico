@@ -44,6 +44,33 @@ export const workOrdersCopy = {
   offline: {
     createOrderDisabled: "Conéctese a internet para crear órdenes.",
     lineEditDisabled: "Conéctese a internet para editar líneas.",
+    statusChangeDisabled: "Conéctese a internet para cambiar el estado de la orden.",
+  },
+  statusActions: {
+    // `quote` is never a reachable target (`TRANSITIONS` has no edge into
+    // it, per `design.md`'s AD-7), so this label is never shown; it is
+    // declared anyway to keep the map total over `WorkOrderStatus`.
+    quote: "Volver a cotización",
+    approved: "Aprobar",
+    in_progress: "Iniciar trabajo",
+    completed: "Marcar como terminada",
+    delivered: "Marcar como entregada",
+    cancelled: "Cancelar orden",
+  },
+  share: {
+    shareButton: "Compartir por WhatsApp",
+    dialogTitle: "Compartir por WhatsApp",
+    photosLabel: "Fotos (opcional)",
+    photosSelected: (count: number) =>
+      `${count} foto${count === 1 ? "" : "s"} seleccionada${count === 1 ? "" : "s"}`,
+    send: "Enviar",
+    cancel: "Cancelar",
+    greeting: (workshopName: string) => `Hola, le escribimos desde ${workshopName}.`,
+    orderLine: (number: number, vehicleLabel: string) => `Orden #${number} · ${vehicleLabel}`,
+    linesHeading: "Detalle:",
+    lineItem: (description: string, quantity: number, unitPrice: string) =>
+      `• ${description} (${quantity} x ${unitPrice})`,
+    totalLine: (total: string) => `Total: ${total}`,
   },
   lineEditor: {
     addLine: "Agregar línea",
@@ -84,6 +111,11 @@ export function lineKindLabel(kind: LineKind): string {
   return workOrdersCopy.lineKind[kind];
 }
 
+/** The Spanish verb for triggering a transition to `status` (e.g. `in_progress` -> "Iniciar trabajo"), never the status's own name (`statusLabel`). */
+export function statusActionLabel(status: WorkOrderStatus): string {
+  return workOrdersCopy.statusActions[status];
+}
+
 /**
  * Maps an API error `code` (the `detail` string) to a Spanish message the
  * user can act on. Unknown codes (including the array `detail` FastAPI
@@ -97,6 +129,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   work_order_line_id_conflict: "No se pudo guardar la línea. Intente de nuevo.",
   work_order_line_not_found: "No se encontró la línea.",
   work_order_locked: "Esta orden ya no se puede editar.",
+  invalid_status_transition: "No se puede cambiar la orden a ese estado.",
   movement_id_conflict: "No se pudo registrar el movimiento. Intente de nuevo.",
   stock_out_of_range: "La cantidad está fuera de rango.",
   not_authenticated: "Debe iniciar sesión para continuar.",

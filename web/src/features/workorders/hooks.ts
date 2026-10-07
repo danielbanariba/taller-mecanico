@@ -1,8 +1,10 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useWorkshopId, workshopQueryKey } from "../auth/hooks";
+import { inventoryQueryKey } from "../inventory/hooks";
 import {
   workOrdersApi,
+  type ChangeStatusPayload,
   type CreateLinePayload,
   type CreateWorkOrderPayload,
   type StatusGroup,
@@ -106,5 +108,26 @@ export function useRemoveLine(orderId: string) {
   return useMutation({
     mutationFn: (lineId: string) => workOrdersApi.removeLine(orderId, lineId),
     onSuccess,
+  });
+}
+
+/**
+ * A status change also moves stock for a consuming transition
+ * (`design.md`'s AD-7/AD-4), so beyond the usual order/list cache update
+ * every other line mutation does, this also invalidates
+ * `inventoryQueryKey` -- otherwise the inventory list/detail screens
+ * would keep showing the pre-consumption stock until an unrelated
+ * refetch happened to run.
+ */
+export function useChangeStatus(orderId: string) {
+  const onOrderSuccess = useLineMutationCacheUpdate(orderId);
+  const queryClient = useQueryClient();
+  const workshopId = useWorkshopId();
+  return useMutation({
+    mutationFn: (payload: ChangeStatusPayload) => workOrdersApi.changeStatus(orderId, payload),
+    onSuccess: (order) => {
+      onOrderSuccess(order);
+      queryClient.invalidateQueries({ queryKey: inventoryQueryKey(workshopId) });
+    },
   });
 }

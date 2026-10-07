@@ -101,6 +101,10 @@ export interface UpdateLinePayload {
   unit_price_cents?: number;
 }
 
+export interface ChangeStatusPayload {
+  status: WorkOrderStatus;
+}
+
 function buildListQuery(params: ListWorkOrdersParams): string {
   const query = new URLSearchParams();
   query.set("status_group", params.statusGroup ?? "open");
@@ -130,4 +134,6 @@ export const workOrdersApi = {
     http.patch<WorkOrderOut>(`/api/work-orders/${orderId}/lines/${lineId}`, payload),
   removeLine: (orderId: string, lineId: string) =>
     http.delete<WorkOrderOut>(`/api/work-orders/${orderId}/lines/${lineId}`),
+  changeStatus: (orderId: string, payload: ChangeStatusPayload) =>
+    http.put<WorkOrderOut>(`/api/work-orders/${orderId}/status`, payload),
 };

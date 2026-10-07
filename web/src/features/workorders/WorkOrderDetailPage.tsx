@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router";
 
+import { useSession } from "../auth/hooks";
 import { ApiError } from "../../shared/api/http";
 import { formatCents } from "../../shared/format/money";
 import { useOnlineStatus } from "../../shared/offline/useOnlineStatus";
@@ -8,6 +9,8 @@ import { Alert } from "../../shared/ui/Alert";
 import { Button } from "../../shared/ui/Button";
 import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
+import { ShareWhatsAppButton } from "./ShareWhatsAppButton";
+import { StatusActions } from "./StatusActions";
 import { getWorkOrdersErrorMessage, statusLabel, workOrdersCopy } from "./copy";
 import { useAddLine, useRemoveLine, useUpdateLine, useWorkOrder } from "./hooks";
 import { LineEditorDialog, type LineEditorValues } from "./LineEditorDialog";
@@ -18,8 +21,8 @@ type LineDialogState = { mode: "create" } | { mode: "edit"; line: WorkOrderLineO
 
 /**
  * Container: the order detail -- vehicle, customer, lines and total, with
- * the line editor (add/edit/remove) wired this slice. Status actions,
- * WhatsApp sharing and payments are wired in later slices (S6/P3).
+ * the line editor (add/edit/remove), status actions and WhatsApp sharing
+ * all wired. Payments are wired in phase 3.
  */
 export function WorkOrderDetailPage() {
   // Route param name matches `routes.tsx`'s `:orderId` segment (`workOrderRoutes`
@@ -28,6 +31,7 @@ export function WorkOrderDetailPage() {
   const orderId = paramOrderId ?? "";
   const isOffline = useOnlineStatus();
   const order = useWorkOrder(orderId);
+  const workshopName = useSession().data?.workshop.name ?? "";
 
   const addLine = useAddLine(orderId);
   const updateLine = useUpdateLine(orderId);
@@ -129,6 +133,9 @@ export function WorkOrderDetailPage() {
           {data.complaint}
         </p>
       ) : null}
+
+      <StatusActions order={data} />
+      <ShareWhatsAppButton order={data} workshopName={workshopName} />
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
