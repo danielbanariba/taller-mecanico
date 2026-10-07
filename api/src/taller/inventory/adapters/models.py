@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from taller.shared.db import Base
@@ -48,9 +48,15 @@ class StockMovementModel(Base):
     """
 
     __tablename__ = "inventory_movements"
-    # Speeds up "an item's history, newest first" (GET /items/{id}/movements).
     __table_args__ = (
+        # Speeds up "an item's history, newest first" (GET /items/{id}/movements).
         Index("ix_inventory_movements_item_id_recorded_at", "item_id", "recorded_at"),
+        # Either both the order and its line are set, or neither is: a
+        # movement is never linked to an order without a specific line.
+        CheckConstraint(
+            "(order_id IS NULL) = (order_line_id IS NULL)",
+            name="ck_inventory_movements_order_link_pair",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
@@ -67,3 +73,13 @@ class StockMovementModel(Base):
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    # Nullable: set only when a work-order line caused this movement (see
+    # `design.md`'s AD-3); null for manual adjustments, physical counts, and
+    # offline-queued movements. Referenced by table name only in the ORM
+    # layer too -- the FK target table is still owned by `taller.workorders`.
+    order_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("work_orders.id"), nullable=True, index=True
+    )
+    order_line_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("work_order_lines.id"), nullable=True, index=True
+    )

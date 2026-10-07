@@ -3,7 +3,7 @@
 import uuid
 from typing import Protocol
 
-from taller.inventory.domain.entities import Item, StockMovement
+from taller.inventory.domain.entities import Item, MovementHistoryEntry, StockMovement
 
 
 class ItemRepository(Protocol):
@@ -50,4 +50,4 @@ class MovementRepository(Protocol):
 
     def list_for_item(
         self, *, workshop_id: uuid.UUID, item_id: uuid.UUID, limit: int
-    ) -> list[StockMovement]: ...
+    ) -> list[MovementHistoryEntry]: ...

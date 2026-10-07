@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 
 from taller.inventory.application.ports import ItemRepository, MovementRepository
-from taller.inventory.domain.entities import Item, StockMovement
+from taller.inventory.domain.entities import Item, MovementHistoryEntry, StockMovement
 from taller.inventory.domain.errors import (
     ItemIdConflict,
     ItemNameTaken,
@@ -285,7 +285,7 @@ def list_item_movements(
     limit: int,
     item_repo: ItemRepository,
     movement_repo: MovementRepository,
-) -> list[StockMovement]:
+) -> list[MovementHistoryEntry]:
     """Raises: ItemNotFound: no such item in this workshop."""
     if item_repo.get_by_id(workshop_id=workshop_id, item_id=item_id) is None:
         raise ItemNotFound(item_id)
@@ -294,13 +294,22 @@ def list_item_movements(
 
 
 def _movement_matches(
-    existing: StockMovement, *, item_id: uuid.UUID, kind: str, quantity: int, note: str | None
+    existing: StockMovement,
+    *,
+    item_id: uuid.UUID,
+    kind: str,
+    quantity: int,
+    note: str | None,
+    order_id: uuid.UUID | None = None,
+    order_line_id: uuid.UUID | None = None,
 ) -> bool:
     return (
         existing.item_id == item_id
         and existing.kind == kind
         and existing.quantity == quantity
         and existing.note == note
+        and existing.order_id == order_id
+        and existing.order_line_id == order_line_id
     )
 
 
@@ -316,13 +325,22 @@ def record_movement(
     created_by: uuid.UUID,
     item_repo: ItemRepository,
     movement_repo: MovementRepository,
+    order_id: uuid.UUID | None = None,
+    order_line_id: uuid.UUID | None = None,
 ) -> tuple[StockMovement, Item, bool]:
     """Record a stock movement, or replay an idempotent one.
 
     Returns ``(movement, item, is_new)``: ``is_new`` is False when
     ``movement_id`` already existed with the same ``item_id``/``kind``/
-    ``quantity``/``note`` (the caller should respond 200, not 201); nothing
-    is changed in that case.
+    ``quantity``/``note``/``order_id``/``order_line_id`` (the caller should
+    respond 200, not 201); nothing is changed in that case.
+
+    ``order_id``/``order_line_id`` are set only by the work-orders feature,
+    when this movement was caused by one of its lines (see `design.md`'s
+    AD-2). They take part in replay matching (AD-3): a movement planted at a
+    derived id with a different link than a real consumption surfaces as a
+    conflict instead of being silently skipped as a harmless replay. The
+    HTTP movement endpoint never accepts these fields from a client.
 
     Raises:
         ItemNotFound: no such item in this workshop (archived items still
@@ -334,7 +352,15 @@ def record_movement(
     """
     existing = movement_repo.get_by_id(workshop_id=workshop_id, movement_id=movement_id)
     if existing is not None:
-        if _movement_matches(existing, item_id=item_id, kind=kind, quantity=quantity, note=note):
+        if _movement_matches(
+            existing,
+            item_id=item_id,
+            kind=kind,
+            quantity=quantity,
+            note=note,
+            order_id=order_id,
+            order_line_id=order_line_id,
+        ):
             item = item_repo.get_by_id(workshop_id=workshop_id, item_id=existing.item_id)
             if item is None:
                 raise ItemNotFound(item_id)
@@ -362,6 +388,8 @@ def record_movement(
         occurred_at=occurred_at or now,
         recorded_at=now,
         created_by=created_by,
+        order_id=order_id,
+        order_line_id=order_line_id,
     )
     movement_repo.add(movement)
 
