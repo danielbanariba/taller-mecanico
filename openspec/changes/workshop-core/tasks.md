@@ -260,16 +260,16 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
   - Web: `cd web && npm run lint && npm run typecheck && npm test -- --run && npm run build`. **Result:** eslint clean; tsc clean; vitest 117 passed (25 files); build succeeded (main chunk 416.00 kB / gzip 125.16 kB).
   - Migrations: upgrade → downgrade → upgrade (T4). **Result:** see T4.
 
-- [ ] **P1.S6.T6** Deploy phase 1 to the demo (`deploy/demo/README.md` procedure) and re-run the seed script against it. **Deferred:** not run in this apply pass per explicit orchestrator instruction — the orchestrator deploys after the PR.
+- [x] **P1.S6.T6** Deploy phase 1 to the demo (`deploy/demo/README.md` procedure) and re-run the seed script against it. **Evidence:** the demo worktree runs the branch head; `alembic upgrade` applied `1b224b5a2186` cleanly; `/api/health` answered ok. The first seed run created 5 customers and 6 vehicles; the second run created 0 of each.
 
-- [ ] **P1.S6.T7** Real-browser check at **390×844** against the deployed demo, covering phase 1's success criteria from `proposal.md`:
+- [x] **P1.S6.T7** Real-browser check at **390×844** against the deployed demo, covering phase 1's success criteria from `proposal.md`:
   - Every protected screen shows `Inventario · Clientes · Órdenes`; logout works from the shell; existing inventory flows (list, detail, movement, count, offline tap) still work.
   - Clientes lists the seeded customers; `maria` finds `María`.
   - A customer saved with `+504 2234-5678` is stored as `22345678` and recognized as a landline; `9876-5432` is a mobile; an empty phone is accepted; a 7-digit number or one starting with `1` is rejected with a Spanish message.
   - A vehicle saved with plate `hab-1234` shows `HAB1234`; a second active vehicle with `HAB 1234` in the same workshop is rejected with a Spanish duplicate message; several unplated vehicles are allowed.
   - With the device offline, a previously visited customer list/detail still renders; create/edit is disabled with a message.
   - Rerunning the seed script creates no duplicates (confirmed via T1, re-verified against the demo database).
-  **Deferred:** not run in this apply pass per explicit orchestrator instruction — the orchestrator runs the real-browser check after the PR.
+  **Evidence:** checked in a real browser at 390×844 on the public demo. Bottom nav with `aria-current` and logout from the shell work. Accent, plate and phone-fragment searches work. A customer was created with a landline. `prb-123` showed as `PRB123`, and `DEM 0001` was rejected with the Spanish duplicate message. Offline, the cached list still rendered and create was disabled with its message. The Órdenes placeholder shows. Console was clean apart from the expected 401/409. The check exposed one layout defect: detail and form screens rendered as a narrow centered strip inside the shell. It was fixed in `1232af0` and re-checked on the demo. The 7-digit phone rejection, several unplated vehicles, and inventory movement/count/offline-tap flows were not repeated in the browser; the API and web suites cover them.
 
 - [x] **P1.S6.T8** Work-unit commit: `:hammer: chore(deploy): seed phase 1 customers and vehicles, document the shell` (covers T1–T3; T4–T7 are verification evidence, not code changes, recorded in this change's history/PR description).
 
