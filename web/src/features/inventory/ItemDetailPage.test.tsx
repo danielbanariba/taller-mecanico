@@ -308,6 +308,10 @@ describe("ItemDetailPage", () => {
       http.get("/api/inventory/items/item-1", () =>
         HttpResponse.json({ detail: "item_not_found" }, { status: 404 }),
       ),
+      // `useMovements` fires unconditionally alongside the item fetch
+      // (not gated on the item query succeeding), so a 404 item still
+      // needs this mocked.
+      http.get("/api/inventory/items/item-1/movements", () => HttpResponse.json([])),
     );
     renderDetailPage();
 
