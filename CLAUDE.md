@@ -2,47 +2,99 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Overview
+## Project overview
 
-Mechanic-shop management system ("Taller Mecánico"), originally a university project. Identifiers, routes, and UI text are in Spanish. It is two independent Python apps:
+Taller Mecánico is a mobile-first parts inventory app for small Honduran auto/moto repair shops: phone-number login, one-tap stock changes, physical counts, low-stock alerts, movement history, and offline use. It replaced an unsalvageable university prototype (Reflex talking directly to Oracle with hardcoded credentials); none of that code remains. Product rationale and the roadmap after this MVP (customers/vehicles/quotes/work orders, then opt-in SAR/CAI invoicing, then multi-user roles) live in `odd/tasks/inventory-mvp-rebuild.md` and `docs/research/`.
 
-- `backend/`: FastAPI. Only exposes auth (login / create user).
-- `frontend/`: Reflex 0.4.8 (`app_name="frontend"`, so the app package is `frontend/frontend/`).
+Code, identifiers, and comments are in English. UI copy (web) and the README are in Spanish — this is the product's market language, not a translation step to add later.
 
-There are no tests, linters, formatters, or CI.
+## Commands
 
-## Setup and running
-
-Dependencies are only listed in `pip_install.ps1` (`frontend/requirements.txt` pins just `reflex==0.4.8`). The `.ps1` scripts assume Windows and a venv named `env` at the repo root (`env\Scripts\activate.ps1`). On Linux:
+### API (`api/`, Python + uv)
 
 ```sh
-python -m venv env && source env/bin/activate
-pip install fastapi "uvicorn[standard]" reflex==0.4.8 pydantic "pydantic[email]" pandas sqlalchemy passlib bcrypt pyjwt requests cx_Oracle plotly reflex-dynoselect reflex-calendar
+docker compose up -d db                               # Postgres on localhost:5440
+cd api
+cp env.example .env                                     # then edit TALLER_* values; see below
+uv run alembic upgrade head
+uv run uvicorn taller.main:app --reload --port 8010
+
+uv run ruff check .                                      # lint
+uv run ruff format --check .                             # format check (uv run ruff format . to fix)
+uv run pytest                                             # all tests
+uv run pytest tests/inventory/test_items_api.py::test_name_of_test   # one test (standard pytest node id)
+
+uv run alembic revision --autogenerate -m "add x"         # new migration
 ```
 
-- Backend: `cd backend && uvicorn main:app --reload`. It must run from `backend/`: imports are cwd-relative, and the SQLite file `./users.db` is created there when `auth_controller` is imported.
-- Frontend: `cd frontend && reflex run`. Login posts to a hardcoded `http://localhost:8000/login/`, so FastAPI must own port 8000; Reflex's own backend also defaults to 8000, so move it (`reflex run --backend-port 8001`).
-- `front.ps1` does `Set-Location Frontend` (capital F), which breaks on case-sensitive filesystems.
-- Seed scripts in `backend/db/` (`crear_tablas_SQLite.py`, `insertar_datos_SQLite.py`) use a bare `from client import ...`, so run them with cwd `backend/db/`. `insertar_datos_SQLite.py` calls `.db_url` on the tuple returned by `conectar_SQLite()` and fails as written.
+`api/.env` cannot be created by writing a dotfile directly in this sandbox (permissions deny any `.env*`-prefixed write); `api/env.example` is the checked-in template and is the one file to copy from, not invent from scratch. Settings are read by `pydantic-settings` from env vars prefixed `TALLER_` (`api/src/taller/shared/config.py`): `TALLER_DATABASE_URL`, `TALLER_JWT_SECRET` (required, ≥32 chars, no default), `TALLER_COOKIE_SECURE` (set `false` for local HTTP).
+
+Tests need the `db` container reachable (`conftest.py` exits with a clear message otherwise) and a `taller_test` database, created by `docker/postgres/init/01-test-db.sql` **only on a fresh Postgres volume** — `docker compose down -v && docker compose up -d db` to recreate it if that database doesn't exist yet. Each test runs inside a SAVEPOINT (`conftest.py`'s `db_session` fixture) and is rolled back on teardown, so tests never leave data behind.
+
+### Web (`web/`, npm)
+
+```sh
+cd web
+npm install
+npm run dev                                               # Vite dev server on 5173, proxies /api to :8010
+
+npm run lint                                              # eslint .
+npm run typecheck                                         # tsc -b --noEmit
+npm test -- --run                                         # vitest, all tests, non-watch
+npm test -- --run src/app/RequireSession.test.tsx         # one file
+npm run build                                             # tsc -b && vite build
+```
+
+Tests mock the API with MSW (`web/src/test/server.ts`, `web/src/test/handlers.ts`): `beforeAll(() => server.listen({ onUnhandledFrame: "error" }))` fails a test loudly if it hits a route with no handler, and a test overrides one handler for its case with `server.use(http.get("/api/...", () => HttpResponse.json({...})))`. IndexedDB (the outbox, the persisted query cache) is polyfilled once in `web/src/test/setup.ts` via `fake-indexeddb/auto`, which also clears the outbox and query-cache IndexedDB stores after every test to stop state leaking between tests.
 
 ## Architecture
 
-The two halves do not share a database, and the frontend mostly bypasses the backend.
+### API: hexagonal per feature
 
-**Data paths, per feature:**
+`api/src/taller/<feature>/` (`identity`, `inventory`; `health` is just a router) each split into:
 
-- Login: `frontend/frontend/login.py` (`Login` state) → HTTP → `backend/auth_controller.py` (SQLite `users.db`, bcrypt via passlib, JWT via PyJWT). `backend/auth/LoginState.py` is an unused duplicate of the Reflex login state.
-- Inventario, proveedores, usuarios CRUD: Reflex talks **directly to Oracle** through SQLAlchemy, with no API in between. Layers: `pages/*.py` → root-level `*_page.py` (Reflex `State` classes such as `InventarioState`, `UserState`, `ProvedorState`) → `service/*_service.py` → `repository/*_repository.py` → `repository/connect_db.py` (hardcoded `oracle+cx_oracle://...@localhost:1521/xe`). Models are `rx.Model`/SQLModel classes in `model/`. The Oracle schema lives in `frontend/oracle/*.sql` (DDL, DML, sequences, triggers, user). Without a local Oracle XE these pages fail.
-- Clientes, empleados, cotización: no service/repository layer; they are UI-only or use static data (CSV reads, hardcoded lists).
+- `domain/` — entities and errors, no framework imports.
+- `application/` — use cases (plain functions) and `Protocol` ports (`UserRepository`, `ItemRepository`, `MovementRepository`, `TokenService`, ...) that the use cases depend on without knowing the implementation.
+- `adapters/` — SQLAlchemy repositories implementing those ports, Pydantic request/response schemas, and the FastAPI `router.py`.
 
-**Routing:** every route is registered in `frontend/frontend/frontend.py` via `app.add_page`. `pages/` composes routes; `view/` holds the UI components those pages use. The live `/proveedores` route renders the hardcoded list in `view/proveedores.py`; the Oracle-backed `proveedor_page.py` is only wired in a commented-out route. `frontend.py` also redefines `inventarios()` locally, shadowing the imported `pages.inventarios`.
+`taller/shared/` holds cross-feature plumbing (`db.py` session factory, `config.py` settings). `taller/main.py` is the only place routers get assembled into the `FastAPI` app, each mounted under `/api`.
 
-**Shared UI:** `styles/` (color, font, and size constants), `components/` (buttons, notifications, forms), `figures/` (calendar, charts, decorative widgets).
+### Web: container/presentational + shared UI kit
 
-**Dead code** (nothing imports it): `frontend/frontend/view/Ey-Apurence-xd/`, `frontend/frontend/view/inventario.py`, `frontend/frontend/utils/*.ts`, `backend/routers/`, `backend/schemas/`, `backend/config/db.py`. `backend/main.py` mounts only the `auth_controller` router.
+`web/src/features/<feature>/` (`auth`, `inventory`) hold screens (containers, wired to TanStack Query and the API client) and presentational components (props in, JSX out, no fetching) side by side, plus one `api.ts` and one `copy.ts` per feature. `web/src/shared/ui/` is the atomic kit (`Button`, `Spinner`, ...) shared across features. `web/src/app/` wires routing (`router.tsx`) and the session guard (`RequireSession.tsx`).
 
-**Other gotchas:**
+`copy.ts` holds every Spanish user-facing string for its feature in one object, plus a map from an API error `code` (the `detail` string FastAPI returns) to the Spanish message shown for it. The API itself never returns Spanish — it returns English error codes in `detail`, and the web layer is solely responsible for localizing them.
 
-- `backend/sql/BD_TALLER_MECANICO.sql` is a binary SQLite database, not a SQL script.
-- `SECRET_KEY` is hardcoded in `backend/auth_controller.py`; `secret_key.env` is never loaded (there is no dotenv or `os.environ` usage anywhere).
-- `frontend/frontend/URL.py` holds in-page anchor routes, not the backend base URL.
+### Tenancy
+
+Every workshop (tenant) owns its users and inventory. `get_current_workshop_id` (`api/src/taller/identity/adapters/dependencies.py`) reads the session, resolves the current user, and returns `user.workshop_id`; every inventory query and mutation is scoped by it, so cross-tenant access is structurally impossible rather than checked ad hoc per endpoint. A session is a JWT signed with `TALLER_JWT_SECRET`, carried in the httpOnly, `SameSite=Lax` cookie `taller_session`. Web and API are served same-origin — the Vite dev proxy forwards `/api` to the API in development — so the cookie needs no CORS configuration.
+
+### Stock ledger
+
+Stock is never stored as a mutable counter the client edits directly: it is the sum of an append-only movement ledger (`in`, `out`, `adjust`), and the sum is cached on the `Item` row for cheap reads. `record_movement` (`api/src/taller/inventory/application/use_cases.py`) takes a row lock on the item (`item_repo.get_for_update`) before computing the new stock and saving it, so two concurrent movements on the same item can't race and lose an update.
+
+Movements carry a client-generated UUID. If that id already exists with the exact same `{item_id, kind, quantity, note}`, the call is a replay and nothing changes (idempotent — this is what makes offline retry and replay safe); if it exists with a different payload, that's a real conflict (409). Item creation is idempotent the same way via a client-generated item id, and its `initial_stock` is always recorded as an `adjust` movement with a deterministic id derived from the item id — even when the initial stock is 0 — so replaying item creation never double-applies the initial stock.
+
+Negative stock is allowed and flagged (`needs_review`/`is_low` on the item), never blocked: a mechanic mid-job must not be stopped by the app, and a queued offline movement must always apply once it reaches the server. Search is accent-insensitive via an `IMMUTABLE` plpgsql wrapper function, `taller_unaccent_lower`, used both for search filtering and for the name-uniqueness constraint.
+
+### Offline
+
+`recordMovement` (`web/src/features/inventory/commands.ts`) never calls the API directly — it only enqueues the movement into an IndexedDB outbox, then triggers a flush. `flushOutboxOnce` → `withFlushLock` (`web/src/features/inventory/offlineSync.ts`) sends the outbox's entries to the server FIFO, one at a time, serialized by a Web Locks–based mutex (with an in-tab `Promise` chain fallback where Web Locks aren't available, e.g. the test runner) — responses can never be reconciled out of order. Reading items (`fetchItemsFolded` / the single-item fetch in `hooks.ts`) runs inside that *same* lock and folds any still-pending outbox entries onto the fetched data, so a read can never land in the gap between a flush's PUT succeeding and it removing the entry, and a queued tap is never invisible because a refetch happened to win a race.
+
+Creating or editing an item requires a live connection (disabled in the UI with a message when offline); only movements go through the outbox. Outbox entries are scoped by workshop id and only flush for the session's current workshop. The TanStack Query cache is persisted to IndexedDB for offline reads, capped at 7 days, version-busted on the Vite-injected app version (`__APP_VERSION__`, see `vite.config.ts`), and cleared on logout.
+
+`RequireSession` (`web/src/app/RequireSession.tsx`) treats a `network_error` specially: if a cached session is still present (restored from the persisted cache, or just stale after a failed background refetch), protected content renders anyway — only a real 401 ("not logged in") redirects to `/login`. An offline user with no cached session at all sees a dedicated "sin conexión" screen instead of a login form they could fill in for nothing.
+
+The service worker (`vite-plugin-pwa`, configured in `vite.config.ts`) precaches the app shell but routes every `/api/` request `NetworkOnly` — API responses are never served from the service worker's cache, because the persisted query cache above is the one offline data source, and a stale cached API response must never win a race against the real backend.
+
+## Gotchas
+
+- Local Postgres/API ports: `5432`–`5434` and `8000`–`8001` are taken on the usual dev machine, hence Postgres on `5440` and the API on `8010` (`docker-compose.yml`, `api/env.example`).
+- TypeScript is pinned to `6.0.x` (`web/package.json`) because `typescript-eslint@8.71.x` requires `<6.1`.
+- FastAPI deprecates `HTTP_422_UNPROCESSABLE_ENTITY` in favor of `HTTP_422_UNPROCESSABLE_CONTENT` — the latter is what this codebase uses (`api/src/taller/inventory/adapters/router.py`); don't reach for the deprecated name out of habit.
+- This agent sandbox denies writes to any path matching `.env*` by its own permission settings, regardless of content — `api/env.example` is the checked-in, writable template; `cp api/env.example api/.env` (shell copy, not a direct write to the `.env` path) then edit the values the task needs.
+
+## Planning and history
+
+- `odd/tasks/` — feature documents: objective, decisions, task-by-task progress and verification evidence for each feature.
+- `docs/research/` — the market research (Honduran workshop needs, adoption barriers, competitors) that the product decisions in `odd/tasks/` are based on.

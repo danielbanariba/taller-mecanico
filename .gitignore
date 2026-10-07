@@ -1,10 +1,7 @@
-*.db
 *.py[cod]
-.web
 __pycache__
 __pycache__/
-env
-venv
+
 # Local tooling
 .codegraph/
 .atl/

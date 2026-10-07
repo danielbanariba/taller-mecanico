@@ -1,181 +1,74 @@
-<div align="center">
-  <h1 align="center">Taller Mecanico</a></h1>
-</div>
+# Taller Mecánico — Inventario
 
-<div align="center">
-  <img align="center" src="frontend/assets/logo2.jpg" alt="TallerMecanico" width="50%">
-</div>
-<br>
+Control de inventario de repuestos para talleres mecánicos de autos y motos en Honduras. Pensado para un taller pequeño, de bajo presupuesto, que hoy lleva el conteo en la cabeza o en papel y necesita saber, en el momento, cuántas unidades le quedan de cada repuesto (amortiguadores, aceite, filtros, etc.) sin depender de Excel ni de internet estable.
 
-## Ir a la documentacion para la creacion de un entorno virtual
-https://docs.python.org/3/library/venv.html
+## ¿Qué resuelve?
 
-## 👨‍💻 Crear un entorno virtual
- ```sh
-python -m venv /path/to/new/virtual/environment
-```
- ```sh
-python -m venv env
-```
+- **Inicio de sesión con número de teléfono** (8 dígitos) y contraseña: sin correo, sin pasos de más.
+- **Un toque para sumar o restar** una unidad de un repuesto desde la lista.
+- **Conteo físico**: registrar la cantidad real contada y el sistema calcula el ajuste.
+- **Alertas de stock bajo**: aviso cuando un repuesto llega a su mínimo configurado.
+- **Historial por repuesto**: qué movimientos se hicieron, cuándo y el efecto en el stock.
+- **Funciona sin señal**: la lista de repuestos queda disponible sin conexión y los cambios se guardan en el teléfono para enviarse solos cuando vuelva la señal.
+- Instalable como app (PWA) en el teléfono del mecánico, con botones grandes pensados para usarse con las manos sucias en el taller.
 
-Acceder a la carpeta env, scripts 
-```sh
-cd env/Scripts
-```
+## Stack
 
-y por ultimo activarlo, y ya estaremos en el entorno virtual
-```sh
-.\activate.ps1
-```
-<!-- Installation -->
-### :gear: Instalacion
-  
-Librerias que se tienen que instalar:
-```sh
-pip install fastapi
-```
-```sh
-pip install "uvicorn[standard]"
-```
-```sh
-pip install reflex
-```
-```sh
-pip install pydantic
-```
-```sh
-pip install pandas
-```
-```sh
-pip install sqlalchemy
-```
-```sh
-pip install passlib
-```
-```sh
-pip install typing
-```
-```sh
-pip install requests
-```
-```sh
-pip install bcrypt
-```
-```sh
-pip install pyjwt
-```
-```sh
-pip install pydantic[email]
-```
+| Capa | Tecnología |
+|---|---|
+| API | Python, FastAPI, SQLAlchemy 2, Alembic, PostgreSQL |
+| Web | React + TypeScript, Vite, Tailwind CSS, TanStack Query, PWA (service worker + caché offline) |
+| Pruebas | pytest (API), Vitest + Testing Library + MSW (web) |
 
+Arquitectura: screaming, por feature, en ambos lados. El detalle para quien va a tocar código vive en [`CLAUDE.md`](./CLAUDE.md).
 
-## Aqui esta la estructura de carpetas del TallerMecanico
-```bash
-TALLER-MECANICO/
-|- backend/
-  |-- db/
-    |--- TALLER_MECANICO.db
-  |-- models/
-    |--- client.py
-  |-- routers/
-|- env/
+## Cómo correrlo en local
 
-|- frontend/
-  |-- assets/
-  |-- frontend/
-    |-- components/
-    |-- styles/
-    |-- view/
-    |-- frontend.py/
-    |-- login.py/
-    |-- URL.py/
-```
+1. **Base de datos** (Postgres en Docker, puerto `5440`):
+   ```sh
+   docker compose up -d db
+   ```
+2. **API** (puerto `8010`): copiar `api/env.example` a `api/.env` y ajustar las variables `TALLER_*` (URL de base de datos, secreto del JWT, si la cookie requiere HTTPS). Luego:
+   ```sh
+   cd api
+   uv run alembic upgrade head
+   uv run uvicorn taller.main:app --reload --port 8010
+   ```
+3. **Web** (puerto `5173`, con proxy a la API en `/api`):
+   ```sh
+   cd web
+   npm install
+   npm run dev
+   ```
 
-<!-- TENGO QUE DEJAR PASO A PASO QUE TIENE QUE HACER! -->
-## Instruciones antes de probar el proyecto: 
+Con los tres arriba, abrir `http://localhost:5173` registra un taller nuevo y entra directo al inventario.
 
-Despues de a ver cloneado e instalado todas la dependencia y la estructura de carpetas quede exactamente igual que en el ejemplo de arriba lo que sigue es lo siquiente:
-
-#### Paso 1:
-Abrimos dos terminamles una para levantar Reflex(frontend) y la otra para FastAPI(backend)
-
-#### Paso 2:
-Nos vamos a la terminal del backend y ponemos:
-> [!CAUTION] 
-> Recuerda que tienes que activar el entorno virtual
->
+## Checks
 
 ```sh
-cd backend
-```
-```sh
-uvicorn auth_controller:app --reload
-```
+# API
+cd api && uv run ruff check . && uv run ruff format --check . && uv run pytest
 
-#### Paso 3:
-Una vez levantado el backend ahora tenemos que levantar el frontend, nos dirigimos a la otra terminal y ponemos:
-```sh
-cd frontend/
-```
-```sh
-cd reflex init
-```
-```sh
-cd reflex run
+# Web
+cd web && npm run lint && npm run typecheck && npm test -- --run && npm run build
 ```
 
-#### Paso 4:
-> [!WARNING] 
-> ESTO SOLO ES PARA FIN DE EJEMPLO
->
+## Estructura del repositorio
 
-Nos vamos a la herramienta Thunder Client, Postman o cualquier otra, y hacemos una nueva peticion de tipo POST para poder crear un nuevo usuario
-Ponemos la direccion "localhost:8000/create_user/"
+| Carpeta | Contenido |
+|---|---|
+| `api/` | API en FastAPI (identidad, inventario, migraciones de Alembic, pruebas) |
+| `web/` | App web/PWA en React + Vite |
+| `docker-compose.yml`, `docker/` | Postgres local y script de creación de la base de pruebas |
+| `docs/research/` | Investigación de mercado que sustenta las decisiones de producto |
+| `odd/` | Historial de planificación e implementación de cada feature |
 
+## Hacia dónde va
 
+El inventario es la base. Después de esto, en este orden:
 
+1. **Clientes, vehículos (autos y motos), cotizaciones y órdenes de trabajo** que consuman repuestos del inventario.
+2. **Facturación SAR/CAI** como módulo opcional (rango de CAI, RTN, desglose de ISV 15%, solo en lempiras) — el taller que no factura no paga ni ve ese módulo.
+3. **Más usuarios por taller con roles**, recuperación de contraseña, envío de cotizaciones por WhatsApp, fotos por repuesto, y el cobro del producto en sí.
 
-
-
-
-
-
-<!-- Run Locally -->
-## :running: Correr el servidor
-
-Abrir dos terminames donde uno se dirija al backend y el otro al frontend
-
-```sh
-python -m uvicorn main:app –reload
-```
-  
-Si va a levatar el servidor desde visual studio code
-```sh
-uvicorn main:app
-```
-Ha
-
-#### Paso 4: Conectarse a la base de datos
-Conecatar a la base de datos, lo primero que necesitamos es instalar la extencion en visual estudio code SQLToos, tenemos que darle, "Add New Connection" nos va a salir un meno, ponemos en el primer campo "Connetion name: TALLER_MECANICO" y despues selecionamos el archivo en el directorio "Taller_Mecanico/backend/db/DB_TALLER_MECANICO.sql" probamos que se conecte en "Test Connection" y por ultimo le damos en "Save Connection"
-
-
-
-
-<!-- TechStack -->
-## 👀 Ir a la documentación
-
-### Swagger:
-```sh
-127.0.0.1:8000/docs
-```
-### Redocly:
-```sh
-127.0.0.1:8000/redoc
-```
-<!-- TechStack -->
-## :space_invader: Tecnologias utilizadas
-<p align="left">
-<a href="https://www.python.org/" target="_blank"><img src="https://img.icons8.com/color/144/000000/python--v1.png" alt="Python" width="50" height="50"/> </a>
-<a href="https://www.oracle.com/database/" target="_blank"> <img src="https://img.icons8.com/color/144/000000/oracle-logo.png" alt="Oracle SQL" width="50" height="50"/> </a>
-<a href="https://fastapi.tiangolo.com/" target="_blank"> <img src="/assets/fastapi-logo.svg" alt="FastAPI" width="50" height="50"/> </a> 
-</p>
+La prioridad y el porqué de este orden están en la investigación de mercado: [`docs/research/Necesidades de talleres en Honduras.md`](./docs/research/Necesidades%20de%20talleres%20en%20Honduras.md).
