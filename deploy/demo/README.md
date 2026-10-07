@@ -72,12 +72,13 @@ still works.
   expires.
 
 `seed-demo-account.sh` registers the account (or logs in if it already
-exists) and creates eight sample parts, five customers and six vehicles
-through the API, three of the parts at or below their minimum stock so the
-low-stock alert shows. Every id is deterministic, so rerunning it never
-duplicates anything, and it leaves rows that testers edited alone. Run it
-after the first deploy, or after wiping the demo database, once the public
-URL answers:
+exists) and creates eight sample parts, five customers, six vehicles and
+(from phase 2) six work orders with their lines, driven through the status
+lifecycle step by step, through the API. Three of the parts start at or
+below their minimum stock so the low-stock alert shows. Every id is
+deterministic, so rerunning it never duplicates anything, and it leaves
+rows that testers edited alone. Run it after the first deploy, or after
+wiping the demo database, once the public URL answers:
 
 Seeded customers and vehicles (all fictional; the phone numbers are
 patterned test data and **must never be messaged**):
@@ -93,6 +94,25 @@ patterned test data and **must never be messaged**):
 The seed submits the vehicle plates raw (`DEM-0001`, `DEM 0002`, `dem0003`,
 `DEM0004`) to exercise the API's plate normalization; they all land
 normalized as shown above.
+
+Seeded work orders, one per vehicle except the Corolla (two, so its detail
+screen always has more than one entry in its service history):
+
+| Order | Vehicle | Status | Lines |
+| --- | --- | --- | --- |
+| #1 | Toyota Corolla | `in_progress` | Labor + 1 `pastillas-freno` (stock drops from 2 to 1, so the in-progress consumption is visible) |
+| #2 | Honda CG 150 | `quote` | Labor + 1 `cadena-moto-428` + 1 external part |
+| #3 | Nissan Frontier | `completed` | Labor + 2 `aceite-20w50` + 1 `filtro-aceite` |
+| #4 | Hyundai Accent | `approved` | Labor only |
+| #5 | Toyota Corolla | `delivered` | Labor only |
+| #6 | Bajaj Pulsar | `cancelled` (from `quote`) | None |
+
+Each order is driven through `POST /api/work-orders`, `POST
+.../lines` and `PUT .../status` one transition edge at a time (never a
+direct jump), the same way a real mechanic would use the app. A seeded
+`in_progress`/`completed` order's parts have already consumed stock, so the
+item detail screens for `pastillas-freno`, `aceite-20w50` and
+`filtro-aceite` show a movement linked back to the order that caused it.
 
 ```sh
 bash -c 'set -a; . ~/.config/taller-mecanico/demo.env; set +a; \
