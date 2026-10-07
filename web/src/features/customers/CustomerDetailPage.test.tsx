@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
 
@@ -41,6 +41,17 @@ function vehicle(id: string, make: string, plate: string | null): VehicleOut {
   };
 }
 
+const ORDER_SUMMARY = {
+  id: "order-1",
+  number: 7,
+  status: "quote",
+  vehicle: { id: "v1", vehicle_type: "car", make: "Toyota", model: "Corolla", year: 2015, plate: "HAB1234" },
+  customer: { id: "c1", full_name: "María Hernández" },
+  total_cents: 50000,
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+};
+
 function renderCustomerDetailPage() {
   return renderWithQueryClient(
     <MemoryRouter initialEntries={["/clientes/c1"]}>
@@ -63,11 +74,22 @@ describe("CustomerDetailPage", () => {
       http.get("/api/customers/c1/vehicles", () =>
         HttpResponse.json([vehicle("v1", "Toyota", "HAB1234"), vehicle("v2", "Honda", null)]),
       ),
+      // `CustomerDetailPage` also renders this customer's orders
+      // unconditionally (`useWorkOrdersForCustomer`); left unmocked, the
+      // request errors silently and the section would pass this test
+      // empty without anyone noticing.
+      http.get("/api/work-orders", () => HttpResponse.json([ORDER_SUMMARY])),
     );
     renderCustomerDetailPage();
 
     expect(await screen.findByText("Toyota")).toBeInTheDocument();
-    expect(screen.getByText("Honda")).toBeInTheDocument();
-    expect(screen.getByText(/HAB1234/)).toBeInTheDocument();
+    const vehiclesSection = screen.getByRole("heading", { name: "Vehículos" }).closest("section");
+    if (!vehiclesSection) throw new Error("vehicles section not found");
+    expect(within(vehiclesSection).getByText("Honda")).toBeInTheDocument();
+    expect(within(vehiclesSection).getByText(/HAB1234/)).toBeInTheDocument();
+    // Defect this catches: the orders section wiring itself (the query,
+    // its key, or `WorkOrderList`'s render) silently showing nothing for
+    // this customer's own work orders.
+    expect(await screen.findByText("Orden #7")).toBeInTheDocument();
   });
 });

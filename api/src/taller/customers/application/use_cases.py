@@ -387,3 +387,57 @@ def archive_vehicle(
         vehicle.archived_at = now
         vehicle.updated_at = now
         vehicle_repo.save(vehicle)
+
+
+def get_active_vehicle(
+    *, workshop_id: uuid.UUID, vehicle_id: uuid.UUID, vehicle_repo: VehicleRepository
+) -> Vehicle:
+    """Resolve a vehicle a new work order may reference (phase 2's AD-12).
+
+    Raises:
+        VehicleNotFound: no such vehicle in this workshop, or it is
+            archived. Archived vehicles cannot receive new links, the same
+            rule AD-14 already applies to an archived customer.
+    """
+    vehicle = vehicle_repo.get_by_id(workshop_id=workshop_id, vehicle_id=vehicle_id)
+    if vehicle is None or vehicle.archived_at is not None:
+        raise VehicleNotFound(vehicle_id)
+    return vehicle
+
+
+def describe_vehicles(
+    *,
+    workshop_id: uuid.UUID,
+    vehicle_ids: list[uuid.UUID],
+    vehicle_repo: VehicleRepository,
+    customer_repo: CustomerRepository,
+) -> dict[uuid.UUID, tuple[Vehicle, Customer]]:
+    """Batch-resolve vehicles and their owners for a work-order list or
+    detail response (`design.md`'s AD-12).
+
+    Two queries total, however many ids are passed: one against
+    `vehicles`, one against `customers`. Never a per-order round trip, and
+    never a join across the two features' tables. An archived vehicle (or
+    one owned by an archived customer) is still resolved: an existing
+    order must keep displaying it, even though AD-14 forbids a *new* link
+    to one.
+
+    An id with no matching vehicle, or whose owner cannot be resolved
+    (should not happen for a vehicle a work order already references), is
+    simply absent from the result; callers decide how to handle a gap.
+    """
+    unique_vehicle_ids = list(dict.fromkeys(vehicle_ids))
+    if not unique_vehicle_ids:
+        return {}
+    vehicles = vehicle_repo.get_many(workshop_id=workshop_id, vehicle_ids=unique_vehicle_ids)
+    customer_ids = list(dict.fromkeys(vehicle.customer_id for vehicle in vehicles))
+    customers_by_id = {
+        customer.id: customer
+        for customer in customer_repo.get_many(workshop_id=workshop_id, customer_ids=customer_ids)
+    }
+    result: dict[uuid.UUID, tuple[Vehicle, Customer]] = {}
+    for vehicle in vehicles:
+        owner = customers_by_id.get(vehicle.customer_id)
+        if owner is not None:
+            result[vehicle.id] = (vehicle, owner)
+    return result

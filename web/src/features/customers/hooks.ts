@@ -115,12 +115,18 @@ export function useVehiclesForCustomer(customerId: string, params: ListVehiclesP
   });
 }
 
+/**
+ * `id !== ""` matters beyond the usual guard: `NewWorkOrderPage` calls this
+ * with a possibly-empty `?vehiculo=` query param, and without it this would
+ * fire a request to `/api/vehicles/` (no id) on every visit to the plain
+ * `/ordenes/nueva` flow.
+ */
 export function useVehicle(id: string) {
   const workshopId = useWorkshopId();
   return useQuery({
     queryKey: vehicleQueryKey(workshopId, id),
     queryFn: () => customersApi.getVehicle(id),
-    enabled: workshopId !== undefined,
+    enabled: workshopId !== undefined && id !== "",
   });
 }
 

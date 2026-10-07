@@ -58,3 +58,21 @@ class StockMovement:
     occurred_at: datetime
     recorded_at: datetime
     created_by: uuid.UUID
+    #: Set only when a work-order line caused this movement (see
+    #: `design.md`'s AD-3); `None` for manual adjustments, physical counts,
+    #: and offline-queued movements.
+    order_id: uuid.UUID | None = None
+    order_line_id: uuid.UUID | None = None
+
+
+@dataclass(slots=True)
+class MovementHistoryEntry:
+    """A movement as shown in an item's history, with the order number it
+    belongs to (when linked) resolved alongside it.
+
+    Kept separate from `StockMovement` so the write-side entity never
+    carries a read-projection field (see `design.md`'s AD-12).
+    """
+
+    movement: StockMovement
+    order_number: int | None

@@ -123,9 +123,20 @@ class MovementOut(BaseModel):
     occurred_at: datetime
     recorded_at: datetime
     created_by: uuid.UUID
+    order_id: uuid.UUID | None
+    order_line_id: uuid.UUID | None
+    order_number: int | None
 
     @classmethod
-    def from_domain(cls, movement: StockMovement) -> "MovementOut":
+    def from_domain(
+        cls, movement: StockMovement, *, order_number: int | None = None
+    ) -> "MovementOut":
+        """``order_number`` is only resolvable from an item-history read
+        (see `MovementHistoryEntry`); the record-movement endpoint returns
+        the movement it just wrote/replayed, which (since the HTTP layer
+        never accepts an order link) always has a plain `StockMovement`
+        with no order to look up, so it is left at its default of `None`.
+        """
         return cls(
             id=movement.id,
             item_id=movement.item_id,
@@ -136,6 +147,9 @@ class MovementOut(BaseModel):
             occurred_at=movement.occurred_at,
             recorded_at=movement.recorded_at,
             created_by=movement.created_by,
+            order_id=movement.order_id,
+            order_line_id=movement.order_line_id,
+            order_number=order_number,
         )
 
 

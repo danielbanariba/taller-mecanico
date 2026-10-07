@@ -41,6 +41,9 @@ function movement(overrides: Partial<MovementOut>): MovementOut {
     occurred_at: "2026-01-01T00:00:00Z",
     recorded_at: "2026-01-01T00:00:00Z",
     created_by: "u1",
+    order_id: null,
+    order_line_id: null,
+    order_number: null,
     ...overrides,
   };
 }
@@ -212,6 +215,24 @@ describe("ItemDetailPage", () => {
     expect(entries[1]).toHaveTextContent("Entrada +3");
   });
 
+  it("links a movement to the order that caused it, and renders no such link for a manual one", async () => {
+    // Defect this catches: the API already links a movement to the work
+    // order that caused it (`order_id`/`order_number`), but the history
+    // never surfaced that link, so a mechanic looking at a stock change
+    // had no way to open the order that made it -- or, the opposite bug,
+    // every movement grew a link even when it was never order-caused.
+    mockItemAndMovements([
+      movement({ id: "mv-linked", order_id: "order-1", order_line_id: "line-1", order_number: 42 }),
+      movement({ id: "mv-manual" }),
+    ]);
+    renderDetailPage();
+
+    const orderLinks = await screen.findAllByRole("link", { name: /^Orden #/ });
+    expect(orderLinks).toHaveLength(1);
+    expect(orderLinks[0]).toHaveTextContent("Orden #42");
+    expect(orderLinks[0]).toHaveAttribute("href", "/ordenes/order-1");
+  });
+
   it("asks for confirmation before archiving, then sends the archive request and returns to the list", async () => {
     mockItemAndMovements();
     let archiveWasCalled = false;
@@ -287,6 +308,10 @@ describe("ItemDetailPage", () => {
       http.get("/api/inventory/items/item-1", () =>
         HttpResponse.json({ detail: "item_not_found" }, { status: 404 }),
       ),
+      // `useMovements` fires unconditionally alongside the item fetch
+      // (not gated on the item query succeeding), so a 404 item still
+      // needs this mocked.
+      http.get("/api/inventory/items/item-1/movements", () => HttpResponse.json([])),
     );
     renderDetailPage();
 

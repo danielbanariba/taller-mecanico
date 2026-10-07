@@ -7,7 +7,6 @@ import { MemoryRouter, Route, Routes } from "react-router";
 
 import { sessionQueryKey } from "../features/auth/hooks";
 import { InventoryPage } from "../features/inventory/InventoryPage";
-import { WorkOrdersComingSoon } from "../features/workorders/WorkOrdersComingSoon";
 import { server } from "../test/server";
 import { AppShell } from "./AppShell";
 
@@ -22,9 +21,10 @@ function mockSession() {
 
 /**
  * The shell mounted over a small slice of the real route tree: an
- * inventory detail route, a nested vehicle route (its screen does not
- * exist until Slice 5 -- a stub stands in for it here), and the Órdenes
- * placeholder. `/login` sits outside the shell, like in `router.tsx`.
+ * inventory detail route, a nested vehicle route, and the Órdenes tab.
+ * None of their real screens are under test here -- a stub stands in for
+ * each, since this file only tests the shell's own wiring (active tab,
+ * logout). `/login` sits outside the shell, like in `router.tsx`.
  */
 function renderShell(initialPath: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -37,7 +37,7 @@ function renderShell(initialPath: string) {
             <Route path="/inventario" element={<InventoryPage />} />
             <Route path="/inventario/:id" element={<div>Detalle de repuesto</div>} />
             <Route path="/clientes/:customerId/vehiculos/:vehicleId" element={<div>Detalle de vehículo</div>} />
-            <Route path="/ordenes" element={<WorkOrdersComingSoon />} />
+            <Route path="/ordenes" element={<div>Pantalla de órdenes</div>} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -111,15 +111,15 @@ describe("AppShell", () => {
     await waitFor(() => expect(queryClient.getQueryData(sessionQueryKey)).not.toEqual(SESSION_RESPONSE));
   });
 
-  it("shows the Órdenes placeholder and makes no request to a work-orders endpoint", async () => {
-    // Defect this catches: a placeholder that still fetches, which would
-    // 404 against a server that has not shipped work orders yet -- MSW's
-    // onUnhandledFrame: "error" (test/server.ts) fails this test outright
-    // on any request this test did not explicitly mock.
+  it("marks Órdenes active on its route", async () => {
+    // Defect this catches: a shell that only highlights Inventario/
+    // Clientes, leaving the third tab permanently unmarked.
     mockSession();
     renderShell("/ordenes");
 
-    expect(await screen.findByText("Próximamente")).toBeInTheDocument();
+    const ordenesTab = await screen.findByRole("link", { name: "Órdenes" });
+    expect(ordenesTab).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("Pantalla de órdenes")).toBeInTheDocument();
   });
 
   it("still renders the shell and switches tabs while offline, with no network request of its own", async () => {
@@ -138,7 +138,7 @@ describe("AppShell", () => {
           <Routes>
             <Route element={<AppShell />}>
               <Route path="/inventario" element={<InventoryPage />} />
-              <Route path="/ordenes" element={<WorkOrdersComingSoon />} />
+              <Route path="/ordenes" element={<div>Pantalla de órdenes</div>} />
             </Route>
           </Routes>
         </MemoryRouter>
@@ -149,6 +149,6 @@ describe("AppShell", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("link", { name: "Órdenes" }));
 
-    expect(await screen.findByText("Próximamente")).toBeInTheDocument();
+    expect(await screen.findByText("Pantalla de órdenes")).toBeInTheDocument();
   });
 });

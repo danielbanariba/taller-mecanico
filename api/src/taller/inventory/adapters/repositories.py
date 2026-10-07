@@ -2,11 +2,16 @@
 
 import uuid
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, column, func, or_, table
 from sqlalchemy.orm import Session
 
 from taller.inventory.adapters.models import ItemModel, StockMovementModel
-from taller.inventory.domain.entities import Item, StockMovement
+from taller.inventory.domain.entities import Item, MovementHistoryEntry, StockMovement
+
+#: Lightweight, column-only reference to `work_orders` -- no ORM import of
+#: `WorkOrderModel`, so inventory never depends on the work-orders feature
+#: module, only on its table by name (see `design.md`'s AD-1/AD-12).
+_work_orders = table("work_orders", column("id"), column("number"))
 
 
 def _item_from_model(model: ItemModel) -> Item:
@@ -58,6 +63,8 @@ def _movement_from_model(model: StockMovementModel) -> StockMovement:
         occurred_at=model.occurred_at,
         recorded_at=model.recorded_at,
         created_by=model.created_by,
+        order_id=model.order_id,
+        order_line_id=model.order_line_id,
     )
 
 
@@ -198,15 +205,18 @@ class SqlAlchemyMovementRepository:
                 occurred_at=movement.occurred_at,
                 recorded_at=movement.recorded_at,
                 created_by=movement.created_by,
+                order_id=movement.order_id,
+                order_line_id=movement.order_line_id,
             )
         )
         self._session.flush()
 
     def list_for_item(
         self, *, workshop_id: uuid.UUID, item_id: uuid.UUID, limit: int
-    ) -> list[StockMovement]:
-        models = (
-            self._session.query(StockMovementModel)
+    ) -> list[MovementHistoryEntry]:
+        rows = (
+            self._session.query(StockMovementModel, _work_orders.c.number)
+            .outerjoin(_work_orders, _work_orders.c.id == StockMovementModel.order_id)
             .filter(
                 StockMovementModel.workshop_id == workshop_id,
                 StockMovementModel.item_id == item_id,
@@ -215,4 +225,7 @@ class SqlAlchemyMovementRepository:
             .limit(limit)
             .all()
         )
-        return [_movement_from_model(model) for model in models]
+        return [
+            MovementHistoryEntry(movement=_movement_from_model(model), order_number=order_number)
+            for model, order_number in rows
+        ]

@@ -9,12 +9,14 @@ import { customersCopy, getCustomersErrorMessage } from "./copy";
 import { formatPhone } from "./format";
 import { useCustomer, useVehiclesForCustomer } from "./hooks";
 import { VehicleList } from "./VehicleList";
+import { useWorkOrdersForCustomer } from "../workorders/hooks";
+import { WorkOrderList } from "../workorders/WorkOrderList";
 
 /**
  * Container: a customer's own detail screen, reached from the customers
- * list. Lists that customer's vehicles (phase 1); their orders join this
- * page in phase 2. Reads come from the persisted query cache, so a
- * previously visited customer still renders offline.
+ * list. Lists that customer's vehicles and, across every one of them, their
+ * work orders (newest first). Reads come from the persisted query cache, so
+ * a previously visited customer still renders offline.
  */
 export function CustomerDetailPage() {
   const { customerId: id } = useParams<{ customerId: string }>();
@@ -23,6 +25,7 @@ export function CustomerDetailPage() {
 
   const customer = useCustomer(customerId);
   const vehicles = useVehiclesForCustomer(customerId);
+  const orders = useWorkOrdersForCustomer(customerId);
 
   if (customer.isPending) {
     return (
@@ -83,6 +86,17 @@ export function CustomerDetailPage() {
             vehicles={vehicles.data ?? []}
             onOpen={(vehicle) => navigate(`/clientes/${customerId}/vehiculos/${vehicle.id}`)}
           />
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-xl font-semibold text-brand-foreground">{customersCopy.detail.ordersTitle}</h2>
+        {orders.isPending ? (
+          <div className="flex justify-center py-8">
+            <Spinner />
+          </div>
+        ) : (
+          <WorkOrderList orders={orders.data ?? []} onOpen={(order) => navigate(`/ordenes/${order.id}`)} />
         )}
       </section>
     </div>

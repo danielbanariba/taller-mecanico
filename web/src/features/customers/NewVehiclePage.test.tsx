@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
@@ -7,6 +7,19 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { renderWithQueryClient } from "../../test/render";
 import { server } from "../../test/server";
 import { NewVehiclePage } from "./NewVehiclePage";
+
+const SESSION = {
+  user: { id: "u1", full_name: "Ana Pérez", phone: "99998888", role: "owner" },
+  workshop: { id: "w1", name: "Taller Ana" },
+};
+
+// `NewVehiclePage` reads `useWorkshopId()` (for the create mutation's
+// query key), which fires a real `GET /api/auth/me` if nothing mocks it --
+// every test in this file needs the session, not just the ones that
+// assert on it.
+beforeEach(() => {
+  server.use(http.get("/api/auth/me", () => HttpResponse.json(SESSION)));
+});
 
 function renderNewVehiclePage() {
   return renderWithQueryClient(

@@ -25,6 +25,12 @@ class CustomerRepository(Protocol):
         """Persist every mutable field of an already-existing customer."""
         ...
 
+    def get_many(self, *, workshop_id: uuid.UUID, customer_ids: list[uuid.UUID]) -> list[Customer]:
+        """Batched lookup for phase 2's `describe_vehicles` (AD-12): one
+        query for every id requested, instead of one per order.
+        """
+        ...
+
     def list(
         self, *, workshop_id: uuid.UUID, query: str | None, include_archived: bool
     ) -> list[Customer]: ...

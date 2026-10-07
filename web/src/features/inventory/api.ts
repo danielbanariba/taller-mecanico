@@ -28,6 +28,11 @@ export interface MovementOut {
   occurred_at: string;
   recorded_at: string;
   created_by: string;
+  /** Set only when a work order's status change or line edit caused this movement; `null` for a manual/offline one. */
+  order_id: string | null;
+  order_line_id: string | null;
+  /** Resolved alongside the movement on an item-history read; `null` when `order_id` is `null`. */
+  order_number: number | null;
 }
 
 /** The subset of `ItemOut` the movement endpoint returns to reconcile stock. */

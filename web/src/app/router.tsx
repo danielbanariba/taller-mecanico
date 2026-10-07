@@ -7,7 +7,7 @@ import { EditItemPage } from "../features/inventory/EditItemPage";
 import { InventoryPage } from "../features/inventory/InventoryPage";
 import { ItemDetailPage } from "../features/inventory/ItemDetailPage";
 import { NewItemPage } from "../features/inventory/NewItemPage";
-import { WorkOrdersComingSoon } from "../features/workorders/WorkOrdersComingSoon";
+import { workOrderRoutes } from "../features/workorders/routes";
 import { AppShell } from "./AppShell";
 import { RequireSession } from "./RequireSession";
 
@@ -41,7 +41,10 @@ export const router = createBrowserRouter([
             path: "/clientes",
             children: customerRoutes,
           },
-          { path: "/ordenes", element: <WorkOrdersComingSoon /> },
+          {
+            path: "/ordenes",
+            children: workOrderRoutes,
+          },
         ],
       },
     ],

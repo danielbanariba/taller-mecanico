@@ -64,6 +64,48 @@ vehicles=(
   "luis-accent|luis-zelaya|car|Hyundai|Accent|2010|DEM0004"
 )
 
+# key|owner_vehicle_key|target_status (reached by walking the acyclic
+# transition table step by step below -- never jumped to directly).
+# `maria-corolla` gets two orders on purpose, so its detail screen's
+# service history always has more than one entry to show.
+orders=(
+  "corolla-brakes|maria-corolla|in_progress"
+  "cg150-service|jose-cg150|quote"
+  "frontier-oil|carlos-frontier|completed"
+  "accent-diagnosis|luis-accent|approved"
+  "corolla-alignment|maria-corolla|delivered"
+  "pulsar-quote|jose-pulsar|cancelled"
+)
+
+# order_key|kind|item_key(empty unless inventory_part)|description|quantity|unit_price_cents
+order_lines=(
+  "corolla-brakes|labor||Cambio de pastillas delanteras|1|35000"
+  "corolla-brakes|inventory_part|pastillas-freno|Pastillas de freno delanteras|1|65000"
+  "cg150-service|labor||Revisión general|1|25000"
+  "cg150-service|inventory_part|cadena-moto-428|Cadena de moto 428|1|45000"
+  "cg150-service|external_part||Llanta trasera 3.00-18|1|90000"
+  "frontier-oil|inventory_part|aceite-20w50|Aceite de motor 20W-50|2|62000"
+  "frontier-oil|inventory_part|filtro-aceite|Filtro de aceite (Toyota/Nissan)|1|18000"
+  "frontier-oil|labor||Cambio de aceite y filtro|1|15000"
+  "accent-diagnosis|labor||Diagnóstico general|1|30000"
+  "corolla-alignment|labor||Alineación y balanceo|1|40000"
+)
+
+# The ordered `PUT .../status` steps that walk each target status from
+# `quote`, one edge of the acyclic transition table at a time (`design.md`'s
+# AD-7) -- never a direct jump. On a rerun, every step the order already
+# passed replies 200 (no-op, already there) or 409 (unreachable from a
+# later status, i.e. a tester already moved it further); either way
+# nothing new is created.
+declare -A status_sequence=(
+  [quote]=""
+  [approved]="approved"
+  [in_progress]="approved in_progress"
+  [completed]="approved in_progress completed"
+  [delivered]="approved in_progress completed delivered"
+  [cancelled]="cancelled"
+)
+
 cookie_jar="$(mktemp)"
 body_file="$(mktemp)"
 trap 'rm -f "$cookie_jar" "$body_file"' EXIT
@@ -160,6 +202,7 @@ for entry in "${customers[@]}"; do
   esac
 done
 
+declare -A vehicle_ids
 vehicles_created=0
 vehicles_present=0
 vehicles_edited=0
@@ -167,6 +210,7 @@ vehicles_plate_conflict=0
 for entry in "${vehicles[@]}"; do
   IFS='|' read -r key owner_key vehicle_type make model year plate <<<"$entry"
   vehicle_id="$(uuidgen --sha1 --namespace @url --name "$id_namespace/vehicle/$key")"
+  vehicle_ids["$key"]="$vehicle_id"
   owner_id="${customer_ids[$owner_key]}"
   vehicle_json="$(jq -n --arg id "$vehicle_id" --arg customer_id "$owner_id" --arg type "$vehicle_type" \
     --arg make "$make" --arg model "$model" --arg year "$year" --arg plate "$plate" '
@@ -192,9 +236,85 @@ for entry in "${vehicles[@]}"; do
   esac
 done
 
+declare -A order_ids
+orders_created=0
+orders_present=0
+orders_edited=0
+for entry in "${orders[@]}"; do
+  IFS='|' read -r key vehicle_key _target_status <<<"$entry"
+  order_id="$(uuidgen --sha1 --namespace @url --name "$id_namespace/order/$key")"
+  order_ids["$key"]="$order_id"
+  vehicle_id="${vehicle_ids[$vehicle_key]}"
+  order_json="$(jq -n --arg id "$order_id" --arg vehicle_id "$vehicle_id" '{id: $id, vehicle_id: $vehicle_id}')"
+  status="$(request POST /api/work-orders "$order_json")"
+  case "$status" in
+    201) orders_created=$((orders_created + 1)) ;;
+    200) orders_present=$((orders_present + 1)) ;;
+    409)
+      # work_order_id_conflict: a tester edited this seeded order. Leave it.
+      orders_edited=$((orders_edited + 1))
+      ;;
+    *) fail "creating work order \"$key\" returned HTTP $status" ;;
+  esac
+done
+
+lines_created=0
+lines_present=0
+lines_edited=0
+for entry in "${order_lines[@]}"; do
+  IFS='|' read -r order_key kind item_key description quantity unit_price_cents <<<"$entry"
+  order_id="${order_ids[$order_key]}"
+  line_id="$(uuidgen --sha1 --namespace @url --name "$id_namespace/line/$order_key/${item_key:-$kind}")"
+  if [[ -n "$item_key" ]]; then
+    item_id="$(uuidgen --sha1 --namespace @url --name "$id_namespace/$item_key")"
+    line_json="$(jq -n --arg id "$line_id" --arg kind "$kind" --arg item_id "$item_id" --arg desc "$description" \
+      --argjson qty "$quantity" --argjson price "$unit_price_cents" \
+      '{id: $id, kind: $kind, item_id: $item_id, description: $desc, quantity: $qty, unit_price_cents: $price}')"
+  else
+    line_json="$(jq -n --arg id "$line_id" --arg kind "$kind" --arg desc "$description" \
+      --argjson qty "$quantity" --argjson price "$unit_price_cents" \
+      '{id: $id, kind: $kind, description: $desc, quantity: $qty, unit_price_cents: $price}')"
+  fi
+  status="$(request POST "/api/work-orders/$order_id/lines" "$line_json")"
+  case "$status" in
+    201) lines_created=$((lines_created + 1)) ;;
+    200) lines_present=$((lines_present + 1)) ;;
+    409)
+      # work_order_line_id_conflict: a tester edited this seeded line. Leave it.
+      lines_edited=$((lines_edited + 1))
+      ;;
+    *) fail "adding a line to \"$order_key\" returned HTTP $status" ;;
+  esac
+done
+
+status_changes=0
+status_tester_moved=0
+for entry in "${orders[@]}"; do
+  IFS='|' read -r key _vehicle_key target_status <<<"$entry"
+  order_id="${order_ids[$key]}"
+  for step_status in ${status_sequence[$target_status]}; do
+    status_json="$(jq -n --arg s "$step_status" '{status: $s}')"
+    status="$(request PUT "/api/work-orders/$order_id/status" "$status_json")"
+    case "$status" in
+      200) status_changes=$((status_changes + 1)) ;;
+      409)
+        # invalid_status_transition: a tester already moved this order past
+        # (or around) this step, or a rerun finds it already settled past
+        # this point. Leave it as the tester left it.
+        status_tester_moved=$((status_tester_moved + 1))
+        ;;
+      *) fail "changing \"$key\" to \"$step_status\" returned HTTP $status" ;;
+    esac
+  done
+done
+
 status="$(request GET /api/customers)"
 [[ "$status" == "200" ]] || fail "listing customers returned HTTP $status"
 customers_total="$(jq 'length' "$body_file")"
+
+status="$(request GET /api/work-orders?status_group=all)"
+[[ "$status" == "200" ]] || fail "listing work orders returned HTTP $status"
+orders_total="$(jq 'length' "$body_file")"
 
 echo "Demo account $phone ($workshop_name): $account"
 echo "Sample items: $created created, $present already present, $edited edited by testers (kept), $name_taken skipped (name taken)"
@@ -202,3 +322,7 @@ echo "Workshop now lists $total active items, $low of them low on stock"
 echo "Sample customers: $customers_created created, $customers_present already present, $customers_edited edited by testers (kept)"
 echo "Sample vehicles: $vehicles_created created, $vehicles_present already present, $vehicles_edited edited by testers (kept), $vehicles_plate_conflict plate conflicts (kept)"
 echo "Workshop now lists $customers_total active customers"
+echo "Sample work orders: $orders_created created, $orders_present already present, $orders_edited edited by testers (kept)"
+echo "Sample order lines: $lines_created created, $lines_present already present, $lines_edited edited by testers (kept)"
+echo "Sample status changes: $status_changes applied, $status_tester_moved left as testers moved them (already there or unreachable)"
+echo "Workshop now lists $orders_total work orders (any status)"

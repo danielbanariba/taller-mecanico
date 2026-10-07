@@ -221,7 +221,7 @@ def list_item_movements_route(
     item_repo = SqlAlchemyItemRepository(db)
     movement_repo = SqlAlchemyMovementRepository(db)
     try:
-        movements = list_item_movements(
+        entries = list_item_movements(
             workshop_id=workshop_id,
             item_id=item_id,
             limit=limit,
@@ -230,7 +230,10 @@ def list_item_movements_route(
         )
     except ItemNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="item_not_found") from exc
-    return [MovementOut.from_domain(movement) for movement in movements]
+    return [
+        MovementOut.from_domain(entry.movement, order_number=entry.order_number)
+        for entry in entries
+    ]
 
 
 @router.put("/movements/{movement_id}", response_model=MovementRecordResponse)

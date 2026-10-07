@@ -100,3 +100,128 @@ Phase 1 is functionally complete; every automated check is green. The 3 WARNING 
 - Checks after the fixes: pytest 141 passed; ruff check and format clean; eslint, tsc and vitest (117) clean.
 - Real-browser check on the demo (390×844) found a layout defect the suites could not see: detail and form screens kept their old full-page `<main>` wrapper and rendered as a narrow centered strip inside the shell. Fixed in `1232af0`, re-checked on the demo (one `<main>`, one `<h1>`, full width). Phones now display as `3000-0002` (`92e525b`).
 - Web suite after the browser fixes: 119 passed. `ItemDetailPage offline > shows how many changes are waiting to be sent` failed once in four full runs and passed in isolation and on three reruns. It is timing-sensitive, in code this phase did not change.
+
+---
+
+# Verify report — workshop-core, Phase 2 (P2.S1–P2.S7)
+
+Change: `workshop-core`. Scope: phase 2 only — capabilities `work-orders`, `work-order-stock-consumption`, `whatsapp-sharing`. Branch `feat/workshop-core-work-orders`. Verified 2026-10-07.
+
+## 1. Executed checks (real commands, this session)
+
+| Command | Result |
+|---|---|
+| `docker compose up -d db` | Container already running (`taller-mecanico-db-1`) |
+| `cd api && uv run ruff check .` | PASS — "All checks passed!" |
+| `cd api && uv run ruff format --check .` | PASS — 94 files already formatted |
+| `cd api && uv run pytest` | PASS — 191 passed, 1 pre-existing unrelated warning (httpx deprecation) |
+| `cd web && npm run lint` | PASS — eslint clean |
+| `cd web && npm run typecheck` | PASS — `tsc -b --noEmit` clean |
+| `cd web && npm test -- --run` | PASS — 33 files, 143 tests passed |
+| `cd web && npm run build` | PASS — main chunk 440.43 kB / gzip 130.71 kB, PWA precache generated |
+
+All counts match the figures already recorded in `openspec/changes/workshop-core/tasks.md` (P2.S8.T4). Migration round-trip not re-executed this session — `test_migrations.py` (`alembic check`) passed as part of the pytest run above, and `tasks.md` P2.S7.T6 already recorded a clean `upgrade → downgrade -1 → upgrade head` round-trip for revision `8db9fb7d17ef`.
+
+Diff vs `main` (merge-base `17a1b54`, the phase-1 merge commit — confirms this diff is phase-2-only): 77 files changed, +7490/-225. All 11 expected work-unit commits are present on the branch (`9f1a3ba` through `f842fc7`), matching every commit named in `tasks.md`.
+
+## 2. Task completion (observed from `tasks.md`, not rewritten)
+
+P2.S1 through P2.S6 and P2.S8 are fully checked `[x]`. P2.S7 is checked except two items, matching the orchestrator's stated expectation:
+- `P2.S7.T8` (deploy phase 2 to the demo, re-run seed) — unchecked, deferred to the orchestrator after the PR.
+- `P2.S7.T9` (real-browser check at 390×844 + Android Chrome photo-sharing check) — unchecked, deferred to the orchestrator after the PR.
+
+P2.S8 (review-fix slice) is fully checked and its two fixes were spot-verified directly in source this session:
+- `update_work_order` now calls `order_repo.get_for_update` (row-locked), not `get_by_id` — confirmed in `api/src/taller/workorders/application/use_cases.py`.
+- `web/src/features/workorders/copy.ts` maps `work_order_create_failed` to its own Spanish message.
+
+No other unfinished phase-2 tasks found.
+
+## 3. Spec-scenario → test mapping
+
+**Capability: work-orders**
+
+| Scenario | Status | Test evidence |
+|---|---|---|
+| Creating an order for an existing vehicle | COVERED | `test_work_orders_api.py` |
+| Creating for a nonexistent/foreign vehicle (404) | COVERED | `test_work_orders_api.py` |
+| Sequential numbering within a workshop | COVERED | `test_work_orders_api.py` |
+| Concurrent creates never assign the same number | COVERED | `test_work_order_concurrency.py` (re-run 5×, no flake per tasks.md) |
+| Replaying an identical create (no second number) | COVERED | `test_work_orders_api.py` |
+| Reusing an order id with a different payload (409) | COVERED | `test_work_orders_api.py` |
+| Adding labor / inventory-part / external-part lines | COVERED | `test_work_order_lines_api.py` |
+| Inventory-part line referencing nonexistent/foreign item (404) | COVERED | `test_work_order_lines_api.py` |
+| Total reflects all three line kinds | COVERED | `test_work_order_lines_api.py` |
+| Disallowed transition rejected (409) | COVERED | `test_stock_consumption.py` |
+| Exactly one transition consumes stock | COVERED | `test_stock_consumption.py` |
+| Cancelling after consumption reverses it | COVERED | `test_stock_consumption.py` |
+| `completed`/`delivered` cannot be cancelled | COVERED | `test_stock_consumption.py` |
+| Repeating a transition is a no-op | COVERED | `test_stock_consumption.py` |
+| Editing lines in `completed` is allowed | COVERED | `test_stock_consumption.py::test_line_edits_are_locked_in_delivered_and_cancelled_but_allowed_in_completed` |
+| Editing a delivered/cancelled order's **lines** rejected (409) | COVERED | same test above (PATCH line + DELETE line both asserted) |
+| **Editing the order's own fields (`PATCH`) once delivered is rejected** | **WARNING — not covered** | `update_work_order` raises `WorkOrderLocked` when `order.status not in EDITABLE` (verified in source), but no test sends `PATCH /work-orders/{id}` against a delivered/cancelled order — only tenant-isolation and happy-path PATCH are tested |
+| Replaying an identical line add is a no-op | COVERED | `test_work_order_lines_api.py` |
+| Reusing a line id with a different payload (409) | COVERED | `test_work_order_lines_api.py` |
+| Editing/removing a line not on the order (404) | COVERED | `test_work_order_lines_api.py` |
+| Status transition disabled while offline | COVERED | `StatusActions.test.tsx` |
+| **Line add/edit disabled while offline** | **WARNING — not covered** | `LineEditorDialog.tsx` wires `offline` into its submit-disable guard and renders the Spanish alert, but `LineEditorDialog.test.tsx` only renders with `offline={false}` — the offline branch is never exercised |
+| A previously visited order detail renders offline | COVERED | `WorkOrderDetailPage.test.tsx` |
+| Vehicle history shows its orders, most recent first | COVERED | `VehicleDetailPage.test.tsx` |
+| Customer detail shows its work orders (across vehicles) | SUGGESTION — implemented, untested | `CustomerDetailPage.tsx` wires `useWorkOrdersForCustomer` and renders an "Órdenes" section, but `CustomerDetailPage.test.tsx` has exactly one test (vehicles list) with no assertion on the orders section — same gap shape phase 1's report flagged for `CustomersPage.test.tsx` |
+| Another workshop's order is invisible / cannot be mutated (404) | COVERED | `test_work_orders_api.py`, `test_stock_consumption.py::test_workshop_b_cannot_change_status_or_edit_lines_on_workshop_as_order` |
+
+**Capability: work-order-stock-consumption**
+
+| Scenario | Status | Test evidence |
+|---|---|---|
+| Entering `in_progress` posts movements for every inventory-part line | COVERED | `test_stock_consumption.py` |
+| Negative stock is flagged, never blocked | COVERED | `test_stock_consumption.py` |
+| Increasing/decreasing quantity after consumption posts the delta | COVERED | `test_stock_consumption.py` |
+| Cancelling after/before consumption reverses/skips reversal | COVERED | `test_stock_consumption.py` |
+| Revision increments once per posting event | COVERED | `test_reconciliation_plan.py` + `stock.py` (`movement_id_for`, read directly in source) |
+| Retrying consumption/edit/cancellation does not double-apply | COVERED | `test_stock_consumption.py` |
+| Order-caused movement linked / manual movement unlinked | COVERED | `test_movement_order_link.py` |
+| Existing idempotency preserved for non-order movements | COVERED | `test_movement_order_link.py::test_unlinked_movement_replay_is_unaffected_by_the_link_fields` |
+| A failure during movement posting rolls back the status change | COVERED | `test_stock_consumption.py` (monkeypatched `record_movement` failure) |
+| Concurrent overlapping-item transitions don't deadlock | COVERED | `test_work_order_concurrency.py` (re-run 5×, no flake) |
+
+**Capability: whatsapp-sharing**
+
+| Scenario | Status | Test evidence |
+|---|---|---|
+| Mobile/landline/phoneless visibility of the share action | COVERED | `ShareWhatsAppButton.test.tsx`, `WorkOrderDetailPage.test.tsx` |
+| Triggering opens a `wa.me` link with the order's data | COVERED | `whatsapp.test.ts`, `ShareWhatsAppButton.test.tsx` |
+| Photo sharing on a supporting browser invokes Web Share with files+summary | COVERED | `ShareWhatsAppButton.test.tsx` |
+| Fallback on a non-supporting browser (text-only link, no picker) | COVERED | `ShareWhatsAppButton.test.tsx`, `whatsapp.test.ts::supportsFileShare` |
+| No network request carries the photo / no IndexedDB retains it | SUGGESTION — correct by construction, untested | `ShareSheet.tsx` keeps picked `File`s only in local `useState`, with no `fetch`/API call and no IndexedDB/outbox/query-cache write anywhere in the share flow — confirmed by reading the full component — but no test asserts the absence of a network call or persisted storage |
+
+## 4. Additional structural check
+
+`GET /work-orders` accepts `vehicle_id`/`customer_id` query filters (used by `useWorkOrdersForVehicle`/`useWorkOrdersForCustomer`), and `SqlAlchemyWorkOrderRepository.list` applies them correctly scoped by `workshop_id` first (confirmed directly in source). No API-level test exercises `GET /work-orders?vehicle_id=`/`?customer_id=` directly — the only coverage is indirect, through MSW-mocked web tests that never reach the real backend filter. **WARNING** — correct by code reading, not verified end-to-end against a real database.
+
+## 5. Findings summary
+
+- **CRITICAL: 0**
+- **WARNING: 3**
+  1. `PATCH /work-orders/{id}` on a `delivered`/`cancelled` order has no test asserting the spec's named `work_order_locked` scenario (implementation present, verified in source).
+  2. Line add/edit's offline-disable branch (`LineEditorDialog`) is wired but never exercised with `offline={true}`.
+  3. The `vehicle_id`/`customer_id` list-filter capability backing vehicle/customer order history has no direct API-level test; only MSW-mocked web tests touch it indirectly.
+- **SUGGESTION: 2**
+  1. `CustomerDetailPage.test.tsx` has no assertion on the new "Órdenes" section (mirrors a phase-1 report finding of the same shape).
+  2. "Photos never uploaded/stored" (whatsapp-sharing spec) is true by construction but has no dedicated negative-assertion test.
+
+Expected/accepted pending items (not findings): `P2.S7.T8` (demo deploy) and `P2.S7.T9` (real-browser + Android check) are explicitly deferred to the orchestrator after the PR, per the task's own instructions — this does not block archive.
+
+All full checks (API ruff/format/pytest; web lint/typecheck/test/build) pass. No regressions. No CRITICAL defects. The 3 WARNING and 2 SUGGESTION findings above are coverage gaps on correctly-implemented code paths, not functional defects.
+
+
+## 6. Resolution after verify (phase 2)
+
+- Review critical: `update_work_order` read the order without a lock and saved the full row, so it could revert a concurrent status change, line edit or stock reversal. Fixed in `b25c3d0` (`get_for_update`), with a deterministic concurrency test confirmed RED first.
+- Review critical, refuted: "`CustomerDetailPage`'s unmocked orders request breaks its test" was false at the time. MSW 3's `onUnhandledFrame: "error"` covers HTTP and WebSocket, but only logs and fails the request; it never fails the test. `2edd179` now fails any test that makes an unmocked request (`request:unhandled` checked in `afterEach`). That exposed 14 tests in 5 files with missing mocks, all fixed. CLAUDE.md and P2.S8.T2 are corrected.
+- Review minor: `work_order_create_failed` had no Spanish message. Fixed in `f842fc7`.
+- Verify WARNINGs:
+  - The locked header on `delivered`/`cancelled` and the `vehicle_id`/`customer_id` list filters were both already correct; regression tests were added in `6759566`.
+  - The line editor's offline-disable path through its real container: also correct, test added in `7d2907b`.
+- Real-browser check: "Cancelar orden" was a one-tap irreversible action shown first, because `allowed_transitions` is sorted alphabetically. Fixed in `b94f6d8`: forward actions come first, and cancel opens a confirmation dialog. Re-checked on the demo.
+- Still open: the Android Chrome photo-sharing check (P2.S7.T9b) needs a real device.
+- Checks after the fixes: pytest 195 passed; ruff check and format clean; eslint, tsc, vitest (146, stable across repeated runs) and build clean.

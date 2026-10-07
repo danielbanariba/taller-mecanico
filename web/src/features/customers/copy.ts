@@ -52,6 +52,7 @@ export const customersCopy = {
     editCustomer: "Editar cliente",
     vehiclesTitle: "Vehículos",
     addVehicle: "Agregar vehículo",
+    ordersTitle: "Órdenes",
   },
   vehicles: {
     form: {
@@ -94,6 +95,8 @@ export const customersCopy = {
     detail: {
       ownerPrefix: "Propietario:",
       editVehicle: "Editar vehículo",
+      ordersTitle: "Órdenes",
+      newOrder: "Nueva orden",
     },
     offline: {
       createDisabled: "Conéctese a internet para agregar vehículos.",

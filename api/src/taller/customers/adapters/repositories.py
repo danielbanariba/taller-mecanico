@@ -84,6 +84,16 @@ class SqlAlchemyCustomerRepository:
         model.updated_at = customer.updated_at
         self._session.flush()
 
+    def get_many(self, *, workshop_id: uuid.UUID, customer_ids: list[uuid.UUID]) -> list[Customer]:
+        if not customer_ids:
+            return []
+        models = (
+            self._session.query(CustomerModel)
+            .filter(CustomerModel.workshop_id == workshop_id, CustomerModel.id.in_(customer_ids))
+            .all()
+        )
+        return [_customer_from_model(model) for model in models]
+
     def list(
         self, *, workshop_id: uuid.UUID, query: str | None, include_archived: bool
     ) -> list[Customer]:
