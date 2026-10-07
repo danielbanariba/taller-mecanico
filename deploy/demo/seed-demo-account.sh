@@ -91,6 +91,16 @@ order_lines=(
   "corolla-alignment|labor||Alineación y balanceo|1|40000"
 )
 
+# key|order_key|amount_cents|method
+# Frontier oil (total L1,570.00: 2 x aceite-20w50 + filtro-aceite + labor)
+# gets a partial cash deposit, on purpose, so it still shows a balance due.
+# Corolla alignment (total L400.00, labor only) gets a transfer that
+# settles it exactly, so both a partial and a fully-paid order are visible.
+payments=(
+  "frontier-deposit|frontier-oil|50000|cash"
+  "corolla-alignment-paid|corolla-alignment|40000|transfer"
+)
+
 # The ordered `PUT .../status` steps that walk each target status from
 # `quote`, one edge of the acyclic transition table at a time (`design.md`'s
 # AD-7) -- never a direct jump. On a rerun, every step the order already
@@ -308,6 +318,35 @@ for entry in "${orders[@]}"; do
   done
 done
 
+payments_created=0
+payments_present=0
+payments_edited=0
+payments_balance_conflict=0
+for entry in "${payments[@]}"; do
+  IFS='|' read -r key order_key amount_cents method <<<"$entry"
+  payment_id="$(uuidgen --sha1 --namespace @url --name "$id_namespace/payment/$key")"
+  order_id="${order_ids[$order_key]}"
+  payment_json="$(jq -n --arg id "$payment_id" --argjson amount "$amount_cents" --arg method "$method" \
+    '{id: $id, amount_cents: $amount, method: $method}')"
+  status="$(request POST "/api/work-orders/$order_id/payments" "$payment_json")"
+  case "$status" in
+    201) payments_created=$((payments_created + 1)) ;;
+    200) payments_present=$((payments_present + 1)) ;;
+    409)
+      # payment_id_conflict (a tester edited this seeded payment) or
+      # payment_exceeds_balance (a tester edited the order's lines, so the
+      # seeded amount no longer fits the balance): either way, a tester
+      # touched this, kept.
+      if [[ "$(jq -r '.detail' "$body_file")" == "payment_exceeds_balance" ]]; then
+        payments_balance_conflict=$((payments_balance_conflict + 1))
+      else
+        payments_edited=$((payments_edited + 1))
+      fi
+      ;;
+    *) fail "recording payment \"$key\" returned HTTP $status" ;;
+  esac
+done
+
 status="$(request GET /api/customers)"
 [[ "$status" == "200" ]] || fail "listing customers returned HTTP $status"
 customers_total="$(jq 'length' "$body_file")"
@@ -326,3 +365,4 @@ echo "Sample work orders: $orders_created created, $orders_present already prese
 echo "Sample order lines: $lines_created created, $lines_present already present, $lines_edited edited by testers (kept)"
 echo "Sample status changes: $status_changes applied, $status_tester_moved left as testers moved them (already there or unreachable)"
 echo "Workshop now lists $orders_total work orders (any status)"
+echo "Sample payments: $payments_created created, $payments_present already present, $payments_edited edited by testers (kept), $payments_balance_conflict balance conflicts (kept)"

@@ -72,9 +72,10 @@ still works.
   expires.
 
 `seed-demo-account.sh` registers the account (or logs in if it already
-exists) and creates eight sample parts, five customers, six vehicles and
-(from phase 2) six work orders with their lines, driven through the status
-lifecycle step by step, through the API. Three of the parts start at or
+exists) and creates eight sample parts, five customers, six vehicles,
+(from phase 2) six work orders with their lines driven through the
+status lifecycle step by step, and (from phase 3) two payments against
+two of those orders, through the API. Three of the parts start at or
 below their minimum stock so the low-stock alert shows. Every id is
 deterministic, so rerunning it never duplicates anything, and it leaves
 rows that testers edited alone. Run it after the first deploy, or after
@@ -113,6 +114,25 @@ direct jump), the same way a real mechanic would use the app. A seeded
 `in_progress`/`completed` order's parts have already consumed stock, so the
 item detail screens for `pastillas-freno`, `aceite-20w50` and
 `filtro-aceite` show a movement linked back to the order that caused it.
+
+Seeded payments, one per order of the two that can still show a
+meaningful balance:
+
+| Order | Amount | Method | Result |
+| --- | --- | --- | --- |
+| #3 Nissan Frontier (`completed`, total L1,570.00) | L500.00 | Efectivo (cash) | Partial -- balance due L1,070.00 |
+| #5 Toyota Corolla alignment (`delivered`, total L400.00) | L400.00 | Transferencia (transfer) | Settled -- balance due L0.00 |
+
+Each payment's id is deterministic like every other seeded row, so
+rerunning the script replays it (HTTP 200, no new row) instead of
+duplicating it; a `409 payment_exceeds_balance` means a tester edited
+that order's lines first, and is left alone. Each order's non-fiscal
+receipt (`/ordenes/<id>/recibo/58mm` and `/ordenes/<id>/recibo/carta`,
+by URL -- the order detail screen has no link to either route yet) prints
+the "DOCUMENTO NO FISCAL" label with that order's current total, paid
+amount and balance. The "Más" menu's "Caja del día" shows both payments
+(bucketed by their `America/Tegucigalpa` local day); "Exportar todo"
+downloads a ZIP with one CSV per entity, including both payments.
 
 ```sh
 bash -c 'set -a; . ~/.config/taller-mecanico/demo.env; set +a; \

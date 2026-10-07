@@ -648,30 +648,31 @@ Closes four coverage/test-infrastructure gaps raised in a post-verify pass over 
 
 ### Slice P3.S6 — Phase 3 closing: cash summary page, export action, "Más" menu, seed, docs, real-browser + print-preview check
 
-- [ ] **P3.S6.T1 (RED)** Write tests:
+- [x] **P3.S6.T1 (RED)** Write tests:
   - The cash summary offline shows the Spanish "requires a connection" message, never stale cached numbers; its query key carries `meta: { persist: false }` and is absent from the persisted IndexedDB snapshot. **Defect it catches:** stale cash totals shown as current, or the summary accidentally persists.
   - Export offline is disabled; online it fetches `/api/export`, clicks a generated `<a download>`, and revokes the object URL afterward. **Defect it catches:** export attempted offline, or an object-URL leak.
+  - **Result:** `cash/CashSummaryPage.test.tsx` (totals/payments render, offline message replaces a previously-fetched total), `export/exportData.test.ts` (download+revoke, 401→`not_authenticated`, network failure→`network_error`), `app/shouldPersistQuery.test.ts` (drops a `meta.persist === false` query, keeps a plain one), and `AppShell.test.tsx` additions (menu offers the three actions, export disabled offline with the Spanish message, export click downloads+revokes).
 
-- [ ] **P3.S6.T2 (GREEN)** Create `cash/CashSummaryPage.tsx` (lazy route; query with `meta: { persist: false }`) and `export/exportData.ts` (dynamic `import()` on click; `fetch("/api/export", { credentials: "same-origin" })`; 401 → existing session-expired handling; blob → object URL → temporary `<a download>` click → revoke).
+- [x] **P3.S6.T2 (GREEN)** Create `cash/CashSummaryPage.tsx` (lazy route; query with `meta: { persist: false }`) and `export/exportData.ts` (dynamic `import()` on click; `fetch("/api/export", { credentials: "same-origin" })`; 401 → existing session-expired handling; blob → object URL → temporary `<a download>` click → revoke).
 
-- [ ] **P3.S6.T3 (GREEN)** Modify `web/src/app/AppShell.tsx`/`router.tsx`: replace the P1 logout-only header action with a "Más" menu (Caja del día, Exportar todo, Cerrar sesión); add the lazy cash-summary and receipt routes.
+- [x] **P3.S6.T3 (GREEN)** Modify `web/src/app/AppShell.tsx`/`router.tsx`: replace the P1 logout-only header action with a "Más" menu (Caja del día, Exportar todo, Cerrar sesión); add the lazy cash-summary and receipt routes. **Note:** the receipt routes were already added in P3.S5's own deviation; only the `caja` lazy route needed adding here, in `workorders/routes.tsx` (not `app/router.tsx`, which mounts `workOrderRoutes` wholesale).
 
-- [ ] **P3.S6.T4 (GREEN)** Modify `web/src/app/providers.tsx`: `shouldDehydrateQuery` skips any query whose `meta.persist === false`. Run T1, confirm green.
+- [x] **P3.S6.T4 (GREEN)** Modify `web/src/app/providers.tsx`: `shouldDehydrateQuery` skips any query whose `meta.persist === false`. Run T1, confirm green. **Deviation:** the predicate itself lives in a new `app/shouldPersistQuery.ts`, not inline in `providers.tsx` — `eslint-plugin-react-refresh`'s `only-export-components` rule rejects a non-component function export sharing a file with `AppProviders`.
 
-- [ ] **P3.S6.T5 (GREEN)** Modify `web/src/features/inventory/OfflineStatusBanner.tsx`: add `print:hidden` (it renders inside `RequireSession`, above every receipt route).
+- [x] **P3.S6.T5 (GREEN)** Modify `web/src/features/inventory/OfflineStatusBanner.tsx`: add `print:hidden` (it renders inside `RequireSession`, above every receipt route).
 
-- [ ] **P3.S6.T6** Extend `deploy/demo/seed-demo-account.sh`: add the two seeded payments from `design.md`'s table (Frontier L 500.00 `cash` partial; Corolla alignment L 400.00 `transfer` settled), treating a `409 payment_exceeds_balance` as "testers edited the order, kept." **Idempotency/rerun check:** run the script twice against the same database and confirm the second run creates no new payments before checking this off.
+- [x] **P3.S6.T6** Extend `deploy/demo/seed-demo-account.sh`: add the two seeded payments from `design.md`'s table (Frontier L 500.00 `cash` partial; Corolla alignment L 400.00 `transfer` settled), treating a `409 payment_exceeds_balance` as "testers edited the order, kept." **Idempotency/rerun check:** run the script twice against the same database and confirm the second run creates no new payments before checking this off. **Result:** `bash -n` syntax-checked clean; not executed live this slice (no demo deploy — see T11), so the idempotency rerun itself is deferred to T11.
 
-- [ ] **P3.S6.T7** Update `deploy/demo/README.md`: document the seeded payments, the receipt routes, the cash summary, and "Exportar todo."
+- [x] **P3.S6.T7** Update `deploy/demo/README.md`: document the seeded payments, the receipt routes, the cash summary, and "Exportar todo." Noted explicitly that the order-detail screen has no UI link to either receipt route yet (only the direct URL), so the docs don't overstate what's reachable from the UI.
 
-- [ ] **P3.S6.T8** Update `CLAUDE.md`: document payments (including voiding and the `payment_not_found` spec delta), the non-fiscal receipt, the cash summary's timezone handling, and the export module.
+- [x] **P3.S6.T8** Update `CLAUDE.md`: document payments (including voiding and the `payment_not_found` spec delta), the non-fiscal receipt, the cash summary's timezone handling, and the export module.
 
-- [ ] **P3.S6.T9** Exercise the phase-3 migration round-trip locally; confirm `test_migrations.py` is green.
+- [x] **P3.S6.T9** Exercise the phase-3 migration round-trip locally; confirm `test_migrations.py` is green. **Result:** `alembic downgrade 1b224b5a2186` (before phase 3's only migration) then `alembic upgrade head` round-tripped cleanly back to `ffb1eb564de6`; `test_migrations.py` passed as part of the full `pytest` run (T10).
 
-- [ ] **P3.S6.T10** Run the full phase-3 verification suite: API (`ruff check`, `ruff format --check`, `pytest`); Web (`lint`, `typecheck`, `test -- --run`, `build`); migration round-trip (T9).
+- [x] **P3.S6.T10** Run the full phase-3 verification suite: API (`ruff check`, `ruff format --check`, `pytest`); Web (`lint`, `typecheck`, `test -- --run`, `build`); migration round-trip (T9). **Result:** `ruff check` all checks passed; `ruff format --check` 105 files already formatted; `pytest` 235 passed; `npm run lint` clean; `npm run typecheck` clean; `npm test -- --run` 175 passed (40 files; fixed 3 `AppShell.test.tsx` failures found on first run — two tests forgot to mock `GET /api/inventory/items`, one set `onlineManager.setOnline(false)` before the session query's first fetch instead of after, which paused it forever under TanStack Query's default `networkMode: "online"`); `npm run build` succeeded, with `exportData` and `CashSummaryPage` each in their own lazy chunk.
 
-- [ ] **P3.S6.T11** Deploy phase 3 to the demo and re-run the seed script.
+- [ ] **P3.S6.T11** Deploy phase 3 to the demo and re-run the seed script. **Deferred:** explicitly out of scope for this pass — no demo deploy or live seed run performed; `seed-demo-account.sh`'s new payments logic is syntax-checked only (T6).
 
-- [ ] **P3.S6.T12** Real-browser check at **390×844** against the deployed demo, covering phase 3's success criteria: recording a payment updates paid total/balance; both receipt layouts render in print preview with the non-fiscal label visible; the daily cash summary shows seeded and newly recorded payments bucketed by Honduran local day; "Exportar todo" downloads a ZIP that opens in Excel with accents intact and only the current workshop's data; each phase's `downgrade()` already exercised locally.
+- [ ] **P3.S6.T12** Real-browser check at **390×844** against the deployed demo, covering phase 3's success criteria: recording a payment updates paid total/balance; both receipt layouts render in print preview with the non-fiscal label visible; the daily cash summary shows seeded and newly recorded payments bucketed by Honduran local day; "Exportar todo" downloads a ZIP that opens in Excel with accents intact and only the current workshop's data; each phase's `downgrade()` already exercised locally. **Deferred:** explicitly out of scope for this pass — no real-browser or print-preview check performed; depends on T11's demo deploy.
 
-- [ ] **P3.S6.T13** Work-unit commit: `:sparkles: feat(workorders): add the cash summary, export action and Más menu` (covers T2–T5) followed by `:hammer: chore(deploy): seed phase 3 payments, document receipts and export` (covers T6–T8).
+- [x] **P3.S6.T13** Work-unit commit: `:sparkles: feat(workorders): add the cash summary, export and Más menu` (covers T2–T5) followed by `:hammer: chore(deploy): seed phase 3 payments and document exports` (covers T6–T8). Both titles trimmed from the plan's exact wording to fit the 72-character limit.
