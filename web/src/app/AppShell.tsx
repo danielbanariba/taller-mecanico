@@ -11,6 +11,12 @@ import { appCopy } from "./copy";
  * duplicates it), the active screen's own content, and the bottom
  * navigation. `main` is padded at the bottom so its last row is never
  * hidden behind the fixed nav.
+ *
+ * The workshop name renders as a styled `<p>`, not an `<h1>`: every nested
+ * screen already renders its own `<h1>` for its page title, and a second
+ * top-level heading here would leave the page with two `<h1>`s, which
+ * breaks the single-top-level-heading landmark assistive tech relies on
+ * to navigate the page.
  */
 export function AppShell() {
   const navigate = useNavigate();
@@ -26,7 +32,7 @@ export function AppShell() {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="mx-auto flex w-full max-w-md flex-col gap-3 px-4 py-6">
-        <h1 className="text-2xl font-bold text-brand-primary">{session.data?.workshop.name}</h1>
+        <p className="text-2xl font-bold text-brand-primary">{session.data?.workshop.name}</p>
         <Button variant="secondary" onClick={handleLogout} loading={logout.isPending}>
           {appCopy.logout.submit}
         </Button>

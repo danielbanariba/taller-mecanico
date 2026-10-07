@@ -102,7 +102,7 @@ describe("InventoryPage", () => {
     session = otherWorkshopSession;
     await queryClient.invalidateQueries({ queryKey: sessionQueryKey });
 
-    expect(await screen.findByRole("heading", { name: "Taller Beto" })).toBeInTheDocument();
+    expect(await screen.findByText("Taller Beto")).toBeInTheDocument();
     expect(screen.queryByText("Filtro de Ana")).not.toBeInTheDocument();
     releaseOtherWorkshopItems();
     expect(await screen.findByText("Bujía de Beto")).toBeInTheDocument();

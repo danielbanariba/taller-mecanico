@@ -195,7 +195,7 @@ describe("switching workshops on one phone", () => {
       renderApp();
       await START_WORKSHOP_B_SESSION[flow](userEvent.setup());
 
-      expect(await screen.findByRole("heading", { name: "Taller Beto" })).toBeInTheDocument();
+      expect(await screen.findByText("Taller Beto")).toBeInTheDocument();
       expect(screen.queryByText("Filtro de Ana")).not.toBeInTheDocument();
       await waitFor(async () => expect(await persistedCacheText()).not.toContain("Filtro de Ana"));
 
@@ -240,7 +240,7 @@ describe("switching workshops on one phone (customers)", () => {
 
     // Login always redirects to /inventario (see renderAppOnCustomers'
     // docstring); switch to the Clientes tab to observe the purge.
-    expect(await screen.findByRole("heading", { name: "Taller Beto" })).toBeInTheDocument();
+    expect(await screen.findByText("Taller Beto")).toBeInTheDocument();
     await user.click(screen.getByRole("link", { name: "Clientes" }));
 
     expect(screen.queryByText("Cliente de Ana")).not.toBeInTheDocument();

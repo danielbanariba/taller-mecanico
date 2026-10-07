@@ -79,7 +79,7 @@ describe("AppShell", () => {
     server.use(http.get("/api/inventory/items", () => HttpResponse.json([])));
     renderShell("/inventario");
 
-    await screen.findByRole("heading", { name: "Taller Ana" });
+    await screen.findByText("Taller Ana");
     expect(screen.getAllByRole("button", { name: "Cerrar sesión" })).toHaveLength(1);
   });
 
@@ -104,7 +104,7 @@ describe("AppShell", () => {
     const user = userEvent.setup();
     const { queryClient } = renderShell("/inventario");
 
-    await screen.findByRole("heading", { name: "Taller Ana" });
+    await screen.findByText("Taller Ana");
     await user.click(screen.getByRole("button", { name: "Cerrar sesión" }));
 
     expect(await screen.findByText("Pantalla de inicio de sesión")).toBeInTheDocument();
@@ -145,7 +145,7 @@ describe("AppShell", () => {
       </QueryClientProvider>,
     );
 
-    await screen.findByRole("heading", { name: "Taller Ana" });
+    await screen.findByText("Taller Ana");
     const user = userEvent.setup();
     await user.click(screen.getByRole("link", { name: "Órdenes" }));
 
