@@ -106,7 +106,7 @@ function renderDetailPageFromCacheWithoutConnection() {
     user: { id: "u1", full_name: "Ana Pérez", phone: "99998888", role: "owner" },
     workshop: { id: "w1", name: "Taller Ana" },
   });
-  queryClient.setQueryData(itemQueryKey("item-1"), ITEM);
+  queryClient.setQueryData(itemQueryKey("w1", "item-1"), ITEM);
 
   return render(
     <QueryClientProvider client={queryClient}>

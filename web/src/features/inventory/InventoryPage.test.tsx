@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { delay, http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
 
 import { server } from "../../test/server";
 import { renderWithQueryClient } from "../../test/render";
+import { sessionQueryKey } from "../auth/hooks";
 import { InventoryPage } from "./InventoryPage";
 import type { ItemOut } from "./api";
 
@@ -37,8 +39,8 @@ function mockSession() {
   server.use(http.get("/api/auth/me", () => HttpResponse.json(SESSION_RESPONSE, { status: 200 })));
 }
 
-function renderInventoryPage() {
-  return renderWithQueryClient(
+function inventoryRoutes() {
+  return (
     <MemoryRouter initialEntries={["/inventario"]}>
       <Routes>
         <Route path="/inventario" element={<InventoryPage />} />
@@ -46,8 +48,12 @@ function renderInventoryPage() {
         <Route path="/inventario/:id" element={<div>Pantalla de detalle</div>} />
         <Route path="/login" element={<div>Pantalla de inicio de sesión</div>} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+function renderInventoryPage() {
+  return renderWithQueryClient(inventoryRoutes());
 }
 
 describe("InventoryPage", () => {
@@ -55,6 +61,43 @@ describe("InventoryPage", () => {
     // Safety net: a test that fails before reaching its own cleanup must
     // not leave fake timers active for every test that runs after it.
     vi.useRealTimers();
+  });
+
+  it("never shows another workshop's cached items once the session belongs to a different workshop", async () => {
+    // Defect this catches: inventory query keys that are not scoped by
+    // workshop. When the session changes workshop without this tab's cache
+    // being cleared (the cookie replaced from another tab, for one), the
+    // new workshop's screen is served the previous workshop's cached list.
+    const otherWorkshopSession = {
+      user: { id: "u2", full_name: "Beto Díaz", phone: "88887777", role: "owner" },
+      workshop: { id: "w2", name: "Taller Beto" },
+    };
+    let session = SESSION_RESPONSE;
+    let releaseOtherWorkshopItems = () => {};
+    const otherWorkshopItemsReady = new Promise<void>((resolve) => {
+      releaseOtherWorkshopItems = resolve;
+    });
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(session)),
+      http.get("/api/inventory/items", async () => {
+        if (session === SESSION_RESPONSE) {
+          return HttpResponse.json([baseItem({ name: "Filtro de Ana" })]);
+        }
+        await otherWorkshopItemsReady;
+        return HttpResponse.json([baseItem({ id: "item-2", name: "Bujía de Beto" })]);
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={queryClient}>{inventoryRoutes()}</QueryClientProvider>);
+    await screen.findByText("Filtro de Ana");
+
+    session = otherWorkshopSession;
+    await queryClient.invalidateQueries({ queryKey: sessionQueryKey });
+
+    expect(await screen.findByRole("heading", { name: "Taller Beto" })).toBeInTheDocument();
+    expect(screen.queryByText("Filtro de Ana")).not.toBeInTheDocument();
+    releaseOtherWorkshopItems();
+    expect(await screen.findByText("Bujía de Beto")).toBeInTheDocument();
   });
 
   it("renders the stock number and the 'Por acabarse' badge for low stock", async () => {

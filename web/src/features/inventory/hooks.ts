@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 
 import { ApiError } from "../../shared/api/http";
-import { useSession } from "../auth/hooks";
+import { useSession, workshopQueryKey } from "../auth/hooks";
 import {
   inventoryApi,
   type ItemOut,
@@ -15,12 +15,22 @@ import { getInventoryErrorMessage } from "./copy";
 import { flushOutboxOnce, subscribeOutboxChange, withFlushLock } from "./offlineSync";
 import { defaultOutbox, type Outbox } from "./outbox";
 
-const ITEMS_QUERY_BASE = ["inventory", "items"] as const;
-const INVENTORY_QUERY_BASE = ["inventory"] as const;
+/**
+ * Every inventory key starts with the workshop it belongs to (see
+ * `workshopQueryKey`): a list or item cached for one workshop is never
+ * served to another workshop's session, and logging in as another workshop
+ * drops it. `workshopId` is undefined only before the session resolves,
+ * when every inventory query is disabled.
+ */
+const inventoryQueryKey = (workshopId: string | undefined) => [...workshopQueryKey(workshopId), "inventory"] as const;
+const itemsQueryBase = (workshopId: string | undefined) => [...inventoryQueryKey(workshopId), "items"] as const;
 
-export const itemsQueryKey = (params: ListItemsParams = {}) => [...ITEMS_QUERY_BASE, params] as const;
-export const itemQueryKey = (id: string) => ["inventory", "item", id] as const;
-export const movementsQueryKey = (id: string) => ["inventory", "item", id, "movements"] as const;
+export const itemsQueryKey = (workshopId: string | undefined, params: ListItemsParams = {}) =>
+  [...itemsQueryBase(workshopId), params] as const;
+export const itemQueryKey = (workshopId: string | undefined, id: string) =>
+  [...inventoryQueryKey(workshopId), "item", id] as const;
+export const movementsQueryKey = (workshopId: string | undefined, id: string) =>
+  [...itemQueryKey(workshopId, id), "movements"] as const;
 
 /** Debounces `value`, settling `delayMs` after the last change. */
 export function useDebouncedValue<T>(value: T, delayMs: number): T {
@@ -105,55 +115,62 @@ export function fetchItemFolded(
 export function useItems(params: ListItemsParams = {}) {
   const workshopId = useWorkshopId();
   return useQuery({
-    queryKey: itemsQueryKey(params),
+    queryKey: itemsQueryKey(workshopId, params),
     queryFn: () => fetchItemsFolded(params, workshopId),
+    enabled: workshopId !== undefined,
   });
 }
 
 export function useItem(id: string) {
   const workshopId = useWorkshopId();
   return useQuery({
-    queryKey: itemQueryKey(id),
+    queryKey: itemQueryKey(workshopId, id),
     queryFn: () => fetchItemFolded(id, workshopId),
+    enabled: workshopId !== undefined,
   });
 }
 
 export function useMovements(id: string) {
+  const workshopId = useWorkshopId();
   return useQuery({
-    queryKey: movementsQueryKey(id),
+    queryKey: movementsQueryKey(workshopId, id),
     queryFn: () => inventoryApi.listMovements(id),
+    enabled: workshopId !== undefined,
   });
 }
 
 export function useCreateItem() {
   const queryClient = useQueryClient();
+  const workshopId = useWorkshopId();
   return useMutation({
     mutationFn: (payload: CreateItemPayload) => inventoryApi.createItem(payload),
     onSuccess: (item) => {
-      queryClient.setQueryData(itemQueryKey(item.id), item);
-      queryClient.invalidateQueries({ queryKey: ITEMS_QUERY_BASE });
+      queryClient.setQueryData(itemQueryKey(workshopId, item.id), item);
+      queryClient.invalidateQueries({ queryKey: itemsQueryBase(workshopId) });
     },
   });
 }
 
 export function useUpdateItem(id: string) {
   const queryClient = useQueryClient();
+  const workshopId = useWorkshopId();
   return useMutation({
     mutationFn: (payload: UpdateItemPayload) => inventoryApi.updateItem(id, payload),
     onSuccess: (item) => {
-      queryClient.setQueryData(itemQueryKey(id), item);
-      queryClient.invalidateQueries({ queryKey: ITEMS_QUERY_BASE });
+      queryClient.setQueryData(itemQueryKey(workshopId, id), item);
+      queryClient.invalidateQueries({ queryKey: itemsQueryBase(workshopId) });
     },
   });
 }
 
 export function useArchiveItem() {
   const queryClient = useQueryClient();
+  const workshopId = useWorkshopId();
   return useMutation({
     mutationFn: (id: string) => inventoryApi.archiveItem(id),
     onSuccess: (_result, id) => {
-      queryClient.removeQueries({ queryKey: itemQueryKey(id) });
-      queryClient.invalidateQueries({ queryKey: ITEMS_QUERY_BASE });
+      queryClient.removeQueries({ queryKey: itemQueryKey(workshopId, id) });
+      queryClient.invalidateQueries({ queryKey: itemsQueryBase(workshopId) });
     },
   });
 }
@@ -198,16 +215,16 @@ export function useRecordMovement() {
       return recordMovement(input, { workshopId });
     },
     onMutate: async (input): Promise<RecordMovementSnapshot> => {
-      await queryClient.cancelQueries({ queryKey: itemQueryKey(input.itemId) });
-      await queryClient.cancelQueries({ queryKey: ITEMS_QUERY_BASE });
+      await queryClient.cancelQueries({ queryKey: itemQueryKey(workshopId, input.itemId) });
+      await queryClient.cancelQueries({ queryKey: itemsQueryBase(workshopId) });
 
-      const previousItem = queryClient.getQueryData<ItemOut>(itemQueryKey(input.itemId));
-      const previousLists = queryClient.getQueriesData<ItemOut[]>({ queryKey: ITEMS_QUERY_BASE });
+      const previousItem = queryClient.getQueryData<ItemOut>(itemQueryKey(workshopId, input.itemId));
+      const previousLists = queryClient.getQueriesData<ItemOut[]>({ queryKey: itemsQueryBase(workshopId) });
 
-      queryClient.setQueryData<ItemOut>(itemQueryKey(input.itemId), (current) =>
+      queryClient.setQueryData<ItemOut>(itemQueryKey(workshopId, input.itemId), (current) =>
         current ? applyMovementToItem(current, input) : current,
       );
-      queryClient.setQueriesData<ItemOut[]>({ queryKey: ITEMS_QUERY_BASE }, (current) =>
+      queryClient.setQueriesData<ItemOut[]>({ queryKey: itemsQueryBase(workshopId) }, (current) =>
         current?.map((item) => (item.id === input.itemId ? applyMovementToItem(item, input) : item)),
       );
 
@@ -217,7 +234,7 @@ export function useRecordMovement() {
       if (!onMutateResult) {
         return;
       }
-      queryClient.setQueryData(itemQueryKey(input.itemId), onMutateResult.previousItem);
+      queryClient.setQueryData(itemQueryKey(workshopId, input.itemId), onMutateResult.previousItem);
       for (const [key, data] of onMutateResult.previousLists) {
         queryClient.setQueryData(key, data);
       }
@@ -226,20 +243,20 @@ export function useRecordMovement() {
       // server will never reconsider). Refetch the authoritative state
       // instead of trusting the rolled-back snapshot alone, in case another
       // movement (a background flush, another device) has since changed it.
-      queryClient.invalidateQueries({ queryKey: itemQueryKey(input.itemId) });
-      queryClient.invalidateQueries({ queryKey: ITEMS_QUERY_BASE });
+      queryClient.invalidateQueries({ queryKey: itemQueryKey(workshopId, input.itemId) });
+      queryClient.invalidateQueries({ queryKey: itemsQueryBase(workshopId) });
     },
     onSuccess: (result, input) => {
       if (result.status === "queued") {
         return;
       }
-      queryClient.setQueryData<ItemOut>(itemQueryKey(input.itemId), (current) =>
+      queryClient.setQueryData<ItemOut>(itemQueryKey(workshopId, input.itemId), (current) =>
         current ? { ...current, ...result.item } : current,
       );
-      queryClient.setQueriesData<ItemOut[]>({ queryKey: ITEMS_QUERY_BASE }, (current) =>
+      queryClient.setQueriesData<ItemOut[]>({ queryKey: itemsQueryBase(workshopId) }, (current) =>
         current?.map((item) => (item.id === input.itemId ? { ...item, ...result.item } : item)),
       );
-      queryClient.invalidateQueries({ queryKey: movementsQueryKey(input.itemId) });
+      queryClient.invalidateQueries({ queryKey: movementsQueryKey(workshopId, input.itemId) });
     },
   });
 }
@@ -254,8 +271,8 @@ export interface OfflineSyncStatus {
 
 const INITIAL_SYNC_STATUS: OfflineSyncStatus = { pendingCount: 0, syncing: false, lastErrorMessage: undefined };
 
-function syncStatusQueryKey(workshopId: string) {
-  return ["inventory", "sync-status", workshopId] as const;
+function syncStatusQueryKey(workshopId: string | undefined) {
+  return [...inventoryQueryKey(workshopId), "sync-status"] as const;
 }
 
 /**
@@ -282,7 +299,7 @@ export function useOfflineSync(workshopId: string | undefined): OfflineSyncStatu
   const queryClient = useQueryClient();
 
   const statusQuery = useQuery({
-    queryKey: workshopId !== undefined ? syncStatusQueryKey(workshopId) : ["inventory", "sync-status"],
+    queryKey: syncStatusQueryKey(workshopId),
     queryFn: () => INITIAL_SYNC_STATUS,
     enabled: false,
     initialData: INITIAL_SYNC_STATUS,
@@ -313,7 +330,7 @@ export function useOfflineSync(workshopId: string | undefined): OfflineSyncStatu
           patch({ lastErrorMessage: last ? getInventoryErrorMessage(last.error.code) : undefined });
         }
         if (result.sent.length > 0 || result.removedWithError.length > 0) {
-          queryClient.invalidateQueries({ queryKey: INVENTORY_QUERY_BASE });
+          queryClient.invalidateQueries({ queryKey: inventoryQueryKey(workshopId) });
         }
       } finally {
         patch({ syncing: false });

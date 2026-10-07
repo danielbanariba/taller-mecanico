@@ -93,7 +93,7 @@ describe("EditItemPage", () => {
     );
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     queryClient.setQueryData(sessionQueryKey, SESSION);
-    queryClient.setQueryData(itemQueryKey("item-1"), ITEM);
+    queryClient.setQueryData(itemQueryKey("w1", "item-1"), ITEM);
 
     render(
       <QueryClientProvider client={queryClient}>
