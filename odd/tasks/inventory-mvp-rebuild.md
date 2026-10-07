@@ -108,7 +108,7 @@ T3 decisions: quantities are integers; movement replay compares `{item_id, kind,
 
 ## Next step
 
-All tasks done and verified. Propose one PR `feat/inventory-mvp` → `main` to the user (push, PR and merge are the user's call; no PR template in the repo).
+All tasks done and verified. PR #15 (`feat/inventory-mvp` → `main`) is open for review; merging needs the user's explicit OK.
 
 T9b known limitations (accepted for the MVP): if another tab switches the session's workshop without a login in this tab, scoped keys keep this tab from showing the other workshop's data, but its memory and IndexedDB snapshot hold the old entries until the next login or garbage collection; `login_throttles` keeps one row per phone that ever tried to log in (a periodic cleanup can come later).
 
