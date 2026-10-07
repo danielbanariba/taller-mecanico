@@ -584,26 +584,28 @@ Closes four coverage/test-infrastructure gaps raised in a post-verify pass over 
 
 ### Slice P3.S3 — API: export (pure builder, then endpoint tenancy)
 
-- [ ] **P3.S3.T1 (RED)** Write `api/tests/export/test_csv_zip.py` (pure, no DB):
+- [x] **P3.S3.T1 (RED)** Write `api/tests/export/test_csv_zip.py` (pure, no DB):
   - Every produced CSV starts with the UTF-8 BOM (`EF BB BF`). **Defect it catches:** Excel on Windows mojibakes accented names without it.
   - `José Núñez` round-trips byte-for-byte through the writer. **Defect it catches:** an encoding step silently strips or mangles accents.
   - A text cell starting with `=1+1` is written as `'=1+1`; a negative number is **not** prefixed. **Defect it catches:** formula injection in Excel, or the guard over-escapes legitimate negative numbers.
   - An empty table still produces a header-only CSV. **Defect it catches:** a workshop with no payments gets a missing file instead of an empty one.
+  **Result (RED):** confirmed before `taller.export` existed at all: collection failed with `ModuleNotFoundError: No module named 'taller.export.application.csv_zip'`.
 
-- [ ] **P3.S3.T2 (GREEN)** Create `api/src/taller/export/__init__.py` and `application/csv_zip.py`: the pure CSV/ZIP builder (`csv.writer`, `utf-8-sig` encoding, the formula-injection guard, the money/`_hnl`-suffix and local-timestamp formatting rules from `design.md`'s "Export" section, no `sep=,` line). Run T1, confirm green.
+- [x] **P3.S3.T2 (GREEN)** Create `api/src/taller/export/__init__.py` and `application/csv_zip.py`: the pure CSV/ZIP builder (`csv.writer`, `utf-8-sig` encoding, the formula-injection guard, the money/`_hnl`-suffix and local-timestamp formatting rules from `design.md`'s "Export" section, no `sep=,` line). Run T1, confirm green. **Result (GREEN):** 5 passed. **Implementation note:** `format_money` returns a `Decimal`, never a `str` — the injection guard (`build_csv`'s `_render_cell`) only ever inspects `str` cells, so a negative balance ("saldo a favor") is written as `-50.00` and is never escaped, which is what "numeric columns are never prefixed" requires for a value that textually starts with `-`.
 
-- [ ] **P3.S3.T3 (RED)** Write `api/tests/export/test_export_api.py`:
+- [x] **P3.S3.T3 (RED)** Write `api/tests/export/test_export_api.py`:
   - The ZIP contains exactly one CSV per entity (customers, vehicles, items, inventory movements, work orders, work order lines, payments). **Defect it catches:** an entity is missing from the archive.
   - Only workshop A's rows appear when A requests the export; a client-supplied workshop id parameter is ignored. **Defect it catches:** a tenant leak, or a client-controlled scope parameter.
   - Two consecutive exports with no writes in between yield the same rows, and neither request creates/modifies/deletes any record. **Defect it catches:** the export has a side effect, or is non-deterministic absent writes.
+  **Result (RED):** confirmed before `/api/export` existed: all 4 tests failed with `404 Not Found`.
 
-- [ ] **P3.S3.T4 (GREEN)** Create `api/src/taller/export/adapters/sources.py` (explicit column-list reads over each feature's ORM models, always `WHERE workshop_id = :current`) and `adapters/router.py` (`GET /export`, assembling the `BytesIO`/`zipfile` response with `Content-Disposition`/`Cache-Control: no-store`, per AD-13 — not a `StreamingResponse`, so the request's DB session stays open for the whole build). Run T3, confirm green.
+- [x] **P3.S3.T4 (GREEN)** Create `api/src/taller/export/adapters/sources.py` (explicit column-list reads over each feature's ORM models, always `WHERE workshop_id = :current`) and `adapters/router.py` (`GET /export`, assembling the `BytesIO`/`zipfile` response with `Content-Disposition`/`Cache-Control: no-store`, per AD-13 — not a `StreamingResponse`, so the request's DB session stays open for the whole build). Run T3, confirm green. **Result (GREEN):** 4 passed. **Deviation (minimal, necessary):** `work_orders.csv`'s `total_hnl`/`paid_hnl`/`balance_hnl` are computed with two `GROUP BY order_id` aggregate queries over `WorkOrderLineModel`/`PaymentModel` (non-removed lines; non-voided payments) directly in `sources.py`, instead of importing `taller.workorders.domain.money`'s helpers — those take domain entities (`WorkOrderLine`, `Payment`), not model rows, and AD-1's dependency diagram draws `export.adapters` depending only on `customers/inventory/workorders models`, not their domain/application layers.
 
-- [ ] **P3.S3.T5 (GREEN)** Modify `api/src/taller/main.py`: mount the export router.
+- [x] **P3.S3.T5 (GREEN)** Modify `api/src/taller/main.py`: mount the export router.
 
-- [ ] **P3.S3.T6** Run this slice's verification: `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
+- [x] **P3.S3.T6** Run this slice's verification: `uv run ruff check . && uv run ruff format --check . && uv run pytest`. **Result:** ruff check clean; ruff format clean (105 files, 2 auto-reformatted then clean); pytest 235 passed (226 existing + 9 new in `api/tests/export/`). Web was untouched by this slice; re-ran its suite anyway as a baseline check: `eslint .` clean, `tsc -b --noEmit` clean, `vitest --run` 146 passed (33 files), unaffected.
 
-- [ ] **P3.S3.T7** Work-unit commit: `:sparkles: feat(export): add the workshop-scoped CSV/ZIP export`.
+- [x] **P3.S3.T7** Work-unit commit: `:sparkles: feat(export): add the workshop-scoped CSV/ZIP export`.
 
 ### Slice P3.S4 — Web: payments on the order detail
 
