@@ -71,6 +71,10 @@ def _create_order(client: TestClient, *, vehicle_id: str, **overrides: object) -
     return response.json()
 
 
+def _set_status(client: TestClient, order_id: str, target: str) -> object:
+    return client.put(f"/api/work-orders/{order_id}/status", json={"status": target})
+
+
 def test_create_saves_the_order_with_its_vehicle(authenticated_client: TestClient) -> None:
     vehicle = _active_vehicle(authenticated_client)
 
@@ -274,3 +278,107 @@ def test_list_is_isolated_per_workshop(
 
     assert len(response.json()) == 1
     assert response.json()[0]["vehicle"]["id"] == vehicle_a["id"]
+
+
+def test_patching_a_delivered_order_is_locked(authenticated_client: TestClient) -> None:
+    """Defect this catches: the order-header `PATCH` endpoint has no (or
+    a wrong) `EDITABLE` check, so the order's own fields stay editable
+    after `delivered`, letting a mechanic rewrite the complaint/odometer
+    history once the vehicle has already been handed back.
+    """
+    vehicle = _active_vehicle(authenticated_client)
+    order = _create_order(
+        authenticated_client, vehicle_id=vehicle["id"], complaint="Ruido en motor"
+    )
+    for target in ("approved", "in_progress", "completed", "delivered"):
+        assert _set_status(authenticated_client, order["id"], target).status_code == 200
+
+    response = authenticated_client.patch(
+        f"/api/work-orders/{order['id']}", json={"complaint": "intrusion"}
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "work_order_locked"
+    unchanged = authenticated_client.get(f"/api/work-orders/{order['id']}")
+    assert unchanged.json()["complaint"] == "Ruido en motor"
+
+
+def test_patching_a_cancelled_order_is_locked(authenticated_client: TestClient) -> None:
+    """Defect this catches: same as above, for the `cancelled` side of
+    the lock -- a cancelled order's header staying editable would let a
+    cancelled order's complaint/odometer be rewritten after the fact.
+    """
+    vehicle = _active_vehicle(authenticated_client)
+    order = _create_order(
+        authenticated_client, vehicle_id=vehicle["id"], complaint="Ruido en motor"
+    )
+    assert _set_status(authenticated_client, order["id"], "cancelled").status_code == 200
+
+    response = authenticated_client.patch(
+        f"/api/work-orders/{order['id']}", json={"complaint": "intrusion"}
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "work_order_locked"
+    unchanged = authenticated_client.get(f"/api/work-orders/{order['id']}")
+    assert unchanged.json()["complaint"] == "Ruido en motor"
+
+
+def test_list_filters_by_vehicle_id_and_customer_id(authenticated_client: TestClient) -> None:
+    """Defect this catches: the `vehicle_id`/`customer_id` query filters
+    are ignored, swapped, or matched against the wrong column, mixing one
+    vehicle's or one customer's service history with another's.
+    """
+    customer_one = _create_customer(authenticated_client, full_name="Dueno Uno")
+    vehicle_one_a = _create_vehicle(authenticated_client, customer_id=customer_one["id"])
+    vehicle_one_b = _create_vehicle(authenticated_client, customer_id=customer_one["id"])
+    customer_two = _create_customer(authenticated_client, full_name="Dueno Dos")
+    vehicle_two = _create_vehicle(authenticated_client, customer_id=customer_two["id"])
+
+    order_one_a = _create_order(authenticated_client, vehicle_id=vehicle_one_a["id"])
+    order_one_b = _create_order(authenticated_client, vehicle_id=vehicle_one_b["id"])
+    order_two = _create_order(authenticated_client, vehicle_id=vehicle_two["id"])
+
+    by_vehicle = authenticated_client.get(
+        "/api/work-orders",
+        params={"status_group": "all", "vehicle_id": vehicle_one_a["id"]},
+    )
+    assert by_vehicle.status_code == 200
+    assert [item["id"] for item in by_vehicle.json()] == [order_one_a["id"]]
+
+    by_customer = authenticated_client.get(
+        "/api/work-orders",
+        params={"status_group": "all", "customer_id": customer_one["id"]},
+    )
+    assert by_customer.status_code == 200
+    ids_for_customer_one = {item["id"] for item in by_customer.json()}
+    assert ids_for_customer_one == {order_one_a["id"], order_one_b["id"]}
+    assert order_two["id"] not in ids_for_customer_one
+
+
+def test_list_filtering_by_another_workshops_vehicle_or_customer_id_returns_nothing(
+    authenticated_client: TestClient, second_authenticated_client: TestClient
+) -> None:
+    """Defect this catches: a missing `workshop_id` filter alongside
+    `vehicle_id`/`customer_id` leaks another workshop's orders, or an id
+    that matches nothing in this workshop falls back to the unfiltered
+    list instead of an empty one.
+    """
+    vehicle_a = _active_vehicle(authenticated_client)
+    order_a = _create_order(authenticated_client, vehicle_id=vehicle_a["id"])
+    vehicle_b = _active_vehicle(second_authenticated_client)
+    _create_order(second_authenticated_client, vehicle_id=vehicle_b["id"])
+
+    by_vehicle = second_authenticated_client.get(
+        "/api/work-orders",
+        params={"status_group": "all", "vehicle_id": vehicle_a["id"]},
+    )
+    assert by_vehicle.status_code == 200
+    assert by_vehicle.json() == []
+
+    by_customer = second_authenticated_client.get(
+        "/api/work-orders",
+        params={"status_group": "all", "customer_id": order_a["customer"]["id"]},
+    )
+    assert by_customer.status_code == 200
+    assert by_customer.json() == []
