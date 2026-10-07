@@ -6,6 +6,7 @@ import { Button } from "../../shared/ui/Button";
 import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
 import { customersCopy, getCustomersErrorMessage } from "./copy";
+import { formatPhone } from "./format";
 import { useCustomer, useVehiclesForCustomer } from "./hooks";
 import { VehicleList } from "./VehicleList";
 
@@ -54,7 +55,7 @@ export function CustomerDetailPage() {
         <h1 className="text-3xl font-bold text-brand-primary">{data.full_name}</h1>
         {data.phone ? (
           <p className="text-base text-brand-muted-foreground">
-            {data.phone}
+            {formatPhone(data.phone)}
             {data.phone_is_mobile === true
               ? ` · ${customersCopy.list.mobileBadge}`
               : data.phone_is_mobile === false

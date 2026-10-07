@@ -1,4 +1,5 @@
 import { customersCopy } from "./copy";
+import { formatPhone } from "./format";
 import type { CustomerOut } from "./api";
 
 export interface CustomerListProps {
@@ -34,7 +35,7 @@ export function CustomerList({ customers, isFiltered, onOpen }: CustomerListProp
             <span className="text-lg font-semibold text-brand-foreground">{customer.full_name}</span>
             {customer.phone ? (
               <span className="text-sm text-brand-muted-foreground">
-                {customer.phone}
+                {formatPhone(customer.phone)}
                 {customer.phone_is_mobile === true
                   ? ` · ${customersCopy.list.mobileBadge}`
                   : customer.phone_is_mobile === false
