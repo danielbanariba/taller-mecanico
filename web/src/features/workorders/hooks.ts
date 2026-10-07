@@ -6,9 +6,11 @@ import {
   workOrdersApi,
   type ChangeStatusPayload,
   type CreateLinePayload,
+  type CreatePaymentPayload,
   type CreateWorkOrderPayload,
   type StatusGroup,
   type UpdateLinePayload,
+  type VoidPaymentPayload,
   type WorkOrderOut,
   type WorkOrderSummaryOut,
 } from "./api";
@@ -101,10 +103,11 @@ export function useCreateWorkOrder() {
 }
 
 /**
- * Every line mutation (add, edit, remove) returns the whole order
- * (`design.md`'s "API surface per phase" note), so the detail query is
- * updated from that one round trip instead of a refetch, and every list
- * is invalidated since an edited line can change a summary's total.
+ * Every line and payment mutation (add/edit/remove a line, record/void a
+ * payment) returns the whole order (`design.md`'s "API surface per phase"
+ * note), so the detail query is updated from that one round trip instead
+ * of a refetch, and every list is invalidated since any of them can
+ * change a summary's total or paid amount.
  */
 function useLineMutationCacheUpdate(orderId: string) {
   const queryClient = useQueryClient();
@@ -158,5 +161,22 @@ export function useChangeStatus(orderId: string) {
       onOrderSuccess(order);
       queryClient.invalidateQueries({ queryKey: inventoryQueryKey(workshopId) });
     },
+  });
+}
+
+export function useRecordPayment(orderId: string) {
+  const onSuccess = useLineMutationCacheUpdate(orderId);
+  return useMutation({
+    mutationFn: (payload: CreatePaymentPayload) => workOrdersApi.recordPayment(orderId, payload),
+    onSuccess,
+  });
+}
+
+export function useVoidPayment(orderId: string) {
+  const onSuccess = useLineMutationCacheUpdate(orderId);
+  return useMutation({
+    mutationFn: ({ paymentId, payload }: { paymentId: string; payload: VoidPaymentPayload }) =>
+      workOrdersApi.voidPayment(orderId, paymentId, payload),
+    onSuccess,
   });
 }

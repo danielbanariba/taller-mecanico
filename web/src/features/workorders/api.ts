@@ -3,6 +3,7 @@ import { http } from "../../shared/api/http";
 export type WorkOrderStatus = "quote" | "approved" | "in_progress" | "completed" | "delivered" | "cancelled";
 export type LineKind = "labor" | "inventory_part" | "external_part";
 export type StatusGroup = "open" | "closed" | "all";
+export type PaymentMethod = "cash" | "transfer" | "card" | "other";
 
 export interface WorkOrderVehicleOut {
   id: string;
@@ -37,6 +38,19 @@ export interface WorkOrderLineOut {
   updated_at: string;
 }
 
+/** A recorded payment. `voided_at`/`void_reason` are always present (never
+ * omitted), null on a non-voided payment, matching the API's `PaymentOut`.
+ */
+export interface PaymentOut {
+  id: string;
+  amount_cents: number;
+  method: PaymentMethod;
+  note: string | null;
+  paid_at: string;
+  voided_at: string | null;
+  void_reason: string | null;
+}
+
 export interface WorkOrderSummaryOut {
   id: string;
   number: number;
@@ -61,6 +75,10 @@ export interface WorkOrderOut {
   notes: string | null;
   lines: WorkOrderLineOut[];
   total_cents: number;
+  payments: PaymentOut[];
+  paid_cents: number;
+  balance_cents: number;
+  accepts_payments: boolean;
   created_at: string;
   updated_at: string;
   approved_at: string | null;
@@ -105,6 +123,17 @@ export interface ChangeStatusPayload {
   status: WorkOrderStatus;
 }
 
+export interface CreatePaymentPayload {
+  id: string;
+  amount_cents: number;
+  method: PaymentMethod;
+  note?: string;
+}
+
+export interface VoidPaymentPayload {
+  reason: string;
+}
+
 function buildListQuery(params: ListWorkOrdersParams): string {
   const query = new URLSearchParams();
   query.set("status_group", params.statusGroup ?? "open");
@@ -136,4 +165,8 @@ export const workOrdersApi = {
     http.delete<WorkOrderOut>(`/api/work-orders/${orderId}/lines/${lineId}`),
   changeStatus: (orderId: string, payload: ChangeStatusPayload) =>
     http.put<WorkOrderOut>(`/api/work-orders/${orderId}/status`, payload),
+  recordPayment: (orderId: string, payload: CreatePaymentPayload) =>
+    http.post<WorkOrderOut>(`/api/work-orders/${orderId}/payments`, payload),
+  voidPayment: (orderId: string, paymentId: string, payload: VoidPaymentPayload) =>
+    http.post<WorkOrderOut>(`/api/work-orders/${orderId}/payments/${paymentId}/void`, payload),
 };

@@ -609,20 +609,22 @@ Closes four coverage/test-infrastructure gaps raised in a post-verify pass over 
 
 ### Slice P3.S4 — Web: payments on the order detail
 
-- [ ] **P3.S4.T1 (RED)** Write tests:
+- [x] **P3.S4.T1 (RED)** Write tests:
   - Recording a payment while offline is disabled with the Spanish message.
   - The payment-amount field parses `1,500.50` to `150050` cents (reusing `centsToPlainAmount`/`parseLempirasToCents`-equivalent logic, moved to `web/src/shared/` this slice if not already, per `design.md`'s note). **Defect it catches:** a thousands separator is mis-parsed into the wrong cent amount.
   - The 409 codes (`payment_exceeds_balance`, `work_order_not_payable`, `payment_id_conflict`) and the new `payment_not_found` each map to a distinct Spanish message, not a generic fallback.
+  **Result:** `payments/PaymentForm.test.tsx` (money parsing + a zero-amount rejection) and five new `WorkOrderDetailPage.test.tsx` cases (offline disable; the three 409 codes; `payment_not_found` on void).
 
-- [ ] **P3.S4.T2 (GREEN)** If not already done in phase 2, move the lempira formatting/parsing helpers from `web/src/features/inventory/format.ts` to `web/src/shared/` (work orders is now a second consumer, per `design.md`'s File Changes note); re-export from `inventory/format.ts` if other inventory code still imports the old path, to avoid a wide mechanical rename in this slice.
+- [x] **P3.S4.T2 (GREEN)** If not already done in phase 2, move the lempira formatting/parsing helpers from `web/src/features/inventory/format.ts` to `web/src/shared/` (work orders is now a second consumer, per `design.md`'s File Changes note); re-export from `inventory/format.ts` if other inventory code still imports the old path, to avoid a wide mechanical rename in this slice. **Result:** already done in phase 2 (`web/src/shared/format/money.ts` exists and is already `LineEditorDialog.tsx`'s and now `PaymentForm.tsx`/`PaymentList.tsx`'s source of these helpers) — no action needed.
 
-- [ ] **P3.S4.T3 (GREEN)** Modify `web/src/features/workorders/copy.ts`: add the four payment-method labels and the new error-code messages (including `payment_not_found`). Modify `hooks.ts`: `useRecordPayment`, `useVoidPayment`. Create `payments/PaymentForm.tsx`, `payments/PaymentList.tsx`; wire into `WorkOrderDetailPage.tsx`.
+- [x] **P3.S4.T3 (GREEN)** Modify `web/src/features/workorders/copy.ts`: add the four payment-method labels and the new error-code messages (including `payment_not_found`). Modify `hooks.ts`: `useRecordPayment`, `useVoidPayment`. Create `payments/PaymentForm.tsx`, `payments/PaymentList.tsx`; wire into `WorkOrderDetailPage.tsx`. **Result:** `api.ts` gained `PaymentMethod`, `PaymentOut`, `CreatePaymentPayload`, `VoidPaymentPayload` and `WorkOrderOut.{payments,paid_cents,balance_cents,accepts_payments}` (always present, matching the already-shipped API contract) plus `recordPayment`/`voidPayment` client calls. `WorkOrderDetailPage.tsx` gained a "Pagos" section (paid/balance, `PaymentList`, and `PaymentForm` gated by `accepts_payments`, else an "Esta orden no acepta pagos en su estado actual." notice) and a client-generated payment id reused across a failed retry, regenerated only on success (the same double-submit idiom every other create in this app uses). `PaymentList` owns its own void confirm dialog (the shared `Dialog.tsx` pattern `StatusActions` already uses for cancellation), with a required reason.
 
-- [ ] **P3.S4.T4** Run T1, confirm green.
+- [x] **P3.S4.T4** Run T1, confirm green. **Result:** `npm test -- --run src/features/workorders` — 8 files, 32 tests passed.
 
-- [ ] **P3.S4.T5** Run this slice's verification: `npm run lint && npm run typecheck && npm test -- --run`.
+- [x] **P3.S4.T5** Run this slice's verification: `npm run lint && npm run typecheck && npm test -- --run`. **Result:** eslint clean; tsc clean; vitest 153 passed (34 files, up from 146).
 
-- [ ] **P3.S4.T6** Work-unit commit: `:sparkles: feat(workorders): record payments on the order detail`.
+- [x] **P3.S4.T6** Work-unit commit: `:sparkles: feat(workorders): record payments on the order detail`.
+  - **Risk flagged, not fixed (out of this slice's explicit scope):** `work_order_has_payments` (the cancel guard's 409, added by P3.S1) is still unmapped in `copy.ts`'s `ERROR_MESSAGES`, so cancelling a paid order still shows the generic fallback instead of an actionable message. T1/T3 only scoped the four payment-specific codes; flagging for the user/reviewer, as P3.S3 did for `payments.csv`'s missing void columns.
 
 ### Slice P3.S5 — Web: receipts (lazy routes, print CSS, measured 58 mm page)
 
