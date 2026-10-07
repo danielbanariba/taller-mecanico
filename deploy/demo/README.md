@@ -44,10 +44,47 @@ never committed) is the single env file both units load:
 - `TALLER_PREVIEW_ALLOWED_HOSTS=inventario-taller.danielbanariba.com` - read
   by `web/vite.config.ts`; without it `vite preview` answers the tunnel's
   requests with 403.
+- `VITE_DEMO_PHONE` and `VITE_DEMO_PASSWORD` - the shared demo account (see
+  below). Read by `npm run build`, not by the units.
 
 Process environment variables win over the `api/.env` file that
 `taller/shared/config.py` anchors to, and the worktree has no `api/.env`, so
 this file is the only source of configuration.
+
+## Demo account
+
+Testers do not need to register: the login form of this build comes
+prefilled with one shared account, and a notice above it says so. They
+open the link and tap "Iniciar sesión". Registering their own workshop
+still works.
+
+| Phone | Password | Workshop | Owner |
+| --- | --- | --- | --- |
+| `9999-9999` | `demo1234` | Taller Demo | Demo |
+
+- **Security:** Vite compiles every `VITE_*` value into the public JS
+  bundle, so anyone can read these credentials. Set `VITE_DEMO_*` only when
+  building this demo, never for a real deployment. Without them the login
+  form is empty and shows no notice.
+- **Shared data:** every tester sees and edits the same inventory.
+- **Shared lockout:** five wrong passwords in a row lock the phone for 15
+  minutes, for every tester at once. Login still works the moment the lock
+  expires.
+
+`seed-demo-account.sh` registers the account (or logs in if it already
+exists) and creates eight sample parts through the API, three of them at or
+below their minimum stock so the low-stock alert shows. Item ids are
+deterministic, so rerunning it never duplicates anything, and it leaves
+items that testers edited alone. Run it after the first deploy, or after
+wiping the demo database, once the public URL answers:
+
+```sh
+bash -c 'set -a; . ~/.config/taller-mecanico/demo.env; set +a; \
+  /home/banar/Desktop/taller-mecanico-worktrees/demo/deploy/demo/seed-demo-account.sh'
+```
+
+It talks to the public URL by default; pass another base URL as the first
+argument. The session cookie is `Secure`, so that URL must be HTTPS.
 
 ## Deploying an update
 
@@ -64,7 +101,8 @@ uv run --frozen --env-file ~/.config/taller-mecanico/demo.env alembic upgrade he
 
 cd /home/banar/Desktop/taller-mecanico-worktrees/demo/web
 npm ci
-npm run build
+# demo.env must be loaded, or the build ships without the demo account
+bash -c 'set -a; . ~/.config/taller-mecanico/demo.env; set +a; npm run build'
 
 systemctl --user restart taller-demo-api.service taller-demo-web.service
 curl -s https://inventario-taller.danielbanariba.com/api/health
@@ -135,3 +173,5 @@ docker exec taller-demo-db pg_dump -U taller taller_demo > taller_demo.sql
    `cloudflared tunnel --config ~/.cloudflared/ceiba-demos.yml ingress validate`,
    restart `ceiba-tunnel.service`, then
    `cloudflared tunnel route dns <tunnel-uuid> inventario-taller.danielbanariba.com`.
+7. Once the public URL answers, run `seed-demo-account.sh` (see
+   "Demo account").

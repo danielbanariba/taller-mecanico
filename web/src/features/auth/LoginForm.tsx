@@ -10,12 +10,14 @@ export interface LoginFormProps {
   onSubmit: (payload: LoginPayload) => void;
   pending: boolean;
   errorMessage?: string;
+  /** Seeds the fields once on mount; the user can still edit them. */
+  initialValues?: Partial<LoginPayload>;
 }
 
 /** Presentational: owns only the two input values, nothing else. */
-export function LoginForm({ onSubmit, pending, errorMessage }: LoginFormProps) {
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
+export function LoginForm({ onSubmit, pending, errorMessage, initialValues }: LoginFormProps) {
+  const [phone, setPhone] = useState(initialValues?.phone ?? "");
+  const [password, setPassword] = useState(initialValues?.password ?? "");
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -92,6 +92,7 @@ The service worker (`vite-plugin-pwa`, configured in `vite.config.ts`) precaches
 ## Public test deployment
 
 A shareable test instance runs at https://inventario-taller.danielbanariba.com from a detached worktree on the dev machine (its own Postgres container, two systemd user units, the `ceiba-demos` Cloudflare tunnel). `deploy/demo/README.md` is the runbook: what runs where, how to deploy an update, stop it, and read its logs.
+Its build prefills a shared demo account on the login form from `VITE_DEMO_PHONE`/`VITE_DEMO_PASSWORD` (`web/src/features/auth/demoAccount.ts`); Vite compiles those into the public bundle, so never set them for any other build.
 
 ## Gotchas
 
