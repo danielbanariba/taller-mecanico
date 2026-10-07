@@ -97,6 +97,11 @@ The service worker (`vite-plugin-pwa`, configured in `vite.config.ts`) precaches
 - FastAPI deprecates `HTTP_422_UNPROCESSABLE_ENTITY` in favor of `HTTP_422_UNPROCESSABLE_CONTENT` — the latter is what this codebase uses (`api/src/taller/inventory/adapters/router.py`); don't reach for the deprecated name out of habit.
 - This agent sandbox denies writes to any path matching `.env*` by its own permission settings, regardless of content — `api/env.example` is the checked-in, writable template; `cp api/env.example api/.env` (shell copy, not a direct write to the `.env` path) then edit the values the task needs.
 
+## Commits and pull requests
+
+- Commit messages follow `templates/commit-template.en.git.txt`: Gitmoji + Conventional Commits, in English. Title `<gitmoji> <type>(<scope>): <description>` (for example `:sparkles: feat(inventory): add a physical count`), imperative, lowercase, no trailing period, at most 72 characters; the body explains what changed and why, wrapped at 72 characters.
+- Pull requests use `.github/pull_request_template.md` (GitHub pre-fills it): a description readable in one minute whose first line follows the commit format, then the verification checklist for this stack.
+
 ## Planning and history
 
 - `odd/tasks/` — feature documents: objective, decisions, task-by-task progress and verification evidence for each feature.
