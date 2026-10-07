@@ -1,9 +1,21 @@
 /**
- * Money and date formatting for the inventory feature. Money is always
- * integer cents of HNL end to end (API contract); these helpers are the
- * only place that converts between that integer and what a human types or
- * reads.
+ * Money, quantity and date formatting for the inventory feature. Money is
+ * always integer cents of HNL end to end (API contract); these helpers are
+ * the only place that converts between that integer and what a human types
+ * or reads.
  */
+
+/** Upper bound for a typed stock quantity (initial stock, minimum, physical count), matching the API's own bound. */
+export const MAX_STOCK = 1_000_000;
+
+/** Parses a non-negative integer typed as a stock quantity; `undefined` for anything else (letters, a sign, a decimal point, or empty). */
+export function parseStockQuantity(text: string): number | undefined {
+  const trimmed = text.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    return undefined;
+  }
+  return Number(trimmed);
+}
 
 const currencyFormatter = new Intl.NumberFormat("es-HN", {
   style: "currency",

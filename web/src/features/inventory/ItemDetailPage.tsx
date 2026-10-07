@@ -10,7 +10,7 @@ import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
 import { TextField } from "../../shared/ui/TextField";
 import { getInventoryErrorMessage, inventoryCopy } from "./copy";
-import { formatCents } from "./format";
+import { formatCents, MAX_STOCK, parseStockQuantity } from "./format";
 import { useArchiveItem, useItem, useMovements, useRecordMovement } from "./hooks";
 import { MovementHistory } from "./MovementHistory";
 
@@ -33,6 +33,7 @@ export function ItemDetailPage() {
 
   const [countOpen, setCountOpen] = useState(false);
   const [countText, setCountText] = useState("");
+  const [countTouched, setCountTouched] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
 
   if (item.isPending) {
@@ -65,13 +66,23 @@ export function ItemDetailPage() {
       ? getInventoryErrorMessage(recordMovement.error.code)
       : undefined;
 
+  const counted = parseStockQuantity(countText);
+  const countInvalid = counted === undefined || counted > MAX_STOCK;
+
   function openCountDialog() {
     setCountText(String(data.stock));
+    setCountTouched(false);
     setCountOpen(true);
   }
 
   function handleCountSubmit() {
-    const counted = Math.max(0, Math.trunc(Number(countText) || 0));
+    setCountTouched(true);
+    // An empty or invalid entry must never become a count of 0: that would
+    // silently wipe the real stock. (`counted === undefined` is already part
+    // of `countInvalid`; repeated so TypeScript narrows `counted`.)
+    if (countInvalid || counted === undefined) {
+      return;
+    }
     recordMovement.mutate(
       { itemId, kind: "adjust", quantity: counted },
       { onSuccess: () => setCountOpen(false) },
@@ -149,8 +160,11 @@ export function ItemDetailPage() {
             type="number"
             inputMode="numeric"
             min={0}
+            max={MAX_STOCK}
             value={countText}
             onChange={(event) => setCountText(event.target.value)}
+            onBlur={() => setCountTouched(true)}
+            error={countTouched && countInvalid ? inventoryCopy.create.stockRangeInvalid : undefined}
             autoFocus
           />
           <div className="flex gap-3">

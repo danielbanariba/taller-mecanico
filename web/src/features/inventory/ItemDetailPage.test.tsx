@@ -165,6 +165,40 @@ describe("ItemDetailPage", () => {
     await waitFor(() => expect(capturedBody).toMatchObject({ item_id: "item-1", kind: "adjust", quantity: 7 }));
   });
 
+  it.each([
+    ["an empty count", ""],
+    ["a count over the maximum", "1000001"],
+  ])("refuses to save %s and explains why, instead of recording it", async (_case, typed) => {
+    // Defect this catches: the dialog coerced an empty or invalid entry to
+    // 0 (and accepted any size), so clearing the field and tapping "Guardar
+    // conteo" silently set the real stock to 0.
+    mockItemAndMovements();
+    let putCount = 0;
+    server.use(
+      http.put("/api/inventory/movements/:movementId", () => {
+        putCount += 1;
+        return HttpResponse.json({ detail: "unexpected" }, { status: 500 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetailPage();
+
+    await screen.findByText("10");
+    await user.click(screen.getByRole("button", { name: "Contar" }));
+    const countField = await screen.findByLabelText(/cantidad contada/i);
+    await user.clear(countField);
+    if (typed) {
+      await user.type(countField, typed);
+    }
+    await user.click(screen.getByRole("button", { name: "Guardar conteo" }));
+
+    expect(await screen.findByText("Ingrese una cantidad entre 0 y 1,000,000.")).toBeInTheDocument();
+    expect(countField).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText("10")).toBeInTheDocument();
+    expect(await defaultOutbox.listForWorkshop("w1")).toEqual([]);
+    expect(putCount).toBe(0);
+  });
+
   it("renders the movement history newest first with Spanish labels", async () => {
     mockItemAndMovements([
       movement({ id: "mv-newest", kind: "out", quantity: 1, delta: -1 }),

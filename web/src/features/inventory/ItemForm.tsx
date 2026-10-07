@@ -5,24 +5,12 @@ import { Button } from "../../shared/ui/Button";
 import { TextArea } from "../../shared/ui/TextArea";
 import { TextField } from "../../shared/ui/TextField";
 import { inventoryCopy } from "./copy";
-import { parseLempirasToCents } from "./format";
-
-/** Upper bound for `initial_stock`/`min_stock`, matching the API's own bound. */
-const MAX_STOCK = 1_000_000;
+import { MAX_STOCK, parseLempirasToCents, parseStockQuantity } from "./format";
 
 /** Upper bound for a sale price in cents (L 10,000,000.00), matching the API's own bound. */
 const MAX_PRICE_CENTS = 1_000_000_000;
 
 const MAX_NAME_LENGTH = 120;
-
-/** Parses a non-negative integer typed as a stock quantity; `undefined` for anything else (letters, a sign, a decimal point, or empty). */
-function parseStockQuantity(text: string): number | undefined {
-  const trimmed = text.trim();
-  if (!/^\d+$/.test(trimmed)) {
-    return undefined;
-  }
-  return Number(trimmed);
-}
 
 export interface ItemFormInitialValues {
   name: string;
