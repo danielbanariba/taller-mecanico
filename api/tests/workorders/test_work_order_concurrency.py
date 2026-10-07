@@ -38,7 +38,12 @@ from taller.workorders.adapters.repositories import (
     SqlAlchemyWorkOrderRepository,
     SqlAlchemyWorkshopCounterRepository,
 )
-from taller.workorders.application.use_cases import add_line, change_status, create_work_order
+from taller.workorders.application.use_cases import (
+    add_line,
+    change_status,
+    create_work_order,
+    update_work_order,
+)
 from taller.workorders.domain.entities import LineKind
 from taller.workorders.domain.status import WorkOrderStatus
 
@@ -247,6 +252,125 @@ def test_concurrent_creates_with_the_same_id_persist_exactly_one_order(
         counter = verify.get(WorkshopCounterModel, (workshop_id, "work_order"))
         assert counter is not None
         assert counter.value == 1
+
+
+class _ReadPausingWorkOrderRepository:
+    """Wraps the real repository so a test can land a concurrent commit
+    precisely between `update_work_order`'s own (unlocked) read and its
+    later `save()` -- the exact window a missing row lock leaves open.
+    `get_for_update` is a plain passthrough: once `update_work_order` is
+    fixed to call it instead of `get_by_id`, it blocks on the real
+    Postgres row lock on its own, and this wrapper's pause never engages.
+    """
+
+    def __init__(
+        self,
+        inner: SqlAlchemyWorkOrderRepository,
+        read_done: threading.Event,
+        resume: threading.Event,
+    ) -> None:
+        self._inner = inner
+        self._read_done = read_done
+        self._resume = resume
+
+    def get_by_id(self, *, workshop_id: uuid.UUID, order_id: uuid.UUID):
+        order = self._inner.get_by_id(workshop_id=workshop_id, order_id=order_id)
+        self._read_done.set()
+        self._resume.wait(timeout=5)
+        return order
+
+    def get_for_update(self, *, workshop_id: uuid.UUID, order_id: uuid.UUID):
+        return self._inner.get_for_update(workshop_id=workshop_id, order_id=order_id)
+
+    def save(self, order) -> None:
+        self._inner.save(order)
+
+
+def test_update_work_order_does_not_revert_a_concurrently_committed_status_change(
+    committed_workshop: dict[str, uuid.UUID], test_engine: Engine
+) -> None:
+    """Defect this catches: `update_work_order` (the order's own PATCH --
+    editing `complaint`/`odometer_km`/`notes`) reads the order without
+    taking its row lock, then its `save()` blindly rewrites every column
+    (including `status`) from that stale snapshot. If a `change_status`
+    call locks the row, commits a transition, and releases the lock
+    while the PATCH's own re-read inside `save()` lands right after that
+    commit, the PATCH's stale status overwrites the just-committed one --
+    `design.md`'s AD-5 requires every mutating work-order use case to
+    lock the order row first, exactly to close this window.
+    """
+    workshop_id = committed_workshop["workshop_id"]
+    vehicle_id = committed_workshop["vehicle_id"]
+    user_id = committed_workshop["user_id"]
+
+    with Session(test_engine) as setup_session:
+        order, _ = create_work_order(
+            workshop_id=workshop_id,
+            order_id=uuid.uuid4(),
+            vehicle_id=vehicle_id,
+            complaint=None,
+            odometer_km=None,
+            notes=None,
+            created_by=user_id,
+            order_repo=SqlAlchemyWorkOrderRepository(setup_session),
+            counter_repo=SqlAlchemyWorkshopCounterRepository(setup_session),
+            vehicle_repo=SqlAlchemyVehicleRepository(setup_session),
+        )
+        setup_session.commit()
+        order_id = order.id
+
+    read_done = threading.Event()
+    resume = threading.Event()
+    errors: list[BaseException] = []
+
+    def _patch() -> None:
+        try:
+            with Session(test_engine) as session:
+                repo = _ReadPausingWorkOrderRepository(
+                    SqlAlchemyWorkOrderRepository(session), read_done, resume
+                )
+                update_work_order(
+                    workshop_id=workshop_id,
+                    order_id=order_id,
+                    fields={"notes": "Actualizado durante la aprobación"},
+                    order_repo=repo,
+                )
+                session.commit()
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    with Session(test_engine) as holder_session:
+        # Lock the order row and transition it, exactly like a real
+        # `PUT .../status` request would, but hold the transaction open
+        # (no commit yet).
+        change_status(
+            workshop_id=workshop_id,
+            order_id=order_id,
+            target=WorkOrderStatus.approved,
+            created_by=user_id,
+            order_repo=SqlAlchemyWorkOrderRepository(holder_session),
+            item_repo=SqlAlchemyItemRepository(holder_session),
+            movement_repo=SqlAlchemyMovementRepository(holder_session),
+        )
+
+        thread = threading.Thread(target=_patch)
+        thread.start()
+        # On the buggy (`get_by_id`) path, `read_done` fires almost
+        # instantly, before this commit. On the fixed (`get_for_update`)
+        # path, the PATCH blocks on the real row lock instead and never
+        # reaches the wrapper's hook, so this just bounds the wait.
+        read_done.wait(timeout=1)
+        holder_session.commit()
+        resume.set()
+
+    thread.join(timeout=5)
+    assert not errors, errors
+
+    with Session(test_engine) as verify:
+        model = verify.get(WorkOrderModel, order_id)
+        assert model is not None
+        assert model.status == WorkOrderStatus.approved.value
+        assert model.notes == "Actualizado durante la aprobación"
 
 
 #: Fixed phone for this fixture's committed user row (see `_PHONE`'s own

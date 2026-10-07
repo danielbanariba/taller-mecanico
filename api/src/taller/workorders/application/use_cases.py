@@ -330,12 +330,17 @@ def update_work_order(
     """Edit the order's own fields (``complaint``, ``odometer_km``,
     ``notes``).
 
+    Locks the order row first (``design.md``'s AD-5), like every other
+    mutating work-order use case: a blind read-then-save here would
+    otherwise be able to overwrite a concurrently committed status
+    transition or line edit with this call's own stale snapshot.
+
     Raises:
         WorkOrderNotFound: no such order in this workshop.
         WorkOrderLocked: the order's status is ``delivered`` or
             ``cancelled``.
     """
-    order = order_repo.get_by_id(workshop_id=workshop_id, order_id=order_id)
+    order = order_repo.get_for_update(workshop_id=workshop_id, order_id=order_id)
     if order is None:
         raise WorkOrderNotFound(order_id)
     if order.status not in EDITABLE:
