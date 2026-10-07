@@ -14,10 +14,12 @@ flushes in a single ``commit()``, so they land as one transaction.
 
 import uuid
 
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from taller.identity.adapters.models import UserModel, WorkshopModel
+from taller.identity.adapters.models import LoginThrottleModel, UserModel, WorkshopModel
 from taller.identity.domain.entities import User, Workshop
+from taller.identity.domain.login_throttle import LoginThrottle
 from taller.identity.domain.phone_number import PhoneNumber
 
 
@@ -80,4 +82,43 @@ class SqlAlchemyWorkshopRepository:
         self._session.add(
             WorkshopModel(id=workshop.id, name=workshop.name, created_at=workshop.created_at)
         )
+        self._session.flush()
+
+
+class SqlAlchemyLoginThrottleRepository:
+    """Login throttle persistence backed by SQLAlchemy (PostgreSQL only)."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get_for_update(self, phone: PhoneNumber) -> LoginThrottle:
+        # Make sure the row exists before locking it: `SELECT ... FOR UPDATE`
+        # locks nothing when there is no row, so two concurrent first
+        # attempts for a phone would otherwise both read "no failures" and
+        # one increment would be lost. `ON CONFLICT DO NOTHING` never fails
+        # on a concurrent insert of the same phone; it waits for it instead.
+        self._session.execute(
+            insert(LoginThrottleModel)
+            .values(phone=phone.value, failed_attempts=0, locked_until=None)
+            .on_conflict_do_nothing(index_elements=[LoginThrottleModel.phone])
+        )
+        model = (
+            self._session.query(LoginThrottleModel)
+            .filter(LoginThrottleModel.phone == phone.value)
+            .with_for_update()
+            .populate_existing()
+            .one()
+        )
+        return LoginThrottle(
+            phone=phone,
+            failed_attempts=model.failed_attempts,
+            locked_until=model.locked_until,
+        )
+
+    def save(self, throttle: LoginThrottle) -> None:
+        model = self._session.get(LoginThrottleModel, throttle.phone.value)
+        if model is None:
+            return
+        model.failed_attempts = throttle.failed_attempts
+        model.locked_until = throttle.locked_until
         self._session.flush()

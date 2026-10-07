@@ -1,5 +1,7 @@
 """HTTP routes for registration, login, logout, and the current session."""
 
+import math
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -7,20 +9,26 @@ from sqlalchemy.orm import Session
 from taller.identity.adapters.dependencies import (
     SESSION_COOKIE_NAME,
     SESSION_COOKIE_PATH,
+    get_clock,
     get_current_user,
     get_password_hasher,
     get_token_service,
 )
 from taller.identity.adapters.repositories import (
+    SqlAlchemyLoginThrottleRepository,
     SqlAlchemyUserRepository,
     SqlAlchemyWorkshopRepository,
 )
 from taller.identity.adapters.schemas import LoginRequest, MeResponse, RegisterRequest
 from taller.identity.adapters.token_service import SESSION_MAX_AGE, JwtTokenService
-from taller.identity.application.ports import PasswordHasher
-from taller.identity.application.use_cases import authenticate, register_workshop
+from taller.identity.application.ports import Clock, PasswordHasher
+from taller.identity.application.use_cases import attempt_login, register_workshop
 from taller.identity.domain.entities import User
-from taller.identity.domain.errors import InvalidCredentials, PhoneAlreadyRegistered
+from taller.identity.domain.errors import (
+    InvalidCredentials,
+    PhoneAlreadyRegistered,
+    TooManyLoginAttempts,
+)
 from taller.shared.config import Settings, get_settings
 from taller.shared.db import get_db
 
@@ -94,16 +102,31 @@ def login(
     settings: Settings = Depends(get_settings),
     hasher: PasswordHasher = Depends(get_password_hasher),
     token_service: JwtTokenService = Depends(get_token_service),
+    clock: Clock = Depends(get_clock),
 ) -> MeResponse:
     user_repo = SqlAlchemyUserRepository(db)
     try:
-        user = authenticate(
+        user = attempt_login(
             phone_raw=payload.phone,
             password=payload.password,
             user_repo=user_repo,
             hasher=hasher,
+            throttle_repo=SqlAlchemyLoginThrottleRepository(db),
+            clock=clock,
         )
+    except TooManyLoginAttempts as exc:
+        db.rollback()
+        retry_after = max(1, math.ceil(exc.retry_after.total_seconds()))
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="too_many_login_attempts",
+            headers={"Retry-After": str(retry_after)},
+        ) from exc
     except InvalidCredentials as exc:
+        # Commit the counted failure: `get_db` never commits, so without
+        # this the failed attempt would roll back with the 401 response and
+        # the lockout would never trigger.
+        db.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials") from exc
 
     workshop_repo = SqlAlchemyWorkshopRepository(db)
@@ -113,6 +136,8 @@ def login(
         # foreign key to an existing workshop that is never deleted.
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="workshop_not_found")
 
+    # Persists the reset of earlier failed attempts.
+    db.commit()
     token = token_service.issue(user_id=user.id, workshop_id=workshop.id)
     _set_session_cookie(response, token, settings)
     return MeResponse.from_domain(user, workshop)

@@ -11,10 +11,11 @@ from functools import lru_cache
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from taller.identity.adapters.clock import SystemClock
 from taller.identity.adapters.password_hasher import PwdlibPasswordHasher
 from taller.identity.adapters.repositories import SqlAlchemyUserRepository
 from taller.identity.adapters.token_service import JwtTokenService
-from taller.identity.application.ports import PasswordHasher
+from taller.identity.application.ports import Clock, PasswordHasher
 from taller.identity.application.use_cases import get_current_user as _resolve_current_user
 from taller.identity.domain.entities import User
 from taller.identity.domain.errors import NotAuthenticated
@@ -33,6 +34,11 @@ SESSION_COOKIE_PATH = "/api"
 def get_password_hasher() -> PasswordHasher:
     """Return the process-wide password hasher instance."""
     return PwdlibPasswordHasher()
+
+
+def get_clock() -> Clock:
+    """The clock login throttling reads; tests override it to move time."""
+    return SystemClock()
 
 
 def get_token_service(settings: Settings = Depends(get_settings)) -> JwtTokenService:

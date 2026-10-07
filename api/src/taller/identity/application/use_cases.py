@@ -4,6 +4,8 @@ import uuid
 from datetime import UTC, datetime
 
 from taller.identity.application.ports import (
+    Clock,
+    LoginThrottleRepository,
     PasswordHasher,
     TokenService,
     UserRepository,
@@ -14,6 +16,7 @@ from taller.identity.domain.errors import (
     InvalidCredentials,
     NotAuthenticated,
     PhoneAlreadyRegistered,
+    TooManyLoginAttempts,
 )
 from taller.identity.domain.phone_number import PhoneNumber
 
@@ -92,6 +95,49 @@ def authenticate(
         raise InvalidCredentials
     if not hasher.verify(password, user.password_hash):
         raise InvalidCredentials
+    return user
+
+
+def attempt_login(
+    *,
+    phone_raw: str,
+    password: str,
+    user_repo: UserRepository,
+    hasher: PasswordHasher,
+    throttle_repo: LoginThrottleRepository,
+    clock: Clock,
+) -> User:
+    """``authenticate`` behind a per-phone lockout.
+
+    The phone's throttle state stays locked for the rest of the caller's
+    transaction, so concurrent attempts for one phone run one at a time and
+    each sees every earlier failure. The caller must commit after an
+    ``InvalidCredentials`` too: that failure is the whole point of the
+    bookkeeping.
+
+    Raises:
+        TooManyLoginAttempts: the phone is locked; the password was not
+            checked.
+        InvalidCredentials: unknown phone or wrong password (counted).
+    """
+    phone = PhoneNumber.from_raw(phone_raw)
+    now = clock.now()
+    throttle = throttle_repo.get_for_update(phone)
+    remaining = throttle.remaining_lock(now)
+    if remaining is not None:
+        raise TooManyLoginAttempts(remaining)
+
+    try:
+        user = authenticate(
+            phone_raw=phone.value, password=password, user_repo=user_repo, hasher=hasher
+        )
+    except InvalidCredentials:
+        throttle.record_failure(now)
+        throttle_repo.save(throttle)
+        raise
+
+    throttle.record_success()
+    throttle_repo.save(throttle)
     return user
 
 

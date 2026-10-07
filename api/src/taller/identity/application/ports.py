@@ -2,9 +2,11 @@
 
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 
 from taller.identity.domain.entities import User, Workshop
+from taller.identity.domain.login_throttle import LoginThrottle
 from taller.identity.domain.phone_number import PhoneNumber
 
 
@@ -20,6 +22,25 @@ class WorkshopRepository(Protocol):
     def get_by_id(self, workshop_id: uuid.UUID) -> Workshop | None: ...
 
     def add(self, workshop: Workshop) -> None: ...
+
+
+class LoginThrottleRepository(Protocol):
+    def get_for_update(self, phone: PhoneNumber) -> LoginThrottle:
+        """Return the phone's throttle state, locked until the transaction ends.
+
+        A phone with no state yet gets a fresh, zero-failure one, so even
+        its first login attempt is serialized against concurrent ones and
+        no failed attempt can be lost to a race.
+        """
+        ...
+
+    def save(self, throttle: LoginThrottle) -> None: ...
+
+
+class Clock(Protocol):
+    def now(self) -> datetime:
+        """The current time, timezone-aware (UTC)."""
+        ...
 
 
 class PasswordHasher(Protocol):

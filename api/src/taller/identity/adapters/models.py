@@ -1,9 +1,9 @@
-"""SQLAlchemy ORM models for workshops and users."""
+"""SQLAlchemy ORM models for workshops, users, and login throttling."""
 
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from taller.shared.db import Base
@@ -33,3 +33,17 @@ class UserModel(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False, server_default="owner")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class LoginThrottleModel(Base):
+    """Failed-login bookkeeping per phone number, registered or not.
+
+    Deliberately not a foreign key to ``users``: unregistered phones are
+    throttled too, so a lockout never reveals which phones have accounts.
+    """
+
+    __tablename__ = "login_throttles"
+
+    phone: Mapped[str] = mapped_column(String(8), primary_key=True)
+    failed_attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
