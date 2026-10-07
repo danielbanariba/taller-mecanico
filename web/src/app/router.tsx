@@ -47,6 +47,23 @@ export const router = createBrowserRouter([
           },
         ],
       },
+      // Receipt routes render without `AppShell` (`design.md`'s AD-16),
+      // so no navigation chrome ever prints, while staying siblings of it
+      // under the same `RequireSession` guard above. Lazy per AD-16's
+      // "Lazy loading" note: a mechanic who never prints a receipt never
+      // downloads this chunk.
+      {
+        path: "/ordenes/:orderId/recibo/58mm",
+        lazy: async () => ({
+          Component: (await import("../features/workorders/receipt/Receipt58Page")).Receipt58Page,
+        }),
+      },
+      {
+        path: "/ordenes/:orderId/recibo/carta",
+        lazy: async () => ({
+          Component: (await import("../features/workorders/receipt/ReceiptLetterPage")).ReceiptLetterPage,
+        }),
+      },
     ],
   },
 ]);

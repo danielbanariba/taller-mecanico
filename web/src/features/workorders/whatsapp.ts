@@ -12,7 +12,8 @@ export function buildWhatsAppUrl(localNumber: string, text: string): string {
   return `https://wa.me/504${localNumber}?text=${encodeURIComponent(text)}`;
 }
 
-function vehicleLabel(order: WorkOrderOut): string {
+/** Also reused by `receipt/ReceiptBody.tsx` (phase 3), its second consumer. */
+export function vehicleLabel(order: WorkOrderOut): string {
   const name = [order.vehicle.make, order.vehicle.model].filter((part): part is string => Boolean(part)).join(" ");
   return order.vehicle.plate ? `${name} · ${order.vehicle.plate}` : name;
 }

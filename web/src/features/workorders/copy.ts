@@ -94,6 +94,11 @@ export const workOrdersCopy = {
     voidConfirm: "Sí, anular pago",
     voidedLabel: (reason: string) => `Anulado: ${reason}`,
   },
+  receipt: {
+    nonFiscalLabel: "DOCUMENTO NO FISCAL — No válido como factura",
+    notEligible: "El recibo solo está disponible una vez que la orden está terminada o entregada.",
+    print: "Imprimir",
+  },
   share: {
     shareButton: "Compartir por WhatsApp",
     dialogTitle: "Compartir por WhatsApp",
