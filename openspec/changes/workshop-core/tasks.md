@@ -197,28 +197,28 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
 
 ### Slice P1.S4 — Web: customers list, search, create, edit, archive
 
-- [ ] **P1.S4.T1 (RED)** Write tests under `web/src/features/customers/` (one `*.test.tsx` per container, `server.use(...)` per test per the existing MSW pattern):
+- [x] **P1.S4.T1 (RED)** Write tests under `web/src/features/customers/` (one `*.test.tsx` per container, `server.use(...)` per test per the existing MSW pattern):
   - Submitting the new-customer form while offline is disabled with the Spanish message; the cached list still renders offline. **Defect it catches:** a write pauses offline and is silently lost, or offline reads break.
   - Double-clicking "Guardar" sends one client id, and a retry reuses the same id. **Defect it catches:** a new id generated per click/retry creates duplicate customers.
   - A 409 `plate_taken`-shaped and a 422 `invalid_phone` response each render their Spanish message from `copy.ts`, not a generic fallback. **Defect it catches:** a new error code falls through to the generic message.
   - A workshop switch (login as a different workshop) removes cached customer list/detail queries (extends the existing `workshopSwitch` test). **Defect it catches:** an unscoped query key serves workshop A's customers to workshop B.
   - Search `maria` renders `María` from the list.
 
-- [ ] **P1.S4.T2 (GREEN)** Create `web/src/features/customers/api.ts` (typed client for every phase-1 customer endpoint) and `copy.ts` (every Spanish string, including the offline-write message and the `invalid_phone`/`plate_taken` mappings).
+- [x] **P1.S4.T2 (GREEN)** Create `web/src/features/customers/api.ts` (typed client for every phase-1 customer endpoint) and `copy.ts` (every Spanish string, including the offline-write message and the `invalid_phone`/`plate_taken` mappings).
 
-- [ ] **P1.S4.T3 (GREEN)** Create `web/src/features/customers/hooks.ts`: `useCustomers(params)`, `useCustomer(id)`, `useCreateCustomer`, `useUpdateCustomer`, `useArchiveCustomer`, every query key prefixed with `workshopQueryKey(w)` (per the "Query keys" table in `design.md`); no explicit `networkMode` on the mutations (per P1.S1.T1's confirmed convention).
+- [x] **P1.S4.T3 (GREEN)** Create `web/src/features/customers/hooks.ts`: `useCustomers(params)`, `useCustomer(id)`, `useCreateCustomer`, `useUpdateCustomer`, `useArchiveCustomer`, every query key prefixed with `workshopQueryKey(w)` (per the "Query keys" table in `design.md`); no explicit `networkMode` on the mutations (per P1.S1.T1's confirmed convention).
 
-- [ ] **P1.S4.T4 (GREEN)** Create presentational `CustomerList.tsx`, `CustomerForm.tsx`.
+- [x] **P1.S4.T4 (GREEN)** Create presentational `CustomerList.tsx`, `CustomerForm.tsx`.
 
-- [ ] **P1.S4.T5 (GREEN)** Create containers `CustomersPage.tsx` (search + list), `NewCustomerPage.tsx`, `EditCustomerPage.tsx`; each reads `useOnlineStatus()` to disable submit, and generates the client id once per form mount (`useState(() => crypto.randomUUID())`).
+- [x] **P1.S4.T5 (GREEN)** Create containers `CustomersPage.tsx` (search + list), `NewCustomerPage.tsx`, `EditCustomerPage.tsx`; each reads `useOnlineStatus()` to disable submit, and generates the client id once per form mount (`useState(() => crypto.randomUUID())`).
 
-- [ ] **P1.S4.T6 (GREEN)** Create `web/src/features/customers/routes.tsx` and wire it into `web/src/app/router.tsx`'s `/clientes` slot from S3.
+- [x] **P1.S4.T6 (GREEN)** Create `web/src/features/customers/routes.tsx` and wire it into `web/src/app/router.tsx`'s `/clientes` slot from S3.
 
-- [ ] **P1.S4.T7** Run T1 and confirm every scenario is green.
+- [x] **P1.S4.T7** Run T1 and confirm every scenario is green.
 
-- [ ] **P1.S4.T8** Run this slice's verification: `npm run lint && npm run typecheck && npm test -- --run`.
+- [x] **P1.S4.T8** Run this slice's verification: `npm run lint && npm run typecheck && npm test -- --run`.
 
-- [ ] **P1.S4.T9** Work-unit commit: `:sparkles: feat(customers): add the customers list, search, create, edit and archive screens`.
+- [x] **P1.S4.T9** Work-unit commit: `:sparkles: feat(customers): add the customers list, search, create, edit and archive screens`.
 
 ### Slice P1.S5 — Web: vehicle create, edit, archive and detail
 

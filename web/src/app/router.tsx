@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate, Outlet } from "react-router";
 
 import { LoginPage } from "../features/auth/LoginPage";
 import { RegisterPage } from "../features/auth/RegisterPage";
+import { customerRoutes } from "../features/customers/routes";
 import { EditItemPage } from "../features/inventory/EditItemPage";
 import { InventoryPage } from "../features/inventory/InventoryPage";
 import { ItemDetailPage } from "../features/inventory/ItemDetailPage";
@@ -36,9 +37,13 @@ export const router = createBrowserRouter([
               { path: ":id/editar", element: <EditItemPage /> },
             ],
           },
+          {
+            // "/clientes/:customerId" (detail) and every vehicle route
+            // land in Slice 5.
+            path: "/clientes",
+            children: customerRoutes,
+          },
           { path: "/ordenes", element: <WorkOrdersComingSoon /> },
-          // "/clientes" route slots land in Slice 4 (list/search/create/
-          // edit) and Slice 5 (vehicles). Left empty here on purpose.
         ],
       },
     ],
