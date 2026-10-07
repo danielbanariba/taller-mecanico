@@ -139,5 +139,5 @@ Add or update a skill with `DO_NOT_TRACK=1 npx skills add <owner/repo> --skill <
 
 - `odd/tasks/` — feature documents: objective, decisions, task-by-task progress and verification evidence for each feature.
 - `docs/research/` — the market research (Honduran workshop needs, adoption barriers, competitors) that the product decisions in `odd/tasks/` are based on.
-- `openspec/changes/` — active spec-driven changes in progress (e.g. `workshop-core`): each change's `proposal.md`, capability `specs/`, `design.md` and `tasks.md`.
-- `openspec/specs/` — archived baseline specs for already-shipped capabilities, once their change completes.
+- `openspec/changes/` — active spec-driven changes in progress: each change's `proposal.md`, capability `specs/`, `design.md` and `tasks.md`. A finished change moves to `openspec/changes/archive/<date>-<name>/` with its verify and archive reports (e.g. `2026-10-07-workshop-core`, the customers/vehicles, work orders and payments phases).
+- `openspec/specs/` — the baseline specs for already-shipped capabilities, one folder per capability, promoted from a change's `specs/` when it is archived. Read these first to learn what a capability must do.
