@@ -124,6 +124,7 @@ export function statusActionLabel(status: WorkOrderStatus): string {
 const ERROR_MESSAGES: Record<string, string> = {
   work_order_not_found: "No se encontró la orden.",
   work_order_id_conflict: "No se pudo crear la orden. Intente de nuevo.",
+  work_order_create_failed: "No se pudo crear la orden. Intente de nuevo.",
   vehicle_not_found: "No se encontró el vehículo.",
   item_not_found: "No se encontró el repuesto.",
   work_order_line_id_conflict: "No se pudo guardar la línea. Intente de nuevo.",

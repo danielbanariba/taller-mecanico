@@ -155,6 +155,27 @@ describe("NewWorkOrderPage", () => {
     expect(capturedIds[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
   });
 
+  it("shows a specific message for a work_order_create_failed response, not the generic fallback", async () => {
+    // Defect this catches: the API's `work_order_create_failed` code (the
+    // unexpected-IntegrityError branch in `create_work_order_route`) has no
+    // entry in `ERROR_MESSAGES`, so a mechanic would see the unhelpful
+    // generic message instead of being told to retry creating the order.
+    mockSessionCustomerAndVehicle();
+    server.use(
+      http.post("/api/work-orders", () =>
+        HttpResponse.json({ detail: "work_order_create_failed" }, { status: 500 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderNewWorkOrderPage();
+
+    await pickCustomerAndVehicle(user);
+    await user.click(screen.getByRole("button", { name: /crear orden/i }));
+
+    expect(await screen.findByText("No se pudo crear la orden. Intente de nuevo.")).toBeInTheDocument();
+    expect(screen.queryByText("Ocurrió un error. Intente de nuevo.")).not.toBeInTheDocument();
+  });
+
   it("skips the customer and vehicle pickers when opened with a ?vehiculo= preselection", async () => {
     // Defect this catches: the vehicle detail screen's "Nueva orden" action
     // links to `/ordenes/nueva?vehiculo=<id>` precisely so the mechanic

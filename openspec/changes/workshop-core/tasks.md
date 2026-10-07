@@ -477,6 +477,18 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
 
 - [x] **P2.S7.T10** Work-unit commit: `:sparkles: feat(workorders): show order history on customer and vehicle detail` (covers T1–T2) followed by `:hammer: chore(deploy): seed phase 2 work orders, document stock consumption` (covers T3–T5). **Result:** `7757b39` and `b2ef6fb` on `feat/workshop-core-work-orders`.
 
+### Slice P2.S8 — Review fixes (phase 2 findings)
+
+- [x] **P2.S8.T1 (RED→GREEN)** Fix the critical finding: `update_work_order` (PATCH `/work-orders/{id}`) read the order via `order_repo.get_by_id` (no row lock) and then did a blind full-row `save()`, so a concurrent `change_status`/line edit committed in that window could be silently reverted by the PATCH's own stale snapshot (`design.md`'s AD-5 requires every mutating work-order use case to lock the order row first). **Result:** changed `update_work_order` to call `order_repo.get_for_update` instead of `get_by_id` (`api/src/taller/workorders/application/use_cases.py`), and updated its docstring. Added `test_update_work_order_does_not_revert_a_concurrently_committed_status_change` to `api/tests/workorders/test_work_order_concurrency.py`, using a `_ReadPausingWorkOrderRepository` test wrapper that deterministically lands a concurrent `change_status` commit between the PATCH's own read and its `save()` (no sleep-based timing beyond a 1s upper bound on the buggy path's instant signal). Confirmed RED against the unfixed code (`assert 'quote' == 'approved'` — the committed `approved` status was reverted to `quote`); confirmed GREEN after the fix, re-run 5× with no flake.
+
+- [x] **P2.S8.T2** Investigated, not applicable: the finding that `CustomerDetailPage`'s new unconditional `useWorkOrdersForCustomer` call breaks the pre-existing `CustomerDetailPage.test.tsx` under this repo's MSW policy. **Result:** empirically false — ran `npm test -- --run src/features/customers/CustomerDetailPage.test.tsx` and the full `npm test -- --run` (143 passed, 33 files), both clean. `web/src/test/setup.ts`'s `server.listen({ onUnhandledFrame: "error" })` only configures MSW's WebSocket frame handling, not HTTP (confirmed in P2.S7's own notes); the unmocked `GET /api/work-orders` request logs an MSW console error but does not fail the test, since nothing in the test asserts on the orders query. No code change made; see this slice's commit/deviations for the evidence.
+
+- [x] **P2.S8.T3 (RED→GREEN)** Fix the minor finding: the API's `work_order_create_failed` error code (the unexpected-`IntegrityError` branch in `create_work_order_route`) had no entry in `web/src/features/workorders/copy.ts`'s `ERROR_MESSAGES`, falling through to the generic message. **Result:** added the mapping (`"No se pudo crear la orden. Intente de nuevo."`). Added a test to `NewWorkOrderPage.test.tsx` asserting the specific message renders (and the generic one does not) for a `work_order_create_failed` 500 response; confirmed RED with the mapping stashed, GREEN restored.
+
+- [x] **P2.S8.T4** Run the full verification suite: API — `uv run ruff check .` (clean), `uv run ruff format --check .` (94 files), `uv run pytest` (191 passed). Web — `npm run lint` (clean), `npm run typecheck` (clean), `npm test -- --run` (143 passed, 33 files), `npm run build` (succeeded).
+
+- [x] **P2.S8.T5** Work-unit commits: one for the API lock fix, one for the web copy fix.
+
 ---
 
 ## Phase 3: Payments, non-fiscal receipt, daily cash summary, export
