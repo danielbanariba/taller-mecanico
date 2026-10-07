@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -7,6 +7,8 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { server } from "../../test/server";
 import { renderWithQueryClient } from "../../test/render";
 import { ItemDetailPage } from "./ItemDetailPage";
+import { OfflineStatusBanner } from "./OfflineStatusBanner";
+import { defaultOutbox } from "./outbox";
 import type { ItemOut, MovementOut } from "./api";
 
 const ITEM: ItemOut = {
@@ -66,6 +68,32 @@ function renderDetailPage() {
     </MemoryRouter>,
   );
 }
+
+/** The detail page plus the status banner `RequireSession` renders above every protected screen. */
+function renderDetailPageWithBanner() {
+  return renderWithQueryClient(
+    <MemoryRouter initialEntries={["/inventario/item-1"]}>
+      <OfflineStatusBanner workshopId="w1" />
+      <Routes>
+        <Route path="/inventario/:id" element={<ItemDetailPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+/** What a real browser does when the connection drops: `navigator.onLine` turns false and `offline` fires. */
+function goOffline() {
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  act(() => {
+    window.dispatchEvent(new Event("offline"));
+  });
+}
+
+afterEach(() => {
+  // Drops the own-property override from `goOffline`, so jsdom's own
+  // `navigator.onLine` getter (always true) applies to the next test.
+  Reflect.deleteProperty(window.navigator, "onLine");
+});
 
 describe("ItemDetailPage", () => {
   it("sends an adjust movement with the counted quantity from 'Contar'", async () => {
@@ -173,5 +201,51 @@ describe("ItemDetailPage", () => {
     const user = userEvent.setup();
     await user.click(backLink);
     expect(await screen.findByText("Pantalla de inventario")).toBeInTheDocument();
+  });
+});
+
+describe("ItemDetailPage offline", () => {
+  it("writes a tap made after the browser went offline to the IndexedDB outbox", async () => {
+    // Defect this catches: under TanStack Query's default `networkMode:
+    // 'online'` a tap made after the `offline` event never ran its
+    // mutationFn, so nothing reached the outbox; the tap lived only as a
+    // paused mutation in the persisted query cache, which has no way to
+    // resume it after a reload, so the movement was silently lost.
+    mockItemAndMovements();
+    server.use(http.put("/api/inventory/movements/:movementId", () => HttpResponse.error()));
+    const user = userEvent.setup();
+    renderDetailPage();
+
+    await screen.findByText("10");
+    goOffline();
+    await user.click(screen.getByRole("button", { name: "Agregar una unidad de Filtro de aceite" }));
+
+    expect(await screen.findByText("11")).toBeInTheDocument();
+    await waitFor(async () => {
+      const queued = await defaultOutbox.listForWorkshop("w1");
+      expect(queued).toMatchObject([{ itemId: "item-1", kind: "in", quantity: 1 }]);
+    });
+  });
+
+  it("shows how many changes are waiting to be sent, updated after every offline tap", async () => {
+    // Defect this catches: a mechanic tapping while offline had no way to
+    // tell that those taps were saved on the phone and still had to reach
+    // the server (T8 saw only the generic offline message, never a count).
+    mockItemAndMovements();
+    server.use(http.put("/api/inventory/movements/:movementId", () => HttpResponse.error()));
+    const user = userEvent.setup();
+    renderDetailPageWithBanner();
+
+    await screen.findByText("10");
+    goOffline();
+    const increment = screen.getByRole("button", { name: "Agregar una unidad de Filtro de aceite" });
+
+    await user.click(increment);
+    expect(await screen.findByText("1 cambio por enviar")).toBeInTheDocument();
+
+    await user.click(increment);
+    await user.click(increment);
+    expect(await screen.findByText("3 cambios por enviar")).toBeInTheDocument();
+    expect(screen.getByText("Sin conexión. Los cambios se guardan en el teléfono.")).toBeInTheDocument();
   });
 });

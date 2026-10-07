@@ -175,12 +175,20 @@ interface RecordMovementSnapshot {
  * from `onMutate` untouched, exactly as if the request were still in
  * flight. There is nothing to roll back in that case because nothing was
  * rejected; `useOfflineSync`'s flush is what eventually reconciles it.
+ *
+ * `networkMode: "always"` is load-bearing: the mutationFn only writes to
+ * the IndexedDB outbox and never needs the network itself. Under the
+ * default `"online"` mode, TanStack Query pauses a mutation while its
+ * `onlineManager` reports offline, so the mutationFn never ran and the tap
+ * never reached the outbox -- it only existed as a paused mutation, which
+ * a reload discards (there are no mutation defaults to resume it with).
  */
 export function useRecordMovement() {
   const queryClient = useQueryClient();
   const workshopId = useWorkshopId();
 
   return useMutation({
+    networkMode: "always",
     mutationFn: (input: RecordMovementInput) => {
       if (!workshopId) {
         // Every screen that calls this hook renders behind RequireSession,

@@ -40,6 +40,14 @@ export function AppProviders({ children }: { children: ReactNode }) {
         // Busts any cache left over from a previous deployed version whose
         // dehydrated shape may not match this build's query keys/shapes.
         buster: __APP_VERSION__,
+        dehydrateOptions: {
+          // The IndexedDB outbox is the only durable transport for stock
+          // movements. A paused mutation restored from this cache has no
+          // mutationFn to resume with (no `setMutationDefaults`), so
+          // persisting one would only bring back a zombie that fails on
+          // reconnect and drops whatever the user did.
+          shouldDehydrateMutation: () => false,
+        },
       }}
     >
       {children}
