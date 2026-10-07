@@ -1,23 +1,40 @@
+import { useState } from "react";
 import { useParams } from "react-router";
 
 import { ApiError } from "../../shared/api/http";
 import { formatCents } from "../../shared/format/money";
+import { useOnlineStatus } from "../../shared/offline/useOnlineStatus";
 import { Alert } from "../../shared/ui/Alert";
+import { Button } from "../../shared/ui/Button";
 import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
 import { getWorkOrdersErrorMessage, statusLabel, workOrdersCopy } from "./copy";
-import { useWorkOrder } from "./hooks";
+import { useAddLine, useRemoveLine, useUpdateLine, useWorkOrder } from "./hooks";
+import { LineEditorDialog, type LineEditorValues } from "./LineEditorDialog";
 import { WorkOrderLines } from "./WorkOrderLines";
+import type { WorkOrderLineOut } from "./api";
+
+type LineDialogState = { mode: "create" } | { mode: "edit"; line: WorkOrderLineOut } | null;
 
 /**
- * Container: the read-only order detail -- vehicle, customer, lines and
- * total. Status actions, WhatsApp sharing, the line editor and payments
- * are wired in later slices (S5/S6/P3).
+ * Container: the order detail -- vehicle, customer, lines and total, with
+ * the line editor (add/edit/remove) wired this slice. Status actions,
+ * WhatsApp sharing and payments are wired in later slices (S6/P3).
  */
 export function WorkOrderDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const orderId = id ?? "";
+  // Route param name matches `routes.tsx`'s `:orderId` segment (`workOrderRoutes`
+  // under `/ordenes` in `app/router.tsx`).
+  const { orderId: paramOrderId } = useParams<{ orderId: string }>();
+  const orderId = paramOrderId ?? "";
+  const isOffline = useOnlineStatus();
   const order = useWorkOrder(orderId);
+
+  const addLine = useAddLine(orderId);
+  const updateLine = useUpdateLine(orderId);
+  const removeLine = useRemoveLine(orderId);
+  const [lineDialog, setLineDialog] = useState<LineDialogState>(null);
+  const [pendingLineId, setPendingLineId] = useState<string | null>(null);
+  const [removingLineId, setRemovingLineId] = useState<string | undefined>(undefined);
 
   if (order.isPending) {
     return (
@@ -44,6 +61,56 @@ export function WorkOrderDetailPage() {
 
   const data = order.data;
 
+  const activeLineMutation = lineDialog?.mode === "edit" ? updateLine : addLine;
+  const lineErrorMessage =
+    activeLineMutation.error instanceof ApiError ? getWorkOrdersErrorMessage(activeLineMutation.error.code) : undefined;
+  const removeErrorMessage =
+    removeLine.error instanceof ApiError ? getWorkOrdersErrorMessage(removeLine.error.code) : undefined;
+
+  function handleOpenCreateLine() {
+    addLine.reset();
+    setPendingLineId(crypto.randomUUID());
+    setLineDialog({ mode: "create" });
+  }
+
+  function handleOpenEditLine(line: WorkOrderLineOut) {
+    updateLine.reset();
+    setLineDialog({ mode: "edit", line });
+  }
+
+  function handleRemoveLine(line: WorkOrderLineOut) {
+    setRemovingLineId(line.id);
+    removeLine.mutate(line.id, { onSettled: () => setRemovingLineId(undefined) });
+  }
+
+  function handleLineDialogSubmit(values: LineEditorValues) {
+    if (lineDialog?.mode === "edit") {
+      updateLine.mutate(
+        {
+          lineId: lineDialog.line.id,
+          payload: {
+            description: values.description,
+            quantity: values.quantity,
+            unit_price_cents: values.unitPriceCents,
+          },
+        },
+        { onSuccess: () => setLineDialog(null) },
+      );
+      return;
+    }
+    addLine.mutate(
+      {
+        id: pendingLineId ?? crypto.randomUUID(),
+        kind: values.kind,
+        item_id: values.itemId,
+        description: values.description,
+        quantity: values.quantity,
+        unit_price_cents: values.unitPriceCents,
+      },
+      { onSuccess: () => setLineDialog(null) },
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
@@ -64,13 +131,46 @@ export function WorkOrderDetailPage() {
       ) : null}
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-bold text-brand-primary">{workOrdersCopy.detail.linesTitle}</h2>
-        <WorkOrderLines lines={data.lines} />
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-brand-primary">{workOrdersCopy.detail.linesTitle}</h2>
+          {data.lines_editable ? (
+            <Button variant="secondary" onClick={handleOpenCreateLine} disabled={isOffline} className="w-auto px-4">
+              {workOrdersCopy.lineEditor.addLine}
+            </Button>
+          ) : null}
+        </div>
+        {data.lines_editable && isOffline ? <Alert variant="info">{workOrdersCopy.offline.lineEditDisabled}</Alert> : null}
+        {removeErrorMessage ? <Alert variant="error">{removeErrorMessage}</Alert> : null}
+        <WorkOrderLines
+          lines={data.lines}
+          editable={data.lines_editable}
+          disabled={isOffline}
+          onEdit={handleOpenEditLine}
+          onRemove={handleRemoveLine}
+          removingLineId={removingLineId}
+        />
         <p className="flex items-center justify-between text-lg font-bold text-brand-foreground">
           <span>{workOrdersCopy.detail.totalLabel}</span>
           <span>{formatCents(data.total_cents)}</span>
         </p>
       </section>
+
+      <LineEditorDialog
+        // Remounts with a fresh `key` for every dialog open -- a new line,
+        // a different line to edit, or closed -- so its internal state
+        // (which only initializes once, see its own docstring) always
+        // starts from this exact `initialLine`/`mode` instead of carrying
+        // over the previous line's values.
+        key={lineDialog ? (lineDialog.mode === "edit" ? lineDialog.line.id : "new-line") : "closed"}
+        open={lineDialog !== null}
+        mode={lineDialog?.mode ?? "create"}
+        initialLine={lineDialog?.mode === "edit" ? lineDialog.line : undefined}
+        pending={lineDialog?.mode === "edit" ? updateLine.isPending : addLine.isPending}
+        errorMessage={lineErrorMessage}
+        offline={isOffline}
+        onClose={() => setLineDialog(null)}
+        onSubmit={handleLineDialogSubmit}
+      />
     </div>
   );
 }

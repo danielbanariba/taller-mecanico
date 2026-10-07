@@ -78,6 +78,29 @@ export interface ListWorkOrdersParams {
   limit?: number;
 }
 
+export interface CreateWorkOrderPayload {
+  id: string;
+  vehicle_id: string;
+  complaint?: string;
+  odometer_km?: number;
+  notes?: string;
+}
+
+export interface CreateLinePayload {
+  id: string;
+  kind: LineKind;
+  item_id?: string;
+  description: string;
+  quantity: number;
+  unit_price_cents: number;
+}
+
+export interface UpdateLinePayload {
+  description?: string;
+  quantity?: number;
+  unit_price_cents?: number;
+}
+
 function buildListQuery(params: ListWorkOrdersParams): string {
   const query = new URLSearchParams();
   query.set("status_group", params.statusGroup ?? "open");
@@ -100,4 +123,11 @@ export const workOrdersApi = {
   listWorkOrders: (params: ListWorkOrdersParams = {}) =>
     http.get<WorkOrderSummaryOut[]>(`/api/work-orders${buildListQuery(params)}`),
   getWorkOrder: (id: string) => http.get<WorkOrderOut>(`/api/work-orders/${id}`),
+  createWorkOrder: (payload: CreateWorkOrderPayload) => http.post<WorkOrderOut>("/api/work-orders", payload),
+  addLine: (orderId: string, payload: CreateLinePayload) =>
+    http.post<WorkOrderOut>(`/api/work-orders/${orderId}/lines`, payload),
+  updateLine: (orderId: string, lineId: string, payload: UpdateLinePayload) =>
+    http.patch<WorkOrderOut>(`/api/work-orders/${orderId}/lines/${lineId}`, payload),
+  removeLine: (orderId: string, lineId: string) =>
+    http.delete<WorkOrderOut>(`/api/work-orders/${orderId}/lines/${lineId}`),
 };

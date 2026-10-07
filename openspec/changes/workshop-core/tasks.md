@@ -416,18 +416,23 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
 
 ### Slice P2.S5 — Web: new order flow, line editor, item picker
 
-- [ ] **P2.S5.T1 (RED)** Write tests:
+- [x] **P2.S5.T1 (RED)** Write tests:
   - A double submit of the new-order form reuses one client id. **Defect it catches:** duplicate orders and a skipped number.
   - The line editor rejects a part line with no item selected, and an inventory-part line correctly excludes stock effects from its own preview (no optimistic stock mutation before the server responds).
   - Creating an order while offline is disabled with the Spanish message.
+  **Result (RED):** `NewWorkOrderPage.test.tsx`'s "reuses the same client-generated id" test confirmed RED against a one-line regression (generating the create payload's `id` with a fresh `crypto.randomUUID()` per submit instead of the one generated at mount) — the test failed on the two captured ids differing, then passed again once reverted. `LineEditorDialog.test.tsx`'s "rejects a part line with no item selected" confirmed RED the same way against removing `itemMissing` from `handleSubmit`'s guard (first draft of the test left `description` blank too, which masked the defect by blocking the submit for an unrelated reason — fixed by filling every other field validly before asserting). Its "previews a part line's subtotal ... never posting a stock movement" test confirmed RED against an injected fake `PUT /api/inventory/movements/...` call from `handleSelectItem`. The offline scenario mirrors the already-established `NewCustomerPage.test.tsx`/`NewVehiclePage.test.tsx` pattern (disables submission, no API call), not separately RED-verified beyond that precedent.
 
-- [ ] **P2.S5.T2 (GREEN)** Create `NewWorkOrderPage.tsx` (customer search → vehicle pick → create, client id generated once per mount), `ItemPicker.tsx` (reuses inventory's `useItems`), `LineEditorDialog.tsx`, and wire `WorkOrderLines.tsx` to add/edit/remove lines through `hooks.ts` mutations added this slice (`useAddLine`, `useUpdateLine`, `useRemoveLine`) — each `setQueryData`s the order detail from the mutation's full-order response per `design.md`.
+- [x] **P2.S5.T2 (GREEN)** Create `NewWorkOrderPage.tsx` (customer search → vehicle pick → create, client id generated once per mount), `ItemPicker.tsx` (reuses inventory's `useItems`), `LineEditorDialog.tsx`, and wire `WorkOrderLines.tsx` to add/edit/remove lines through `hooks.ts` mutations added this slice (`useAddLine`, `useUpdateLine`, `useRemoveLine`) — each `setQueryData`s the order detail from the mutation's full-order response per `design.md`. **Deviations (minimal, necessary):**
+  - `web/src/shared/api/http.ts` gained a `delete` method — the only HTTP verb the shared client was missing, needed for `DELETE /work-orders/{id}/lines/{line_id}`.
+  - `routes.tsx` gained a literal `nueva` segment ahead of `:orderId` (matching `design.md`'s `/ordenes/nueva?vehiculo=` route), and `WorkOrdersPage.tsx` gained a "Nueva orden" button so the route is reachable from the UI, not just by URL (the `?vehiculo=` pre-selection itself is P2.S7's job, once a vehicle detail screen can link to it).
+  - **Pre-existing bug fixed in the same file this slice already touches:** `WorkOrderDetailPage.tsx` read `useParams<{ id: string }>()`, but `routes.tsx` (written in S4) defines the segment as `:orderId` — through the real app router (`app/router.tsx`'s nested `/ordenes` route), this param was always `undefined`, so every order detail page would have fetched `/api/work-orders/` with an empty id. S4's own test never caught it because it mounted an isolated `<Route path="/ordenes/:id">` matching the component's (wrong) param name instead of the real route tree. Fixed the component to read `orderId`, and updated `WorkOrderDetailPage.test.tsx`'s two route mounts to `:orderId` to match.
+  - `LineEditorDialog`'s fields initialize once from `initialLine`/`mode` and never reset via an effect (this repo's lint config forbids `setState` in an effect body); the caller remounts it with a fresh `key` per dialog open instead (documented in both files).
 
-- [ ] **P2.S5.T3** Run T1, confirm green.
+- [x] **P2.S5.T3** Run T1, confirm green. **Result:** all three new test files green (`NewWorkOrderPage.test.tsx` 2, `LineEditorDialog.test.tsx` 3), each independently RED-confirmed per T1's note above.
 
-- [ ] **P2.S5.T4** Run this slice's verification: `npm run lint && npm run typecheck && npm test -- --run`.
+- [x] **P2.S5.T4** Run this slice's verification: `npm run lint && npm run typecheck && npm test -- --run`. **Result:** eslint clean; `tsc -b --noEmit` clean; vitest 128 passed (30 files, 5 new). `api/` was untouched by this slice; re-ran its suite anyway as a baseline check: `ruff check`/`ruff format --check` clean (94 files), `pytest` 190 passed, unaffected.
 
-- [ ] **P2.S5.T5** Work-unit commit: `:sparkles: feat(workorders): add the new-order flow and the line editor`.
+- [x] **P2.S5.T5** Work-unit commit: `:sparkles: feat(workorders): add the new-order flow and the line editor`.
 
 ### Slice P2.S6 — Web: status actions, WhatsApp builders, lazy share sheet
 

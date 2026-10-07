@@ -62,7 +62,7 @@ function renderDetailPage() {
   return renderWithQueryClient(
     <MemoryRouter initialEntries={["/ordenes/order-1"]}>
       <Routes>
-        <Route path="/ordenes/:id" element={<WorkOrderDetailPage />} />
+        <Route path="/ordenes/:orderId" element={<WorkOrderDetailPage />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -86,7 +86,7 @@ function renderDetailPageFromCacheWithoutConnection() {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={["/ordenes/order-1"]}>
         <Routes>
-          <Route path="/ordenes/:id" element={<WorkOrderDetailPage />} />
+          <Route path="/ordenes/:orderId" element={<WorkOrderDetailPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,

@@ -30,6 +30,8 @@ export function WorkOrdersPage() {
     <div className="flex flex-col gap-4">
       <h1 className="text-2xl font-bold text-brand-primary">{workOrdersCopy.list.title}</h1>
 
+      <Button onClick={() => navigate("/ordenes/nueva")}>{workOrdersCopy.list.newOrder}</Button>
+
       <div role="tablist" className="flex gap-2">
         {TABS.map(({ group, label }) => (
           <button

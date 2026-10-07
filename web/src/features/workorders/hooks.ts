@@ -1,7 +1,15 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useWorkshopId, workshopQueryKey } from "../auth/hooks";
-import { workOrdersApi, type StatusGroup, type WorkOrderSummaryOut } from "./api";
+import {
+  workOrdersApi,
+  type CreateLinePayload,
+  type CreateWorkOrderPayload,
+  type StatusGroup,
+  type UpdateLinePayload,
+  type WorkOrderOut,
+  type WorkOrderSummaryOut,
+} from "./api";
 
 const workOrdersQueryBase = (workshopId: string | undefined) =>
   [...workshopQueryKey(workshopId), "workOrders"] as const;
@@ -46,5 +54,57 @@ export function useWorkOrder(id: string) {
     queryKey: workOrderQueryKey(workshopId, id),
     queryFn: () => workOrdersApi.getWorkOrder(id),
     enabled: workshopId !== undefined,
+  });
+}
+
+export function useCreateWorkOrder() {
+  const queryClient = useQueryClient();
+  const workshopId = useWorkshopId();
+  return useMutation({
+    mutationFn: (payload: CreateWorkOrderPayload) => workOrdersApi.createWorkOrder(payload),
+    onSuccess: (order) => {
+      queryClient.setQueryData(workOrderQueryKey(workshopId, order.id), order);
+      queryClient.invalidateQueries({ queryKey: workOrdersQueryBase(workshopId) });
+    },
+  });
+}
+
+/**
+ * Every line mutation (add, edit, remove) returns the whole order
+ * (`design.md`'s "API surface per phase" note), so the detail query is
+ * updated from that one round trip instead of a refetch, and every list
+ * is invalidated since an edited line can change a summary's total.
+ */
+function useLineMutationCacheUpdate(orderId: string) {
+  const queryClient = useQueryClient();
+  const workshopId = useWorkshopId();
+  return (order: WorkOrderOut) => {
+    queryClient.setQueryData(workOrderQueryKey(workshopId, orderId), order);
+    queryClient.invalidateQueries({ queryKey: workOrdersQueryBase(workshopId) });
+  };
+}
+
+export function useAddLine(orderId: string) {
+  const onSuccess = useLineMutationCacheUpdate(orderId);
+  return useMutation({
+    mutationFn: (payload: CreateLinePayload) => workOrdersApi.addLine(orderId, payload),
+    onSuccess,
+  });
+}
+
+export function useUpdateLine(orderId: string) {
+  const onSuccess = useLineMutationCacheUpdate(orderId);
+  return useMutation({
+    mutationFn: ({ lineId, payload }: { lineId: string; payload: UpdateLinePayload }) =>
+      workOrdersApi.updateLine(orderId, lineId, payload),
+    onSuccess,
+  });
+}
+
+export function useRemoveLine(orderId: string) {
+  const onSuccess = useLineMutationCacheUpdate(orderId);
+  return useMutation({
+    mutationFn: (lineId: string) => workOrdersApi.removeLine(orderId, lineId),
+    onSuccess,
   });
 }
