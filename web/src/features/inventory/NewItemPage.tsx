@@ -47,7 +47,7 @@ export function NewItemPage() {
     createItem.error instanceof ApiError ? getInventoryErrorMessage(createItem.error.code) : undefined;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-4 py-8">
+    <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold text-brand-primary">{inventoryCopy.create.title}</h1>
       <ItemForm
         mode="create"
@@ -59,6 +59,6 @@ export function NewItemPage() {
         submitPendingLabel={inventoryCopy.create.submitPending}
         offline={isOffline}
       />
-    </main>
+    </div>
   );
 }

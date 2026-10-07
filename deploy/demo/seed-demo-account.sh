@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Seed the shared demo account of the public test deployment: register it
-# (or log in if it already exists) and create a handful of sample parts
-# through the real API. Safe to rerun: item ids are derived from fixed
-# keys, so a rerun replays the same creates instead of duplicating them.
+# (or log in if it already exists) and create a handful of sample parts,
+# customers and vehicles through the real API. Safe to rerun: every id is
+# derived from a fixed key, so a rerun replays the same creates instead of
+# duplicating them.
 #
 # Usage (credentials come from demo.env, the same values the web build
 # prefills on the login form):
@@ -37,6 +38,30 @@ items=(
   "banda-distribucion|Banda de distribución|Motor|unidad|2|95000|2"
   "liquido-frenos|Líquido de frenos DOT 3|Frenos|litro|3|16000|7"
   "cadena-moto-428|Cadena de moto 428|Motos|unidad|2|45000|5"
+)
+
+# key|full_name|phone (empty means no phone)
+# Fictional names and patterned numbers only -- README.md warns testers
+# never to message these. One of each: mobile, mobile, landline, no phone,
+# mobile, so WhatsApp eligibility (phone_is_mobile) has a case of each.
+customers=(
+  "maria-hernandez|María Hernández|9000-0001"
+  "jose-nunez|José Núñez|3000-0002"
+  "carlos-mejia|Carlos Mejía|2200-0003"
+  "ana-castillo|Ana Castillo|"
+  "luis-zelaya|Luis Zelaya|8000-0005"
+)
+
+# key|owner_customer_key|vehicle_type|make|model|year|plate (raw, to exercise
+# normalization: a dash, a space, lowercase, and no separator at all; empty
+# plate means unplated, allowed any number of times per owner)
+vehicles=(
+  "maria-corolla|maria-hernandez|car|Toyota|Corolla|2012|DEM-0001"
+  "jose-cg150|jose-nunez|motorcycle|Honda|CG 150|2019|DEM 0002"
+  "jose-pulsar|jose-nunez|motorcycle|Bajaj|Pulsar||"
+  "carlos-frontier|carlos-mejia|car|Nissan|Frontier|2015|dem0003"
+  "ana-ax100|ana-castillo|motorcycle|Suzuki|AX100||"
+  "luis-accent|luis-zelaya|car|Hyundai|Accent|2010|DEM0004"
 )
 
 cookie_jar="$(mktemp)"
@@ -113,6 +138,67 @@ status="$(request GET /api/inventory/items)"
 total="$(jq 'length' "$body_file")"
 low="$(jq '[.[] | select(.is_low)] | length' "$body_file")"
 
+declare -A customer_ids
+customers_created=0
+customers_present=0
+customers_edited=0
+for entry in "${customers[@]}"; do
+  IFS='|' read -r key full_name customer_phone <<<"$entry"
+  customer_id="$(uuidgen --sha1 --namespace @url --name "$id_namespace/customer/$key")"
+  customer_ids["$key"]="$customer_id"
+  customer_json="$(jq -n --arg id "$customer_id" --arg name "$full_name" --arg phone "$customer_phone" \
+    '{id: $id, full_name: $name} + (if $phone == "" then {} else {phone: $phone} end)')"
+  status="$(request POST /api/customers "$customer_json")"
+  case "$status" in
+    201) customers_created=$((customers_created + 1)) ;;
+    200) customers_present=$((customers_present + 1)) ;;
+    409)
+      # customer_id_conflict: a tester edited this seeded customer. Leave it.
+      customers_edited=$((customers_edited + 1))
+      ;;
+    *) fail "creating customer \"$full_name\" returned HTTP $status" ;;
+  esac
+done
+
+vehicles_created=0
+vehicles_present=0
+vehicles_edited=0
+vehicles_plate_conflict=0
+for entry in "${vehicles[@]}"; do
+  IFS='|' read -r key owner_key vehicle_type make model year plate <<<"$entry"
+  vehicle_id="$(uuidgen --sha1 --namespace @url --name "$id_namespace/vehicle/$key")"
+  owner_id="${customer_ids[$owner_key]}"
+  vehicle_json="$(jq -n --arg id "$vehicle_id" --arg customer_id "$owner_id" --arg type "$vehicle_type" \
+    --arg make "$make" --arg model "$model" --arg year "$year" --arg plate "$plate" '
+      {id: $id, customer_id: $customer_id, vehicle_type: $type, make: $make}
+      + (if $model == "" then {} else {model: $model} end)
+      + (if $year == "" then {} else {year: ($year | tonumber)} end)
+      + (if $plate == "" then {} else {plate: $plate} end)
+    ')"
+  status="$(request POST /api/vehicles "$vehicle_json")"
+  case "$status" in
+    201) vehicles_created=$((vehicles_created + 1)) ;;
+    200) vehicles_present=$((vehicles_present + 1)) ;;
+    409)
+      # vehicle_id_conflict (edited) or plate_taken (a tester's own vehicle
+      # now holds this plate): either way, a tester touched this, kept.
+      if [[ "$(jq -r '.detail' "$body_file")" == "plate_taken" ]]; then
+        vehicles_plate_conflict=$((vehicles_plate_conflict + 1))
+      else
+        vehicles_edited=$((vehicles_edited + 1))
+      fi
+      ;;
+    *) fail "creating vehicle \"$key\" returned HTTP $status" ;;
+  esac
+done
+
+status="$(request GET /api/customers)"
+[[ "$status" == "200" ]] || fail "listing customers returned HTTP $status"
+customers_total="$(jq 'length' "$body_file")"
+
 echo "Demo account $phone ($workshop_name): $account"
 echo "Sample items: $created created, $present already present, $edited edited by testers (kept), $name_taken skipped (name taken)"
 echo "Workshop now lists $total active items, $low of them low on stock"
+echo "Sample customers: $customers_created created, $customers_present already present, $customers_edited edited by testers (kept)"
+echo "Sample vehicles: $vehicles_created created, $vehicles_present already present, $vehicles_edited edited by testers (kept), $vehicles_plate_conflict plate conflicts (kept)"
+echo "Workshop now lists $customers_total active customers"

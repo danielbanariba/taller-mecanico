@@ -7,11 +7,14 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import type { Me } from "../features/auth/api";
 import { LoginPage } from "../features/auth/LoginPage";
 import { RegisterPage } from "../features/auth/RegisterPage";
+import type { CustomerOut } from "../features/customers/api";
+import { CustomersPage } from "../features/customers/CustomersPage";
 import type { ItemOut } from "../features/inventory/api";
 import { InventoryPage } from "../features/inventory/InventoryPage";
 import { idbPersister } from "../shared/offline/idbPersister";
 import { server } from "../test/server";
 import { AppProviders } from "./providers";
+import { AppShell } from "./AppShell";
 import { RequireSession } from "./RequireSession";
 
 const WORKSHOP_A: Me = {
@@ -55,10 +58,64 @@ function renderApp() {
             path="/inventario"
             element={
               <RequireSession>
-                <InventoryPage />
+                <AppShell />
               </RequireSession>
             }
-          />
+          >
+            <Route index element={<InventoryPage />} />
+          </Route>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/registro" element={<RegisterPage />} />
+        </Routes>
+      </MemoryRouter>
+    </AppProviders>,
+  );
+}
+
+function customer(id: string, fullName: string): CustomerOut {
+  return {
+    id,
+    full_name: fullName,
+    phone: null,
+    phone_is_mobile: null,
+    notes: null,
+    archived_at: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  };
+}
+
+/**
+ * Same shell slice as `renderApp`, with a `/clientes` tab added. A stub
+ * `/inventario` route is also mounted: `LoginPage` always redirects there
+ * on success, regardless of where the user started, so a login flow in
+ * this tree needs it to land anywhere at all.
+ */
+function renderAppOnCustomers() {
+  return render(
+    <AppProviders>
+      <MemoryRouter initialEntries={["/clientes"]}>
+        <Routes>
+          <Route
+            path="/inventario"
+            element={
+              <RequireSession>
+                <AppShell />
+              </RequireSession>
+            }
+          >
+            <Route index element={<div>Inventario</div>} />
+          </Route>
+          <Route
+            path="/clientes"
+            element={
+              <RequireSession>
+                <AppShell />
+              </RequireSession>
+            }
+          >
+            <Route index element={<CustomersPage />} />
+          </Route>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/registro" element={<RegisterPage />} />
         </Routes>
@@ -138,7 +195,7 @@ describe("switching workshops on one phone", () => {
       renderApp();
       await START_WORKSHOP_B_SESSION[flow](userEvent.setup());
 
-      expect(await screen.findByRole("heading", { name: "Taller Beto" })).toBeInTheDocument();
+      expect(await screen.findByText("Taller Beto")).toBeInTheDocument();
       expect(screen.queryByText("Filtro de Ana")).not.toBeInTheDocument();
       await waitFor(async () => expect(await persistedCacheText()).not.toContain("Filtro de Ana"));
 
@@ -146,4 +203,48 @@ describe("switching workshops on one phone", () => {
       expect(await screen.findByText("Bujía de Beto")).toBeInTheDocument();
     },
   );
+});
+
+describe("switching workshops on one phone (customers)", () => {
+  it("drops the previous workshop's cached customers, on screen and in IndexedDB, when another workshop logs in", async () => {
+    // Defect this catches: the generic workshop-switch cache purge in
+    // `startSession` was only ever proven against inventory queries. A
+    // customers query key that forgot to start with
+    // `workshopQueryKey(w)` would silently survive a workshop switch and
+    // leak workshop A's customers to workshop B.
+    let session: Me | null = WORKSHOP_A;
+    server.use(
+      http.get("/api/auth/me", () =>
+        session ? HttpResponse.json(session) : HttpResponse.json({ detail: "not_authenticated" }, { status: 401 }),
+      ),
+      http.get("/api/customers", () =>
+        session === WORKSHOP_A
+          ? HttpResponse.json([customer("ca-1", "Cliente de Ana")])
+          : HttpResponse.json([customer("cb-1", "Cliente de Beto")]),
+      ),
+      http.post("/api/auth/login", () => {
+        session = WORKSHOP_B;
+        return HttpResponse.json(WORKSHOP_B);
+      }),
+    );
+
+    const workshopAVisit = renderAppOnCustomers();
+    await screen.findByText("Cliente de Ana");
+    await waitFor(async () => expect(await persistedCacheText()).toContain("Cliente de Ana"));
+    workshopAVisit.unmount();
+
+    session = null;
+    renderAppOnCustomers();
+    const user = userEvent.setup();
+    await START_WORKSHOP_B_SESSION.login(user);
+
+    // Login always redirects to /inventario (see renderAppOnCustomers'
+    // docstring); switch to the Clientes tab to observe the purge.
+    expect(await screen.findByText("Taller Beto")).toBeInTheDocument();
+    await user.click(screen.getByRole("link", { name: "Clientes" }));
+
+    expect(screen.queryByText("Cliente de Ana")).not.toBeInTheDocument();
+    await waitFor(async () => expect(await persistedCacheText()).not.toContain("Cliente de Ana"));
+    expect(await screen.findByText("Cliente de Beto")).toBeInTheDocument();
+  });
 });

@@ -76,12 +76,12 @@ export function EditItemPage() {
   if (isNotFound || !item.data) {
     const errorCode = item.error instanceof ApiError ? item.error.code : "item_not_found";
     return (
-      <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 py-8">
+      <div className="flex flex-col gap-4">
         <Alert variant="error">{getInventoryErrorMessage(errorCode)}</Alert>
         <LinkButton to="/inventario" variant="secondary">
           {inventoryCopy.detail.backToList}
         </LinkButton>
-      </main>
+      </div>
     );
   }
 
@@ -98,7 +98,7 @@ export function EditItemPage() {
     updateItem.error instanceof ApiError ? getInventoryErrorMessage(updateItem.error.code) : undefined;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-4 py-8">
+    <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold text-brand-primary">{inventoryCopy.edit.title}</h1>
       <ItemForm
         mode="edit"
@@ -118,6 +118,6 @@ export function EditItemPage() {
         submitPendingLabel={inventoryCopy.edit.submitPending}
         offline={isOffline}
       />
-    </main>
+    </div>
   );
 }
