@@ -93,10 +93,19 @@ def db_session(test_engine: Engine) -> Generator[Session]:
 
 @pytest.fixture
 def client(db_session: Session) -> Generator[TestClient]:
-    """A TestClient whose DB dependency is overridden with the test session."""
+    """A TestClient whose DB dependency is overridden with the test session.
+
+    Each request discards its uncommitted work on exit, the way the real
+    ``get_db`` does by closing its session: otherwise a route that forgets
+    to commit would still look correct here, because every request in a
+    test shares this one session.
+    """
 
     def _override_get_db() -> Generator[Session]:
-        yield db_session
+        try:
+            yield db_session
+        finally:
+            db_session.rollback()
 
     app.dependency_overrides[get_db] = _override_get_db
     try:
