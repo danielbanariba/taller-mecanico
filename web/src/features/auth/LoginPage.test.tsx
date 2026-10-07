@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
@@ -86,5 +86,46 @@ describe("LoginPage", () => {
     await user.click(submitButton);
 
     expect(submitButton).toBeDisabled();
+  });
+
+  describe("demo account", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("prefills the demo credentials, explains them, and logs in with exactly those", async () => {
+      vi.stubEnv("VITE_DEMO_PHONE", "9999-9999");
+      vi.stubEnv("VITE_DEMO_PASSWORD", "demo1234");
+      let sentBody: unknown;
+      server.use(
+        http.post("/api/auth/login", async ({ request }) => {
+          sentBody = await request.json();
+          return HttpResponse.json(ME_RESPONSE, { status: 200 });
+        }),
+      );
+      const user = userEvent.setup();
+      renderLoginPage();
+
+      expect(screen.getByLabelText(/teléfono/i)).toHaveValue("9999-9999");
+      expect(screen.getByLabelText(/contraseña/i)).toHaveValue("demo1234");
+      expect(screen.getByText(/cuenta de demostración/i)).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: /iniciar sesión/i }));
+
+      expect(await screen.findByText("Pantalla de inventario")).toBeInTheDocument();
+      expect(sentBody).toEqual({ phone: "9999-9999", password: "demo1234" });
+    });
+
+    it("leaves the form empty and shows no demo notice when the demo account is not configured", () => {
+      // Stubbed to undefined rather than left alone, so a shell that happens
+      // to export VITE_DEMO_* cannot make this production guard pass or fail.
+      vi.stubEnv("VITE_DEMO_PHONE", undefined);
+      vi.stubEnv("VITE_DEMO_PASSWORD", undefined);
+      renderLoginPage();
+
+      expect(screen.getByLabelText(/teléfono/i)).toHaveValue("");
+      expect(screen.getByLabelText(/contraseña/i)).toHaveValue("");
+      expect(screen.queryByText(/cuenta de demostración/i)).not.toBeInTheDocument();
+    });
   });
 });

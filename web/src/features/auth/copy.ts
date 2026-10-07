@@ -12,6 +12,8 @@ export const authCopy = {
     submit: "Iniciar sesión",
     submitPending: "Ingresando...",
     goToRegister: "¿No tiene cuenta? Regístrese",
+    demoNotice:
+      "Cuenta de demostración: toque «Iniciar sesión». Los datos se comparten con todas las personas que prueban la app.",
   },
   register: {
     title: "Crear cuenta",

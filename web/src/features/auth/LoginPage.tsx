@@ -1,7 +1,9 @@
 import { useNavigate, Link } from "react-router";
 
 import { ApiError } from "../../shared/api/http";
+import { Alert } from "../../shared/ui/Alert";
 import { getAuthErrorMessage, authCopy } from "./copy";
+import { getDemoAccount } from "./demoAccount";
 import { useLogin } from "./hooks";
 import { LoginForm } from "./LoginForm";
 import type { LoginPayload } from "./api";
@@ -10,6 +12,7 @@ import type { LoginPayload } from "./api";
 export function LoginPage() {
   const navigate = useNavigate();
   const login = useLogin();
+  const demoAccount = getDemoAccount();
 
   function handleSubmit(payload: LoginPayload) {
     login.mutate(payload, {
@@ -23,7 +26,13 @@ export function LoginPage() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-4 py-8">
       <h1 className="text-3xl font-bold text-brand-primary">{authCopy.login.title}</h1>
-      <LoginForm onSubmit={handleSubmit} pending={login.isPending} errorMessage={errorMessage} />
+      {demoAccount ? <Alert variant="info">{authCopy.login.demoNotice}</Alert> : null}
+      <LoginForm
+        onSubmit={handleSubmit}
+        pending={login.isPending}
+        errorMessage={errorMessage}
+        initialValues={demoAccount ?? undefined}
+      />
       <Link to="/registro" className="text-center text-base font-medium text-brand-accent">
         {authCopy.login.goToRegister}
       </Link>
