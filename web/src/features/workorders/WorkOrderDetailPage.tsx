@@ -9,6 +9,7 @@ import { Alert } from "../../shared/ui/Alert";
 import { Button } from "../../shared/ui/Button";
 import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
+import { isReceiptEligible } from "./receipt/useReceiptOrder";
 import { ShareWhatsAppButton } from "./ShareWhatsAppButton";
 import { StatusActions } from "./StatusActions";
 import { getWorkOrdersErrorMessage, statusLabel, workOrdersCopy } from "./copy";
@@ -154,6 +155,17 @@ export function WorkOrderDetailPage() {
 
       <StatusActions order={data} />
       <ShareWhatsAppButton order={data} workshopName={workshopName} />
+
+      {isReceiptEligible(data.status) ? (
+        <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+          <LinkButton to={`/ordenes/${orderId}/recibo/58mm`} variant="secondary">
+            {workOrdersCopy.receipt.link58mm}
+          </LinkButton>
+          <LinkButton to={`/ordenes/${orderId}/recibo/carta`} variant="secondary">
+            {workOrdersCopy.receipt.linkLetter}
+          </LinkButton>
+        </div>
+      ) : null}
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">

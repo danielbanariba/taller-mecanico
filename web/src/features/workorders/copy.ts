@@ -98,6 +98,8 @@ export const workOrdersCopy = {
     nonFiscalLabel: "DOCUMENTO NO FISCAL — No válido como factura",
     notEligible: "El recibo solo está disponible una vez que la orden está terminada o entregada.",
     print: "Imprimir",
+    link58mm: "Recibo 58 mm",
+    linkLetter: "Recibo carta",
   },
   cashSummary: {
     title: "Caja del día",

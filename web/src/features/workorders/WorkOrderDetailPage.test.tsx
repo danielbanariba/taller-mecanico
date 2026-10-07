@@ -311,4 +311,34 @@ describe("WorkOrderDetailPage", () => {
 
     expect(await screen.findByText("No se encontró el pago.")).toBeInTheDocument();
   });
+
+  it("links to both receipt layouts once the order is completed", async () => {
+    // Defect this catches: the receipt routes existing in router.tsx with
+    // no way to reach them from the order detail screen, so a mechanic
+    // can never print a receipt for an order that is actually eligible.
+    mockSessionAndOrder({ ...ORDER, status: "completed", allowed_transitions: ["delivered"] });
+    renderDetailPage();
+
+    expect(await screen.findByRole("heading", { name: "Orden #42" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Recibo 58 mm" })).toHaveAttribute(
+      "href",
+      "/ordenes/order-1/recibo/58mm",
+    );
+    expect(screen.getByRole("link", { name: "Recibo carta" })).toHaveAttribute(
+      "href",
+      "/ordenes/order-1/recibo/carta",
+    );
+  });
+
+  it("hides the receipt links for an order that is not yet completed or delivered", async () => {
+    // Defect this catches: offering a receipt for a quote/in-progress
+    // order, which the non-fiscal-receipt spec forbids rendering at all --
+    // the link itself would be a dead end showing "no disponible".
+    mockSessionAndOrder(ORDER); // status: "quote"
+    renderDetailPage();
+
+    expect(await screen.findByRole("heading", { name: "Orden #42" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Recibo 58 mm" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Recibo carta" })).not.toBeInTheDocument();
+  });
 });

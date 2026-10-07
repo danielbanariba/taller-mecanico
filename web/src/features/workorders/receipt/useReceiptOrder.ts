@@ -12,6 +12,17 @@ export type ReceiptOrderState =
 const RECEIPT_ELIGIBLE_STATUSES = new Set<WorkOrderOut["status"]>(["completed", "delivered"]);
 
 /**
+ * Whether `status` may be exposed through either receipt route. Exported
+ * so `WorkOrderDetailPage` can gate its own receipt links on the exact
+ * same rule instead of duplicating this status list -- a duplicated list
+ * could drift and either hide the links for an eligible order or offer a
+ * receipt for one the route itself would then refuse to render.
+ */
+export function isReceiptEligible(status: WorkOrderOut["status"]): boolean {
+  return RECEIPT_ELIGIBLE_STATUSES.has(status);
+}
+
+/**
  * Shared gating for both printable layouts (`Receipt58Page`,
  * `ReceiptLetterPage`): the loading/not-found handling is identical to
  * `WorkOrderDetailPage`'s, plus the receipt-only rule that a work order's
@@ -37,7 +48,7 @@ export function useReceiptOrder(orderId: string): ReceiptOrderState {
     return { phase: "not-found", errorCode };
   }
 
-  if (!RECEIPT_ELIGIBLE_STATUSES.has(order.data.status)) {
+  if (!isReceiptEligible(order.data.status)) {
     return { phase: "not-eligible", order: order.data };
   }
 
