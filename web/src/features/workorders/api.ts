@@ -134,6 +134,29 @@ export interface VoidPaymentPayload {
   reason: string;
 }
 
+export interface CashSummaryTotalsOut {
+  cash: number;
+  transfer: number;
+  card: number;
+  other: number;
+}
+
+export interface CashSummaryPaymentOut {
+  id: string;
+  order_id: string;
+  order_number: number;
+  amount_cents: number;
+  method: PaymentMethod;
+  paid_at: string;
+}
+
+export interface CashSummaryOut {
+  date: string;
+  totals_cents: CashSummaryTotalsOut;
+  total_cents: number;
+  payments: CashSummaryPaymentOut[];
+}
+
 function buildListQuery(params: ListWorkOrdersParams): string {
   const query = new URLSearchParams();
   query.set("status_group", params.statusGroup ?? "open");
@@ -169,4 +192,6 @@ export const workOrdersApi = {
     http.post<WorkOrderOut>(`/api/work-orders/${orderId}/payments`, payload),
   voidPayment: (orderId: string, paymentId: string, payload: VoidPaymentPayload) =>
     http.post<WorkOrderOut>(`/api/work-orders/${orderId}/payments/${paymentId}/void`, payload),
+  getCashSummary: (date?: string) =>
+    http.get<CashSummaryOut>(`/api/cash-summary${date ? `?date=${date}` : ""}`),
 };

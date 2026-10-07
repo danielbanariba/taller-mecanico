@@ -99,6 +99,14 @@ export const workOrdersCopy = {
     notEligible: "El recibo solo está disponible una vez que la orden está terminada o entregada.",
     print: "Imprimir",
   },
+  cashSummary: {
+    title: "Caja del día",
+    dateLabel: (date: string) => `Fecha: ${date}`,
+    offlineMessage: "El corte de caja requiere conexión a internet.",
+    totalLabel: "Total",
+    paymentsTitle: "Pagos del día",
+    paymentsEmpty: "Todavía no se han registrado pagos hoy.",
+  },
   share: {
     shareButton: "Compartir por WhatsApp",
     dialogTitle: "Compartir por WhatsApp",
