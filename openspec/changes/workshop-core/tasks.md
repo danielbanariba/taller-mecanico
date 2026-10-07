@@ -169,31 +169,31 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
 
 ### Slice P1.S3 — Web: app shell, bottom nav, router restructure, Órdenes placeholder
 
-- [ ] **P1.S3.T1 (RED)** Write `web/src/app/AppShell.test.tsx`:
+- [x] **P1.S3.T1 (RED)** Write `web/src/app/AppShell.test.tsx`:
   - The nav renders on `/inventario/:id` and (once customer routes exist in S4) `/clientes/:id/vehiculos/:vid`, with the active tab following the first path segment (`aria-current="page"`). **Defect it catches:** the layout wraps only index routes, or the Clientes tab is not marked active on a nested vehicle screen.
   - Logout from the shell navigates to `/login` and clears the workshop cache; `InventoryPage` renders no logout control of its own. **Defect it catches:** logout is lost or duplicated during the move out of `InventoryPage`.
   - The Órdenes tab renders "Próximamente" and fires no request (MSW's `onUnhandledFrame: "error"` fails the test if it does). **Defect it catches:** the placeholder issues a work-orders request that would 404 before phase 2 ships.
   - Switching tabs while offline still renders the shell and each destination's own offline-read rules; switching makes no network request itself.
 
-- [ ] **P1.S3.T2 (GREEN)** Create `web/src/app/BottomNav.tsx` (presentational: three `NavLink`s, ≥48 px tall, `fixed` bottom with `env(safe-area-inset-bottom)`).
+- [x] **P1.S3.T2 (GREEN)** Create `web/src/app/BottomNav.tsx` (presentational: three `NavLink`s, ≥48 px tall, `fixed` bottom with `env(safe-area-inset-bottom)`).
 
-- [ ] **P1.S3.T3 (GREEN)** Create `web/src/app/AppShell.tsx` (container: reads the session for the workshop name; owns the logout mutation moved out of `InventoryPage`; renders `<BottomNav/>` plus `<Outlet/>`, content padded so it is never hidden behind the nav).
+- [x] **P1.S3.T3 (GREEN)** Create `web/src/app/AppShell.tsx` (container: reads the session for the workshop name; owns the logout mutation moved out of `InventoryPage`; renders `<BottomNav/>` plus `<Outlet/>`, content padded so it is never hidden behind the nav).
 
-- [ ] **P1.S3.T4 (GREEN)** Create `web/src/app/copy.ts` for shell strings (Spanish).
+- [x] **P1.S3.T4 (GREEN)** Create `web/src/app/copy.ts` for shell strings (Spanish).
 
-- [ ] **P1.S3.T5 (GREEN)** Create `web/src/features/workorders/WorkOrdersComingSoon.tsx` and `web/src/features/workorders/copy.ts`: renders "Próximamente", fetches nothing.
+- [x] **P1.S3.T5 (GREEN)** Create `web/src/features/workorders/WorkOrdersComingSoon.tsx` and `web/src/features/workorders/copy.ts`: renders "Próximamente", fetches nothing.
 
-- [ ] **P1.S3.T6 (GREEN)** Modify `web/src/app/router.tsx`: wrap `RequireSession`'s outlet in a pathless layout route; nest the `AppShell` layout route under it with the existing inventory routes, the phase-1 `Órdenes` placeholder route, and (left empty until S4/S5) the `/clientes` route slots.
+- [x] **P1.S3.T6 (GREEN)** Modify `web/src/app/router.tsx`: wrap `RequireSession`'s outlet in a pathless layout route; nest the `AppShell` layout route under it with the existing inventory routes, the phase-1 `Órdenes` placeholder route, and (left empty until S4/S5) the `/clientes` route slots.
 
-- [ ] **P1.S3.T7 (GREEN)** Modify `web/src/features/inventory/InventoryPage.tsx` (and its test): remove the page-level header and logout button (now in the shell). Re-run the **existing** inventory test suite and confirm it is still green (per spec: "Existing Inventory Flows Are Unaffected By The Shell").
+- [x] **P1.S3.T7 (GREEN)** Modify `web/src/features/inventory/InventoryPage.tsx` (and its test): remove the page-level header and logout button (now in the shell). Re-run the **existing** inventory test suite and confirm it is still green (per spec: "Existing Inventory Flows Are Unaffected By The Shell").
 
-- [ ] **P1.S3.T8 (GREEN)** Modify `web/src/features/auth/hooks.ts`: export `useWorkshopId` (currently module-private). Modify `web/src/features/inventory/hooks.ts` to import it from `auth/hooks.ts` instead of its own copy.
+- [x] **P1.S3.T8 (GREEN)** Modify `web/src/features/auth/hooks.ts`: export `useWorkshopId` (currently module-private). Modify `web/src/features/inventory/hooks.ts` to import it from `auth/hooks.ts` instead of its own copy.
 
-- [ ] **P1.S3.T9** Run T1 and confirm every scenario is green.
+- [x] **P1.S3.T9** Run T1 and confirm every scenario is green.
 
-- [ ] **P1.S3.T10** Run this slice's verification: `cd web && npm run lint && npm run typecheck && npm test -- --run`.
+- [x] **P1.S3.T10** Run this slice's verification: `cd web && npm run lint && npm run typecheck && npm test -- --run`.
 
-- [ ] **P1.S3.T11** Work-unit commit: `:sparkles: feat(app): add a bottom-nav shell and move logout out of InventoryPage`.
+- [x] **P1.S3.T11** Work-unit commit: `:sparkles: feat(app): add a bottom-nav shell and move logout out of InventoryPage`.
 
 ### Slice P1.S4 — Web: customers list, search, create, edit, archive
 

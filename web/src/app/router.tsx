@@ -6,6 +6,8 @@ import { EditItemPage } from "../features/inventory/EditItemPage";
 import { InventoryPage } from "../features/inventory/InventoryPage";
 import { ItemDetailPage } from "../features/inventory/ItemDetailPage";
 import { NewItemPage } from "../features/inventory/NewItemPage";
+import { WorkOrdersComingSoon } from "../features/workorders/WorkOrdersComingSoon";
+import { AppShell } from "./AppShell";
 import { RequireSession } from "./RequireSession";
 
 export const router = createBrowserRouter([
@@ -13,17 +15,32 @@ export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
   { path: "/registro", element: <RegisterPage /> },
   {
-    path: "/inventario",
+    // Pathless: guards every tab screen below without adding a path
+    // segment. `AppShell` nests right under it so the bottom nav and
+    // logout render for every one of them.
     element: (
       <RequireSession>
         <Outlet />
       </RequireSession>
     ),
     children: [
-      { index: true, element: <InventoryPage /> },
-      { path: "nuevo", element: <NewItemPage /> },
-      { path: ":id", element: <ItemDetailPage /> },
-      { path: ":id/editar", element: <EditItemPage /> },
+      {
+        element: <AppShell />,
+        children: [
+          {
+            path: "/inventario",
+            children: [
+              { index: true, element: <InventoryPage /> },
+              { path: "nuevo", element: <NewItemPage /> },
+              { path: ":id", element: <ItemDetailPage /> },
+              { path: ":id/editar", element: <EditItemPage /> },
+            ],
+          },
+          { path: "/ordenes", element: <WorkOrdersComingSoon /> },
+          // "/clientes" route slots land in Slice 4 (list/search/create/
+          // edit) and Slice 5 (vehicles). Left empty here on purpose.
+        ],
+      },
     ],
   },
 ]);

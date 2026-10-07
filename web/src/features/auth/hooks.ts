@@ -78,6 +78,12 @@ export function useSession() {
   });
 }
 
+/** The current session's workshop id, or undefined before it resolves. */
+export function useWorkshopId(): string | undefined {
+  const session = useSession();
+  return session.data?.workshop.id;
+}
+
 export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({

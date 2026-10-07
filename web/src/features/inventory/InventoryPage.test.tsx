@@ -7,6 +7,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 
 import { server } from "../../test/server";
 import { renderWithQueryClient } from "../../test/render";
+import { AppShell } from "../../app/AppShell";
 import { sessionQueryKey } from "../auth/hooks";
 import { InventoryPage } from "./InventoryPage";
 import type { ItemOut } from "./api";
@@ -39,14 +40,21 @@ function mockSession() {
   server.use(http.get("/api/auth/me", () => HttpResponse.json(SESSION_RESPONSE, { status: 200 })));
 }
 
+/**
+ * `InventoryPage` nested under `AppShell`, like `router.tsx` does: the
+ * workshop heading these tests assert on now comes from the shell, not
+ * the page.
+ */
 function inventoryRoutes() {
   return (
     <MemoryRouter initialEntries={["/inventario"]}>
       <Routes>
-        <Route path="/inventario" element={<InventoryPage />} />
-        <Route path="/inventario/nuevo" element={<div>Pantalla de nuevo repuesto</div>} />
-        <Route path="/inventario/:id" element={<div>Pantalla de detalle</div>} />
         <Route path="/login" element={<div>Pantalla de inicio de sesión</div>} />
+        <Route element={<AppShell />}>
+          <Route path="/inventario" element={<InventoryPage />} />
+          <Route path="/inventario/nuevo" element={<div>Pantalla de nuevo repuesto</div>} />
+          <Route path="/inventario/:id" element={<div>Pantalla de detalle</div>} />
+        </Route>
       </Routes>
     </MemoryRouter>
   );

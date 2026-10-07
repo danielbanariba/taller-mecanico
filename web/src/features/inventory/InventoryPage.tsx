@@ -7,8 +7,6 @@ import { Button } from "../../shared/ui/Button";
 import { Chip } from "../../shared/ui/Chip";
 import { Spinner } from "../../shared/ui/Spinner";
 import { TextField } from "../../shared/ui/TextField";
-import { authCopy } from "../auth/copy";
-import { useLogout, useSession } from "../auth/hooks";
 import { getInventoryErrorMessage, inventoryCopy } from "./copy";
 import { useDebouncedValue, useItems, useRecordMovement } from "./hooks";
 import { ItemRow } from "./ItemRow";
@@ -21,8 +19,6 @@ const SEARCH_DEBOUNCE_MS = 300;
 /** Container: the inventory list, search, filters and the stock stepper. */
 export function InventoryPage() {
   const navigate = useNavigate();
-  const session = useSession();
-  const logout = useLogout();
   const recordMovement = useRecordMovement();
 
   const [searchInput, setSearchInput] = useState("");
@@ -39,12 +35,6 @@ export function InventoryPage() {
     return filter === "needsReview" ? list.filter((item) => item.needs_review) : list;
   }, [items.data, filter]);
 
-  function handleLogout() {
-    logout.mutate(undefined, {
-      onSuccess: () => navigate("/login", { replace: true }),
-    });
-  }
-
   function handleIncrement(item: ItemOut) {
     recordMovement.mutate({ itemId: item.id, kind: "in", quantity: 1 });
   }
@@ -58,14 +48,7 @@ export function InventoryPage() {
   const isFiltered = filter !== "all" || debouncedQuery.trim().length > 0;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 py-6">
-      <header className="flex flex-col gap-3">
-        <h1 className="text-2xl font-bold text-brand-primary">{session.data?.workshop.name}</h1>
-        <Button variant="secondary" onClick={handleLogout} loading={logout.isPending}>
-          {authCopy.logout.submit}
-        </Button>
-      </header>
-
+    <>
       {movementErrorMessage ? <Alert variant="error">{movementErrorMessage}</Alert> : null}
 
       <TextField
@@ -115,6 +98,6 @@ export function InventoryPage() {
           ))}
         </ul>
       )}
-    </main>
+    </>
   );
 }

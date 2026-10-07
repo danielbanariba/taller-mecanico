@@ -12,6 +12,7 @@ import { InventoryPage } from "../features/inventory/InventoryPage";
 import { idbPersister } from "../shared/offline/idbPersister";
 import { server } from "../test/server";
 import { AppProviders } from "./providers";
+import { AppShell } from "./AppShell";
 import { RequireSession } from "./RequireSession";
 
 const WORKSHOP_A: Me = {
@@ -55,10 +56,12 @@ function renderApp() {
             path="/inventario"
             element={
               <RequireSession>
-                <InventoryPage />
+                <AppShell />
               </RequireSession>
             }
-          />
+          >
+            <Route index element={<InventoryPage />} />
+          </Route>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/registro" element={<RegisterPage />} />
         </Routes>

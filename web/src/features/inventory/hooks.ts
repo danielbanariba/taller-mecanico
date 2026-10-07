@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 
 import { ApiError } from "../../shared/api/http";
-import { useSession, workshopQueryKey } from "../auth/hooks";
+import { useWorkshopId, workshopQueryKey } from "../auth/hooks";
 import {
   inventoryApi,
   type ItemOut,
@@ -42,12 +42,6 @@ export function useDebouncedValue<T>(value: T, delayMs: number): T {
   }, [value, delayMs]);
 
   return debounced;
-}
-
-/** The current session's workshop id, or undefined before it resolves. */
-function useWorkshopId(): string | undefined {
-  const session = useSession();
-  return session.data?.workshop.id;
 }
 
 interface FetchItemsFoldedDeps {
