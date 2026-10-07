@@ -1,7 +1,23 @@
-*.db
 *.py[cod]
-.web
 __pycache__
 __pycache__/
-env
-venv
+
+# Local tooling
+.codegraph/
+.atl/
+
+# Claude Code settings and skill links are personal; shared skills live in .agents/skills
+.claude/
+
+# Python (api/)
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+api/.env
+
+# Web (web/)
+web/node_modules/
+web/dist/
+web/dev-dist/
+

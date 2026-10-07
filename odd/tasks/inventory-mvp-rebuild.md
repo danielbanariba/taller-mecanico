@@ -1,0 +1,124 @@
+# Feature: inventory-mvp-rebuild
+
+Locator: `odd/tasks/inventory-mvp-rebuild.md` · Engram mirror: `odd/inventory-mvp-rebuild/tasks` · Branch: `feat/inventory-mvp`
+
+## Objective
+
+Replace the university project (Reflex 0.4.8 frontend talking directly to Oracle, FastAPI backend that only does login) with a sellable MVP for small Honduran auto/moto repair shops: a dead-simple, mobile-first parts inventory counter.
+
+## Problem and why
+
+- Real lead: a small, low-budget mechanic who wants to know how many units of each part they have (shock absorbers, oil) and is not comfortable with Excel.
+- Market research (`docs/research/Necesidades de talleres en Honduras.md`): software adoption in shops is 9–23.5%, cost is the main barrier, no competitor supports Honduras/HNL/CAI, users are Android + WhatsApp + cash, motorcycles are ~51% of the fleet, parts often have no standard part number.
+- The current codebase is not salvageable (hardcoded Oracle credentials, hardcoded secret, mostly dead or static pages). See `CLAUDE.md` (legacy section) for the map.
+
+## Scope (this feature)
+
+- Multi-tenant API: a workshop (tenant) registers with an owner account; all data is scoped to the workshop.
+- Inventory: items identified by name (optional category, unit, minimum stock, sale price in HNL, notes); stock is the sum of an append-only movement ledger (in, out, physical-count adjustment).
+- Installable PWA in Spanish with big touch targets: list + search, +/- per item, add/edit item, item history, low-stock view, physical count.
+- Offline: app shell cached; inventory readable offline; movements recorded offline queue in IndexedDB and sync when back online.
+- Remove the legacy code and rewrite README/CLAUDE.md.
+
+## Out of scope (next features, in this order)
+
+1. Customers, vehicles (cars and motorcycles), quotes, and work orders that consume stock.
+2. SAR/CAI invoicing as an opt-in module (CAI range, RTN, ISV 15% breakdown, HNL only).
+3. Additional users per workshop with roles, password reset, WhatsApp sharing of quotes, photos per item, pricing/billing of the product itself.
+
+## Decisions
+
+- **Stack:** API in Python (FastAPI, SQLAlchemy 2, Alembic, PostgreSQL, uv, ruff, pytest). Web in React + TypeScript + Vite + vite-plugin-pwa + TanStack Query + Tailwind CSS, tested with Vitest + Testing Library, npm as package manager. Reflex dropped: server-held state over a websocket needs a constant connection and is a poor fit for a phone-first, offline-tolerant app.
+- **Architecture:** screaming, feature-first folders on both sides. API is hexagonal per feature (`domain` → `application` use cases + ports → `adapters` for SQLAlchemy and HTTP). Web uses container/presentational components and an atomic `shared/ui` kit.
+- **Stock as a ledger:** stock = sum of movement deltas. Movements carry a client-generated UUID and are idempotent, so offline replay never double-counts and ordering conflicts disappear. A physical count is stored as an adjustment carrying the counted quantity; the delta is computed against the stock at the moment the server applies it.
+- **Negative stock is allowed and flagged**, never blocked: a mechanic mid-job must not be stopped by the app, and offline replays must always apply. The UI marks negative stock as "revisar".
+- **Identity:** login with a Honduran phone number (8 digits) + password; no email required. Session is a signed JWT in an httpOnly, SameSite=Lax cookie (web and API served same-origin; Vite proxies `/api` in dev).
+- **Money** stored as integer cents of HNL.
+- **Web toolchain pins:** TypeScript 6.0 (typescript-eslint 8.71 requires <6.1), react-router 7, MSW 3, Vitest 5, Vite 8.
+- **Language:** code, identifiers, comments and CLAUDE.md in English; UI copy and README in Spanish (product market).
+- **Local ports** (5432–5434 and 8000–8001 are taken on the dev machine): Postgres `5440`, API `8010`, web dev `5173`.
+- **Review mode:** RDD disabled for this clone (user decision, 2026-10-06) after two `lens_context_budget_exceeded` stops caused by generated lockfiles (`api/uv.lock` was 903 of 1653 lines). Replacement: per-task checks, an independent verifier for high-risk tasks per `gentle-ai review assess`, and one independent review of all code (lockfiles excluded) before the PR.
+- **Offline read consistency (T6b):** item fetch + outbox fold run inside the flush lock, so a read never interleaves with a flush pass; trade-off: a read can wait behind a slow pass (bounded by the 20 s per-request timeout).
+- **Delivery strategy:** `single-pr` (user policy: one task = one branch = one PR, atomic commits). If the final size is unreasonable for one review, agree a cut with the user before splitting.
+- **Commit and PR format (user decision, 2026-10-06, all projects):** Gitmoji + Conventional Commits per `templates/commit-template.en.git.txt` and PR bodies per `.github/pull_request_template.md`, both from main-dagster. Every branch commit was reworded to that format before merge (titles only, tree unchanged); the commit references in this document point to the reworded commits.
+
+## Tasks
+
+Route per task: delegated direct (one bounded writer) unless stated. Trigger evidence: each task touches 2+ non-trivial files.
+
+- [x] **T0** Repo hygiene: ignore local tooling dirs, commit research docs, this plan and the legacy CLAUDE.md. Route: inline (mechanical).
+- [x] **T1** API scaffold: uv project, app factory, settings, DB session, Alembic, `/api/health` with DB check, docker-compose Postgres, ruff + pytest setup.
+- [x] **T2** Identity + workshops: register workshop with owner, login/logout via cookie, `me`, password hashing, authenticated workshop dependency.
+- [x] **T3** Inventory API: items (create, update, archive, list with stock + search + low-stock filter), idempotent movements (in/out/adjust), item history, tenant isolation.
+- [x] **T3b** Inventory API hardening from the T3 verifier: cross-tenant id collision returns 409 instead of an unhandled 500; upper bounds on quantities and prices (no integer overflow 500s); `initial_stock` covered by item replay idempotency (deterministic initial-movement id); escape `%`/`_` in search. Runs after T4 (single writer).
+- [x] **T4** Web scaffold + auth: Vite React TS, Tailwind, router, query client, API client, PWA manifest, Vitest, login/register screens, protected routes.
+- [x] **T5** Inventory UI: list + search, +/- stepper, add/edit item, item detail with history, low-stock view, physical count.
+- [x] **T5b** Inventory UI fixes from the T5 verifier: accept thousands-grouped lempira amounts with `format.ts` tests, client-side upper bounds with Spanish messages, no `<button>` nested in `<a>` on the detail page, a 404 detail test. Runs after T6 (single writer).
+- [x] **T6** Offline: persisted query cache, movement outbox in IndexedDB with sync on reconnect, online/offline indicator.
+- [x] **T6b** Offline fixes from the T6 verifier: a refetch landing between a successful PUT and the outbox removal double-counts the movement (fetch + fold must not interleave with a flush); `nextSeq()` read-then-write is not atomic across tabs; add a flush-time 401 test. Runs after T5b (single writer).
+- [x] **T7** Remove legacy code; rewrite README (Spanish) and CLAUDE.md for the new architecture.
+- [x] **T8** End-to-end check in a real browser (register, add item, move stock, offline queue + sync). Ran; defects found → T8b.
+- [x] **T8b** Fixes from T8: (D1) offline taps never reach the outbox because the movement mutation uses TanStack's default `networkMode: 'online'`, so it pauses, persists as a paused mutation with no resumable defaults, and is lost on reload; plus a reload while offline (or on "lie-fi") must keep a cached session usable instead of blocking on "Sin conexión"; (D2) the offline banner must show the pending-change count; (D3) the edit form and "Archivar" must be disabled offline with a message, like create; (D4) the item detail must show the sale price. Runs as one writer.
+- [x] **T9** Final checks before the PR: re-run the offline-reload scenario in a real browser; one independent review of all branch code (API and web, lockfiles excluded); Test Value Gate Pass 3 list of every new test.
+- [x] **T9b** Fixes from T9 (one writer, atomic commits):
+  - Web, tenant cache: scope every inventory query key by workshop id and drop the previous workshop's cached data (memory and IndexedDB) when a login or register starts a different workshop's session; the outbox stays (already workshop-scoped).
+  - Web, service worker: the `/api/` NetworkOnly rule uses a `matchCallback` on `url.pathname` (a RegExp matches the full URL and never fires).
+  - Web, physical count: empty or invalid input must not submit (it silently set stock to 0); same bounds and Spanish error as the item form.
+  - Web, `Dialog`: Escape closes, focus moves into the dialog on open, stays inside while open, and returns to the trigger on close.
+  - API, login throttling: per-phone (registered or not, so no enumeration) lockout after 5 consecutive failures for 15 minutes, `429 too_many_login_attempts` with `Retry-After`, success resets; Spanish message in the web.
+  - API, minors: `update_item_route` maps only the active-name index violation to `409 item_name_taken`; the movement retry also handles `ItemNotFound`; `_initial_stock_matches` also compares kind and note.
+  - API, found in the parent spot check: `alembic check` reported the active-name unique index and the movement history index as removed, so the next autogenerated migration would have dropped them. Route: inline (two small files plus a test).
+- [x] **T10** Commit and PR templates (user request before merge): add the main-dagster commit template (English) and PR template (checklist adapted to this stack), document them in CLAUDE.md, reword every branch commit to Gitmoji + Conventional Commits, and rewrite the PR #15 title and body to the template. Route: inline (mechanical).
+- [x] **T11** Project agent skills (user request before merge): find skills for this stack, audit each before installing, install the ones that pass into the tracked `.agents/skills/` (the Claude Code symlinks in `.claude/skills/` stay personal and git-ignored, per the user's hook that blocks the AI from committing `.claude/`), and document them in CLAUDE.md. Route: delegated explorer for the search and audit; install inline with the skills CLI.
+
+## Acceptance criteria
+
+- A new workshop can register, log in on a phone-sized screen, add parts, and change stock with one tap per unit.
+- Stock always equals the sum of movements; replaying the same movement twice changes nothing.
+- One workshop can never read or change another workshop's data.
+- Movements made offline appear immediately and reach the server after reconnecting.
+- `api`: ruff check, ruff format --check, pytest all green. `web`: lint, typecheck, vitest, build all green.
+
+## Checks per task
+
+- API: `cd api && uv run ruff check . && uv run ruff format --check . && uv run pytest`
+- Web: `cd web && npm run lint && npm run typecheck && npm test -- --run && npm run build`
+- DB for tests: `docker compose up -d db` (Postgres on 5440).
+
+## Progress
+
+| Task | Route | Commit | Checks | Review tier |
+| --- | --- | --- | --- | --- |
+| T0 | inline (mechanical) | ffd1eb4 (research), 6c491a8 (CLAUDE.md, plan, .gitignore) | structural readback | ffd1eb4 passive (boundary advanced); 6c491a8 medium, under budget (pending in slice). First attempt as one commit: consent granted, review stopped with lens_context_budget_exceeded, so it was split. |
+| T1 | delegated (writer; 2+ non-trivial files) | 511bf35 | ruff check/format clean, pytest 2 passed, alembic upgrade ok, boot + curl health 200; parent spot check pytest 2 passed | high (alembic.ini starts processes); consent granted, review stopped with lens_context_budget_exceeded; RDD then disabled; independent verifier: pass with follow-ups (add `connect_timeout` to `build_engine`, anchor `env_file` to the package path; folded into T3) |
+| T2 | delegated (writer; 2+ non-trivial files) | 600405e (+ fixes 3cd2127) | ruff clean, pytest 26 passed, migration up/down/up ok, boot register→me→logout→me = 201/200/204/401; parent spot check pytest 26 passed | high (auth; assess unassessable → treated high); independent verifier: pass with follow-ups (bound login password length, deterministic tampered-token test, narrow IntegrityError mapping, `secure=` on delete_cookie; fixed in 3cd2127 with a RED→GREEN test for the login bound; pytest 61 passed) |
+| T3 | delegated (writer; 2+ non-trivial files) | 49c83f2 | ruff clean, pytest 60 passed, migration up/down/up ok, boot: initial_stock 5 → out 2 → replay = 201/201/200, final stock 3; parent spot check pytest 60 passed | high (tenant isolation, row locking); independent verifier: pass with follow-ups → T3b |
+| T4 | delegated (writer; 2+ non-trivial files) | efd1b4f | lint, typecheck clean; vitest 9 passed; build emits sw.js + Spanish manifest; smoke via Vite proxy: health 200, register 201, me 200; parent spot check vitest 9 passed | high (auth signal); independent verifier: pass with follow-ups (RegisterForm lacks the 128-char password max; folded into T5) |
+| T3b | delegated (writer) | 6cb3531 | ruff clean, pytest 79 passed (RED per defect observed by stashing the fix); parent spot check pytest 79 passed | follow-up of a verified high-risk task; fixes only |
+| T5 | delegated (writer; 2+ non-trivial files) | 7f6e0da | lint, typecheck clean; vitest 24 passed; build ok; smoke via proxy: register 201, item initial 3, in +1, stock 4; parent spot check vitest 24 passed. Test-first exception: writer wrote most code and tests together; RED proven retroactively for 7 behaviors by reverting each fix | high (auth signal from RegisterForm); independent verifier: pass with follow-ups: out-of-order reconciliation of concurrent taps (sent to the T6 writer, same code); thousands-grouped prices rejected, missing client upper bounds, Button nested in Link, no 404/format tests → T5b |
+| T6 | delegated (writer; 2+ non-trivial files) | eb6a074 | lint, typecheck clean; vitest 50 passed (stable x3); build: sw.js routes `/api/` NetworkOnly, shell precached; RED observed before implementing each module, plus the reverse-order taps regression test failing on the old transport; parent spot check vitest 50 passed | high (auth signal); independent verifier: pass with follow-ups → T6b |
+| T5b | delegated (writer) | 568e5ed | lint, typecheck clean; vitest 72 passed; build ok; RED observed per item before fixing; parent spot check vitest | follow-up of a verified high-risk task; fixes only |
+| T6b | delegated (writer) | 70a05a3 | lint, typecheck clean; vitest 76 passed x3; build ok; RED reproduced by reverting each fix (double count 12 vs 11, seq [1,1,1]); 401 test passed without code change; parent spot check vitest | follow-up of a verified high-risk task; fixes only |
+| T7 | delegated (writer) | c5c4686 | legacy tree removed (120 files, −6820 lines); README (es) and CLAUDE.md rewritten; api and web checks green | passive (docs + deletions) |
+| T8 | delegated (read-only browser checker, Playwright 390×844 against `vite preview` + API) | — (no code) | PASS: register, add items, +/−, badges, search, count + history, logout/login, no `/api` from the SW, ≥48px targets, no overflow. FAIL: D1 (reload offline blocks the app and loses queued taps; the same taps without a reload sync exactly once), D2, D3, D4 → T8b | n/a (check only) |
+| T8b | delegated (writer; 2+ non-trivial files) | 2c5d97e, 54fb6d0, d538d40, 9dee30d | lint, typecheck clean; vitest 88 passed x3; build ok; RED observed per defect (outbox `[]` after an offline tap; second offline reload showed "Sin conexión"; edit form enabled offline; price missing); parent spot check vitest 88 passed | follow-up of T8; root causes: default `networkMode: 'online'` paused taps before the outbox write; the persister only kept `success` queries, so one failed offline refetch erased the cached session; `useOnlineStatus` re-read `navigator.onLine` per screen. Re-checked in a real browser in T9: pass |
+| T9 | delegated (3 read-only workers in parallel: browser checker, API reviewer, web reviewer) | — (no code) | Browser (Playwright 390×844, production build): price on detail, 3 offline taps survive two offline reloads (outbox holds 3 entries, no persisted mutations), reconnect sends exactly 3 `in` (curl), mixed +2/−1/count 15 → server stock 15 in order, edit/archive gated offline, logout/login, no `/api` from the SW: all PASS. Defect: login/register never clear the previous workshop's cache (IndexedDB still held workshop A's items after workshop B registered; on-screen flash not observed). API review: ruff clean, pytest 79 passed, no blocker; major: no login throttling; minors: update-route IntegrityError mapping, retry without `ItemNotFound`, initial-stock replay match. Web review: lint, typecheck, vitest 88, build clean; majors: unscoped inventory query keys, dead SW `/api/` rule, count dialog submits 0 on empty input; minor: `Dialog` focus and Escape. Test Value Gate Pass 3: API 61 test functions and web 88 tests each have a named failing change, none useless or weak (lists in the session scratchpad `t9/test-value-*.md`) | n/a (checks only) → T9b |
+| T9b | delegated (writer; 2+ non-trivial files) + inline drift fix | feff7bc, aed5fc0, 994b18a, fca00ae, 7cafbed, ac8d809, 3f1bc0c, 629f2d0, 49fbcd1; inline 535c40a | ruff clean; pytest 90 passed; alembic upgrade/downgrade/upgrade ok and `alembic check` clean; lint, typecheck clean; vitest 97 passed x3; build ok, `dist/sw.js` registers the `/api/` NetworkOnly route with a pathname callback. RED observed per item, and several fixes broken on purpose afterwards to prove the test catches them (e.g. removing the commit on 401 fails 3 throttle tests). The test `client` fixture now discards each request's uncommitted work like `get_db`, so a missing commit can fail a test. Parent spot check: pytest 89 → 90 with the drift test (RED: `AutogenerateDiffsDetected` with two `remove_index`), vitest 97 passed | follow-up of a verified high-risk task; real-browser re-check (Playwright 390×844, production build): PASS for the tenant switch (B's list empty across 8 polls, A's item 404 for B, no A data in IndexedDB, A's 2 queued offline taps kept while B was in and synced when A returned, stock 12 by curl), count validation (empty and 2,000,000 rejected, no movement; 15 saved), Dialog keys (focus inside, Tab wraps, Escape closes and returns focus), lockout (registered and unregistered phones both get 429 with `Retry-After` and the Spanish message after 5 failures). Observed once, not reproduced: a single `409` on `POST /api/auth/register` during a registration that still succeeded (the submit button is disabled while pending) |
+| T10 | inline (mechanical) | 30fb768 (templates), cf72a08 (references after the rewrite) | every branch title reworded with `git filter-branch --msg-filter` (titles only; titles over 72 characters shortened); tree diff against the pre-rewrite backup: 0 lines; 34 commits before and after; all titles match the Gitmoji pattern and are at most 72 characters; pushed with `--force-with-lease` against the previous head; PR #15 lists every commit with its gitmoji | passive (docs and history metadata) |
+| T11 | delegated explorer (search and audit) + inline install | 6f52150 | 6 of 8 shortlisted skills installed (226 files, 1.9 MB, no scripts); post-install scan found no scripts, attribution or pipe-to-shell patterns. Not installed: `tailwind-4-docs` (its docs sync clones a source-available repo and needs the user's license acceptance) and `webapp-testing` (overlaps the Playwright tools already in use). Rejected in the audit: a pytest skill that stamps fabricated audit references, a Husky setup that would override the global `core.hooksPath` attribution hook, FastAPI templates that contradict the sync hexagonal design, a web-design skill that follows instructions fetched from a remote URL | passive (agent docs only) |
+
+T6 decisions: creating/editing items requires a connection (disabled offline with a message); the outbox is the only movement transport (FIFO, one at a time, Web Locks + in-tab mutex, 20 s timeout) so responses cannot reconcile out of order; pending outbox entries are folded onto fetched/persisted item data so a refetch never hides a queued tap; persisted query cache max age 7 days, busted by app version, cleared on logout; outbox entries carry the workshop id and only flush for the matching session.
+
+T3 decisions: quantities are integers; movement replay compares `{item_id, kind, quantity, note}` (not `occurred_at`); `initial_stock` always records an `adjust` (even 0); simple UUID primary keys; concurrent insert races retried once after `IntegrityError`; accent-insensitive search and name uniqueness via an IMMUTABLE plpgsql wrapper `taller_unaccent_lower`.
+
+## Next step
+
+All tasks done and verified, including the commit/PR templates (T10) and project skills (T11) the user asked for before merging. PR #15 (`feat/inventory-mvp` → `main`) is open for review; merging needs the user's explicit OK. After the merge, delete the local `backup/inventory-mvp-before-gitmoji` branch.
+
+T9b known limitations (accepted for the MVP): if another tab switches the session's workshop without a login in this tab, scoped keys keep this tab from showing the other workshop's data, but its memory and IndexedDB snapshot hold the old entries until the next login or garbage collection; `login_throttles` keeps one row per phone that ever tried to log in (a periodic cleanup can come later).
+
+Accepted, not fixed in this feature: stateless 30-day JWT has no server-side revocation (logout only clears the cookie); login throttling is per phone, so password spraying across many phones is not limited (add per-IP limits at the deployment edge).
+
+T8b known limitations (accepted for the MVP): on "lie-fi" (the phone reports online but requests fail) the banner shows the pending count but not "Sin conexión", and a tap stays pending until the 20 s send timeout; paused mutations saved by the pre-T8b build are dropped (no build reached users).
+
+T8 decision: the "Por acabarse" filter keeps returning negative-stock items (they are at or below the minimum too, and need restocking); the badge shows "Revisar" because it takes precedence. By design, no change.
