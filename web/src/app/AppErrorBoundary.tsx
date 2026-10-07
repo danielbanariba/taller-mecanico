@@ -1,3 +1,4 @@
+import { idbPersister } from "../shared/offline/idbPersister";
 import { Button } from "../shared/ui/Button";
 import { appCopy } from "./copy";
 
@@ -16,7 +17,17 @@ import { appCopy } from "./copy";
  * may be inside the shell itself.
  */
 export function AppErrorBoundary() {
-  function handleReload() {
+  // A crash can come from a persisted response the running code no longer
+  // understands; a plain reload would hydrate that same cache and crash
+  // again, leaving the user stuck here. Drop the persisted query cache
+  // first. The movements outbox lives in its own IndexedDB store and is
+  // never touched, so no queued stock change is lost.
+  async function handleReload() {
+    try {
+      await idbPersister.removeClient();
+    } catch {
+      // Reload anyway: refetching is recoverable, a stuck screen is not.
+    }
     window.location.reload();
   }
 
@@ -24,7 +35,7 @@ export function AppErrorBoundary() {
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
       <h1 className="text-2xl font-bold text-brand-primary">{appCopy.error.title}</h1>
       <p className="text-base text-brand-foreground">{appCopy.error.message}</p>
-      <Button onClick={handleReload} className="w-auto px-6">
+      <Button onClick={() => void handleReload()} className="w-auto px-6">
         {appCopy.error.reload}
       </Button>
     </div>

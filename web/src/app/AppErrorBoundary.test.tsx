@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 
+import { idbPersister } from "../shared/offline/idbPersister";
 import { AppErrorBoundary } from "./AppErrorBoundary";
 
 function ThrowingScreen(): never {
@@ -46,6 +47,28 @@ describe("AppErrorBoundary", () => {
 
     await user.click(await screen.findByRole("button", { name: "Recargar" }));
 
-    expect(reload).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+  });
+
+  it("drops the persisted query cache before reloading", async () => {
+    // Defect this catches: a crash caused by a cached response the code no
+    // longer understands. Reloading alone rehydrates the same cache and
+    // crashes again, so the user can never leave this screen.
+    const reload = vi.fn();
+    Object.defineProperty(window, "location", {
+      value: { ...window.location, reload },
+      writable: true,
+      configurable: true,
+    });
+    const removeClient = vi.spyOn(idbPersister, "removeClient");
+    const user = userEvent.setup();
+    renderThrowingRoute();
+
+    await user.click(await screen.findByRole("button", { name: "Recargar" }));
+
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+    expect(removeClient).toHaveBeenCalledTimes(1);
+    expect(removeClient.mock.invocationCallOrder[0]).toBeLessThan(reload.mock.invocationCallOrder[0]);
+    removeClient.mockRestore();
   });
 });
