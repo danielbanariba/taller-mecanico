@@ -45,7 +45,7 @@ function movement(overrides: Partial<MovementOut>): MovementOut {
   };
 }
 
-function mockItemAndMovements(movements: MovementOut[] = []) {
+function mockItemAndMovements(movements: MovementOut[] = [], item: ItemOut = ITEM) {
   // useRecordMovement/useItem need the session's workshop id to tag and
   // fold outbox entries (see T6); ItemDetailPage always renders behind
   // RequireSession in the real app, so every test mocks it too.
@@ -57,7 +57,7 @@ function mockItemAndMovements(movements: MovementOut[] = []) {
       }),
     ),
   );
-  server.use(http.get("/api/inventory/items/item-1", () => HttpResponse.json(ITEM)));
+  server.use(http.get("/api/inventory/items/item-1", () => HttpResponse.json(item)));
   server.use(http.get("/api/inventory/items/item-1/movements", () => HttpResponse.json(movements)));
 }
 
@@ -200,6 +200,29 @@ describe("ItemDetailPage", () => {
 
     expect(await screen.findByText("Pantalla de inventario")).toBeInTheDocument();
     expect(archiveWasCalled).toBe(true);
+  });
+
+  it("shows the sale price in Lempiras", async () => {
+    // Defect this catches (T8): the price was stored and shown in the
+    // edit form, but the detail screen never displayed it, so a mechanic
+    // quoting a customer had to open the edit form to read it.
+    mockItemAndMovements([], { ...ITEM, sale_price_cents: 125_000 });
+    renderDetailPage();
+
+    await screen.findByText("10");
+
+    expect(screen.getByText(/^Precio de venta: L\s1,250\.00$/)).toBeInTheDocument();
+  });
+
+  it("omits the price line for an item without a sale price", async () => {
+    // Defect this catches: formatting a missing price would show a
+    // misleading "L 0.00" for an item that simply has no price yet.
+    mockItemAndMovements();
+    renderDetailPage();
+
+    await screen.findByText("10");
+
+    expect(screen.queryByText(/Precio de venta/)).not.toBeInTheDocument();
   });
 
   it("renders the edit action as a single link, not a button nested inside one", async () => {

@@ -50,6 +50,7 @@ export const inventoryCopy = {
     submitPending: "Guardando...",
   },
   detail: {
+    priceLabel: "Precio de venta",
     stockLabel: "En inventario",
     countAction: "Contar",
     countDialogTitle: "Contar repuesto",

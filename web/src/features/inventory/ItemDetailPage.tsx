@@ -10,6 +10,7 @@ import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
 import { TextField } from "../../shared/ui/TextField";
 import { getInventoryErrorMessage, inventoryCopy } from "./copy";
+import { formatCents } from "./format";
 import { useArchiveItem, useItem, useMovements, useRecordMovement } from "./hooks";
 import { MovementHistory } from "./MovementHistory";
 
@@ -90,6 +91,11 @@ export function ItemDetailPage() {
         <p className="text-sm text-brand-muted-foreground">
           {[data.category, data.unit].filter(Boolean).join(" · ")}
         </p>
+        {data.sale_price_cents != null ? (
+          <p className="mt-1 text-base font-semibold text-brand-foreground">
+            {`${inventoryCopy.detail.priceLabel}: ${formatCents(data.sale_price_cents)}`}
+          </p>
+        ) : null}
       </header>
 
       {movementErrorMessage ? <Alert variant="error">{movementErrorMessage}</Alert> : null}
