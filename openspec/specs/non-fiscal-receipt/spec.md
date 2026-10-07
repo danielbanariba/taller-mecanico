@@ -95,6 +95,30 @@ The system MUST render, on both layouts, the work order's number, vehicle, custo
 - WHEN either receipt layout is rendered
 - THEN the balance due shown is 300.00
 
+### Requirement: The Work Order Detail Screen Links To Both Receipt Layouts When Eligible
+
+The system MUST display clickable links to both the 58 mm and full-page receipt layouts on the work order detail screen only when the order's status is `completed` or `delivered`. The links MUST NOT appear for any other status. The labels MUST be "Recibo 58 mm" and "Recibo carta" (or similar Spanish labels clearly identifying the two layouts).
+
+#### Scenario: Receipt links appear for a completed order
+
+- GIVEN a work order in status `completed`
+- WHEN the order detail screen is rendered
+- THEN two links to the receipt layouts are visible
+- AND both are clickable
+
+#### Scenario: Receipt links appear for a delivered order
+
+- GIVEN a work order in status `delivered`
+- WHEN the order detail screen is rendered
+- THEN two links to the receipt layouts are visible
+- AND both are clickable
+
+#### Scenario: Receipt links do not appear for an order that is not yet completed
+
+- GIVEN a work order in status `quote`, `approved`, `in_progress`, or `cancelled`
+- WHEN the order detail screen is rendered
+- THEN no receipt links are visible on that screen
+
 ### Requirement: Receipt Data Is Isolated Per Workshop
 
 The system MUST only render a receipt for a work order belonging to the authenticated workshop. A receipt request for another workshop's order MUST be treated as not found.

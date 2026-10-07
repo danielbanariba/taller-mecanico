@@ -24,6 +24,26 @@ The system MUST produce a single ZIP archive containing one CSV file per entity:
 - WHEN "Exportar todo" is requested
 - THEN the ZIP still contains a payments CSV with only a header row
 
+### Requirement: The Payments CSV Includes All Payments, Voided And Non-Voided, With Void Metadata
+
+The system MUST export every recorded payment in the `payments.csv` file, including both non-voided and voided payments. Voided payments MUST NOT be deleted or hidden; they MUST appear as records with their `voided_at` timestamp and `void_reason` filled, while non-voided payments have those fields empty. The `paid_hnl` value in `work_orders.csv` counts only non-voided payments and therefore differs from the sum of all amounts in the payments CSV.
+
+#### Scenario: A voided payment is exported with its void metadata
+
+- GIVEN a work order with a recorded payment of 200.00 that was later voided with reason "duplicado"
+- WHEN "Exportar todo" is requested
+- THEN the payments CSV contains one row for that payment
+- AND its columns include `voided_at` (a timestamp) and `void_reason` ("duplicado")
+- AND that payment does not contribute to the `paid_hnl` total in the work_orders CSV
+
+#### Scenario: Non-voided payments have empty void columns
+
+- GIVEN a work order with a recorded, non-voided payment
+- WHEN "Exportar todo" is requested
+- THEN the payments CSV contains one row for that payment
+- AND its `voided_at` column is empty
+- AND its `void_reason` column is empty
+
 ### Requirement: Every CSV Is UTF-8 With A BOM For Excel Compatibility
 
 The system MUST encode every CSV in the export using UTF-8 with a byte-order mark (`utf-8-sig`), so that Excel on Windows renders Spanish accented characters correctly instead of mojibake.

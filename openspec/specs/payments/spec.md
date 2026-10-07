@@ -166,6 +166,24 @@ The system MUST allow voiding a recorded payment, requiring a reason in the void
 - THEN the action is disabled
 - AND a Spanish message explains that voiding a payment requires a connection
 
+### Requirement: Voiding An Unlinked Or Nonexistent Payment Returns A Distinct Payment-Specific Error
+
+The system MUST distinguish between a payment that does not exist or belongs to a different order (same workshop) versus a request scoped to a foreign order. When voiding a payment id that either does not exist or exists under a different order within the same workshop, the response MUST be HTTP 404 with `detail: "payment_not_found"`. This is distinct from scoping to a foreign work order, which returns `work_order_not_found`. The distinction allows a client to identify whether the payment lookup failed (payment-specific) or the order lookup failed (order-specific).
+
+#### Scenario: Voiding a nonexistent payment id is not found
+
+- GIVEN a work order with no payments recorded
+- WHEN a void request is sent for a randomly-generated payment id under that order
+- THEN the response is HTTP 404 with `detail: "payment_not_found"`
+- AND the order's payments are unchanged
+
+#### Scenario: Voiding a payment id belonging to a different order is not found
+
+- GIVEN two work orders in the same workshop, one with a recorded payment
+- WHEN a void request is sent for that payment's id, but scoped to the second order (a different order)
+- THEN the response is HTTP 404 with `detail: "payment_not_found"`
+- AND the payment remains non-voided
+
 ### Requirement: Cancelling An Order Counts Only Its Non-Voided Payments
 
 The system MUST reject cancelling a work order that has one or more non-voided payments, with `work_order_has_payments` (HTTP 409). An order whose only payments have all been voided MUST remain cancellable.
