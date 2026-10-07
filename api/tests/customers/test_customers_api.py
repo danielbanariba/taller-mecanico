@@ -149,6 +149,27 @@ def test_editing_a_nonexistent_customer_is_not_found(authenticated_client: TestC
     assert response.json()["detail"] == "customer_not_found"
 
 
+def test_patching_full_name_to_an_explicit_null_is_a_clean_validation_error(
+    authenticated_client: TestClient,
+) -> None:
+    """Defect this catches: `full_name` is typed `str | None` only so the
+
+    field can be omitted; without a guard rejecting an explicit `null`,
+    `update_customer` calls `.strip()` on `None` and crashes with an
+    unhandled 500 instead of a 422, and the customer's name is left
+    unaffected either way.
+    """
+    customer = _create_customer(authenticated_client, full_name="Maria Hernandez")
+
+    response = authenticated_client.patch(
+        f"/api/customers/{customer['id']}", json={"full_name": None}
+    )
+
+    assert response.status_code == 422
+    unaffected = authenticated_client.get(f"/api/customers/{customer['id']}")
+    assert unaffected.json()["full_name"] == "Maria Hernandez"
+
+
 def test_archiving_an_active_customer_hides_it_from_the_default_listing(
     authenticated_client: TestClient,
 ) -> None:

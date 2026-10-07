@@ -12,7 +12,7 @@ instead produce FastAPI's generic validation-error body.
 import uuid
 from datetime import UTC, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from taller.customers.domain.entities import Customer, Vehicle, VehicleType
 
@@ -29,12 +29,28 @@ class CustomerCreateRequest(BaseModel):
 
 class CustomerUpdateRequest(BaseModel):
     """Only explicitly set fields are applied; an explicit `null` clears
-    `phone` or `notes`.
+    `phone` or `notes`. `full_name` is required and cannot be cleared.
     """
 
     full_name: str | None = Field(default=None, min_length=1, max_length=120)
     phone: str | None = None
     notes: str | None = None
+
+    @field_validator("full_name")
+    @classmethod
+    def _reject_null_full_name(cls, value: str | None) -> str:
+        """Reject an explicit `full_name: null`.
+
+        `full_name` is typed `str | None` only so the field can be omitted
+        from the request (Pydantic's `None` union branch has no
+        `min_length`/`max_length` of its own, so an explicit `null`
+        otherwise bypasses those constraints entirely). Without this guard,
+        `update_customer` reaches `fields["full_name"].strip()` with `None`
+        and crashes with an unhandled 500 instead of a 422.
+        """
+        if value is None:
+            raise ValueError("full_name cannot be null")
+        return value
 
 
 class CustomerOut(BaseModel):
@@ -75,7 +91,8 @@ class VehicleCreateRequest(BaseModel):
 
 class VehicleUpdateRequest(BaseModel):
     """`customer_id` is intentionally absent: a vehicle's owner never
-    changes after creation (see the vehicles capability spec).
+    changes after creation (see the vehicles capability spec). `make` and
+    `vehicle_type` are required and cannot be cleared.
     """
 
     vehicle_type: VehicleType | None = None
@@ -85,6 +102,32 @@ class VehicleUpdateRequest(BaseModel):
     color: str | None = Field(default=None, max_length=30)
     plate: str | None = None
     notes: str | None = None
+
+    @field_validator("vehicle_type")
+    @classmethod
+    def _reject_null_vehicle_type(cls, value: VehicleType | None) -> VehicleType:
+        """Reject an explicit `vehicle_type: null`.
+
+        Without this guard, `update_vehicle` assigns `None` straight onto
+        the domain entity (no `.strip()`/`.value` call of its own), and the
+        crash only surfaces one call later, in
+        `SqlAlchemyVehicleRepository.save`'s `vehicle.vehicle_type.value`.
+        """
+        if value is None:
+            raise ValueError("vehicle_type cannot be null")
+        return value
+
+    @field_validator("make")
+    @classmethod
+    def _reject_null_make(cls, value: str | None) -> str:
+        """Reject an explicit `make: null` (mirrors `CustomerUpdateRequest`'s
+        `full_name` guard above, for the same reason: the `None` union
+        branch bypasses `min_length`, and `update_vehicle` would otherwise
+        crash calling `.strip()` on `None`).
+        """
+        if value is None:
+            raise ValueError("make cannot be null")
+        return value
 
 
 class VehicleOut(BaseModel):

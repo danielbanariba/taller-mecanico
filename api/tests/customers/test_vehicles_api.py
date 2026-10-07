@@ -503,3 +503,43 @@ def test_listing_a_customers_vehicles_without_include_archived_returns_only_acti
 
     ids = {row["id"] for row in response.json()}
     assert ids == {active_one["id"], active_two["id"]}
+
+
+def test_patching_make_to_an_explicit_null_is_a_clean_validation_error(
+    authenticated_client: TestClient,
+) -> None:
+    """Defect this catches: without a guard rejecting an explicit `null`,
+
+    `update_vehicle` calls `.strip()` on `None` and crashes with an
+    unhandled 500 instead of a 422, and the vehicle's make is left
+    unaffected either way.
+    """
+    customer = _create_customer(authenticated_client)
+    vehicle = _create_vehicle(authenticated_client, customer_id=customer["id"], make="Toyota")
+
+    response = authenticated_client.patch(f"/api/vehicles/{vehicle['id']}", json={"make": None})
+
+    assert response.status_code == 422
+    unaffected = authenticated_client.get(f"/api/vehicles/{vehicle['id']}")
+    assert unaffected.json()["make"] == "Toyota"
+
+
+def test_patching_vehicle_type_to_an_explicit_null_is_a_clean_validation_error(
+    authenticated_client: TestClient,
+) -> None:
+    """Defect this catches: without a guard rejecting an explicit `null`,
+
+    `update_vehicle` stores `None` as the entity's `vehicle_type`, and the
+    crash surfaces one call later in `SqlAlchemyVehicleRepository.save`'s
+    `vehicle.vehicle_type.value` as an unhandled 500 instead of a 422.
+    """
+    customer = _create_customer(authenticated_client)
+    vehicle = _create_vehicle(authenticated_client, customer_id=customer["id"])
+
+    response = authenticated_client.patch(
+        f"/api/vehicles/{vehicle['id']}", json={"vehicle_type": None}
+    )
+
+    assert response.status_code == 422
+    unaffected = authenticated_client.get(f"/api/vehicles/{vehicle['id']}")
+    assert unaffected.json()["vehicle_type"] == "car"
