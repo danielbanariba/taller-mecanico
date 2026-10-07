@@ -475,7 +475,7 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
 
 - [ ] **P2.S7.T9** Real-browser check at **390×844** against the deployed demo, covering phase 2's success criteria: sequential numbering with no skip on a double-submit; a 3-line-kind order's total; `in_progress` lowering linked stock with the history link, edited quantity posting only the delta, cancellation restoring stock, retries not double-applying; WhatsApp share opening with a prefilled summary for a mobile customer and being absent for a landline/phoneless one; vehicle detail listing its orders; the seeded demo showing orders in several states with the in-progress stock effect visible. Plus a manual **Android Chrome** check of photo sharing (per `design.md`'s testing-strategy note).
 
-- [ ] **P2.S7.T10** Work-unit commit: `:sparkles: feat(workorders): show order history on customer and vehicle detail` (covers T1–T2) followed by `:hammer: chore(deploy): seed phase 2 work orders, document stock consumption` (covers T3–T5).
+- [x] **P2.S7.T10** Work-unit commit: `:sparkles: feat(workorders): show order history on customer and vehicle detail` (covers T1–T2) followed by `:hammer: chore(deploy): seed phase 2 work orders, document stock consumption` (covers T3–T5). **Result:** `7757b39` and `b2ef6fb` on `feat/workshop-core-work-orders`.
 
 ---
 
