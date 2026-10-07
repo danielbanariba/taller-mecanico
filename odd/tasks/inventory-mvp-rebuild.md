@@ -57,7 +57,9 @@ Route per task: delegated direct (one bounded writer) unless stated. Trigger evi
 - [x] **T6b** Offline fixes from the T6 verifier: a refetch landing between a successful PUT and the outbox removal double-counts the movement (fetch + fold must not interleave with a flush); `nextSeq()` read-then-write is not atomic across tabs; add a flush-time 401 test. Runs after T5b (single writer).
 - [x] **T7** Remove legacy code; rewrite README (Spanish) and CLAUDE.md for the new architecture.
 - [x] **T8** End-to-end check in a real browser (register, add item, move stock, offline queue + sync). Ran; defects found → T8b.
-- [ ] **T8b** Fixes from T8: (D1) offline taps never reach the outbox because the movement mutation uses TanStack's default `networkMode: 'online'`, so it pauses, persists as a paused mutation with no resumable defaults, and is lost on reload; plus a reload while offline (or on "lie-fi") must keep a cached session usable instead of blocking on "Sin conexión"; (D2) the offline banner must show the pending-change count; (D3) the edit form and "Archivar" must be disabled offline with a message, like create; (D4) the item detail must show the sale price. Runs as one writer.
+- [x] **T8b** Fixes from T8: (D1) offline taps never reach the outbox because the movement mutation uses TanStack's default `networkMode: 'online'`, so it pauses, persists as a paused mutation with no resumable defaults, and is lost on reload; plus a reload while offline (or on "lie-fi") must keep a cached session usable instead of blocking on "Sin conexión"; (D2) the offline banner must show the pending-change count; (D3) the edit form and "Archivar" must be disabled offline with a message, like create; (D4) the item detail must show the sale price. Runs as one writer.
+- [ ] **T9** Final checks before the PR: re-run the offline-reload scenario in a real browser; one independent review of all branch code (API and web, lockfiles excluded); Test Value Gate Pass 3 list of every new test.
+- [ ] **T9b** Fixes from T9 plus the T8b follow-ups: inventory cache must never show one workshop's items to another workshop logging in on the same phone (after a 401 or a re-login); the service-worker `/api/` NetworkOnly rule never matches (Workbox matches the full URL); confirmed review findings.
 
 ## Acceptance criteria
 
@@ -89,6 +91,7 @@ Route per task: delegated direct (one bounded writer) unless stated. Trigger evi
 | T6b | delegated (writer) | b647f9d | lint, typecheck clean; vitest 76 passed x3; build ok; RED reproduced by reverting each fix (double count 12 vs 11, seq [1,1,1]); 401 test passed without code change; parent spot check vitest | follow-up of a verified high-risk task; fixes only |
 | T7 | delegated (writer) | 92d1b7e | legacy tree removed (120 files, −6820 lines); README (es) and CLAUDE.md rewritten; api and web checks green | passive (docs + deletions) |
 | T8 | delegated (read-only browser checker, Playwright 390×844 against `vite preview` + API) | — (no code) | PASS: register, add items, +/−, badges, search, count + history, logout/login, no `/api` from the SW, ≥48px targets, no overflow. FAIL: D1 (reload offline blocks the app and loses queued taps; the same taps without a reload sync exactly once), D2, D3, D4 → T8b | n/a (check only) |
+| T8b | delegated (writer; 2+ non-trivial files) | 70a3364, 5462a33, a440ef1, b9d327d | lint, typecheck clean; vitest 88 passed x3; build ok; RED observed per defect (outbox `[]` after an offline tap; second offline reload showed "Sin conexión"; edit form enabled offline; price missing); parent spot check vitest 88 passed | follow-up of T8; root causes: default `networkMode: 'online'` paused taps before the outbox write; the persister only kept `success` queries, so one failed offline refetch erased the cached session; `useOnlineStatus` re-read `navigator.onLine` per screen. Not yet re-checked in a real browser (T9) |
 
 T6 decisions: creating/editing items requires a connection (disabled offline with a message); the outbox is the only movement transport (FIFO, one at a time, Web Locks + in-tab mutex, 20 s timeout) so responses cannot reconcile out of order; pending outbox entries are folded onto fetched/persisted item data so a refetch never hides a queued tap; persisted query cache max age 7 days, busted by app version, cleared on logout; outbox entries carry the workshop id and only flush for the matching session.
 
@@ -96,6 +99,8 @@ T3 decisions: quantities are integers; movement replay compares `{item_id, kind,
 
 ## Next step
 
-T8b (offline reload data loss, pending count, offline edit gating, price on detail); re-run the offline-reload browser scenario; then the final independent review of all code (lockfiles excluded) and the Test Value Gate Pass 3 list before proposing the PR.
+T9 (browser re-run of the offline-reload scenario and the independent review of all code, in parallel, both read-only), then T9b with every confirmed finding, then propose the PR to the user.
+
+T8b known limitations (accepted for the MVP): on "lie-fi" (the phone reports online but requests fail) the banner shows the pending count but not "Sin conexión", and a tap stays pending until the 20 s send timeout; paused mutations saved by the pre-T8b build are dropped (no build reached users).
 
 T8 decision: the "Por acabarse" filter keeps returning negative-stock items (they are at or below the minimum too, and need restocking); the badge shows "Revisar" because it takes precedence. By design, no change.
