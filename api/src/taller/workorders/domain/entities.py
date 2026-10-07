@@ -111,3 +111,17 @@ class Payment:
     void_reason: str | None
     created_by: uuid.UUID
     created_at: datetime
+
+
+@dataclass(slots=True)
+class CashSummaryEntry:
+    """One payment as shown in the daily cash summary, with the order
+    number it belongs to resolved alongside it.
+
+    Kept separate from `Payment` so the write-side entity never carries a
+    read-projection field, mirroring inventory's `MovementHistoryEntry`
+    (`design.md`'s AD-12).
+    """
+
+    payment: Payment
+    order_number: int

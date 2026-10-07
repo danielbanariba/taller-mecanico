@@ -6,6 +6,7 @@ cross-feature reads AD-12 calls for) and wires them into the use cases.
 """
 
 import uuid
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -20,7 +21,12 @@ from taller.customers.application.ports import CustomerRepository, VehicleReposi
 from taller.customers.application.use_cases import describe_vehicles
 from taller.customers.domain.entities import Customer, Vehicle
 from taller.customers.domain.errors import VehicleNotFound
-from taller.identity.adapters.dependencies import get_current_user, get_current_workshop_id
+from taller.identity.adapters.dependencies import (
+    get_clock,
+    get_current_user,
+    get_current_workshop_id,
+)
+from taller.identity.application.ports import Clock
 from taller.identity.domain.entities import User
 from taller.inventory.adapters.repositories import (
     SqlAlchemyItemRepository,
@@ -34,6 +40,7 @@ from taller.workorders.adapters.repositories import (
     SqlAlchemyWorkshopCounterRepository,
 )
 from taller.workorders.adapters.schemas import (
+    CashSummaryOut,
     PaymentCreateRequest,
     VoidPaymentRequest,
     WorkOrderCreateRequest,
@@ -49,6 +56,7 @@ from taller.workorders.application.use_cases import (
     add_line,
     change_status,
     create_work_order,
+    daily_cash_summary,
     get_work_order,
     list_work_orders,
     record_payment,
@@ -614,3 +622,22 @@ def void_payment_route(
         customer_repo=customer_repo,
         payment_repo=payment_repo,
     )
+
+
+@work_orders_router.get("/cash-summary", response_model=CashSummaryOut)
+def daily_cash_summary_route(
+    date: date | None = Query(default=None),
+    workshop_id: uuid.UUID = Depends(get_current_workshop_id),
+    clock: Clock = Depends(get_clock),
+    db: Session = Depends(get_db),
+) -> CashSummaryOut:
+    payment_repo = SqlAlchemyPaymentRepository(db)
+    order_repo = SqlAlchemyWorkOrderRepository(db)
+    resolved_day, totals_cents, entries = daily_cash_summary(
+        workshop_id=workshop_id,
+        day=date,
+        clock=clock,
+        payment_repo=payment_repo,
+        order_repo=order_repo,
+    )
+    return CashSummaryOut.from_domain(resolved_day, totals_cents, entries)

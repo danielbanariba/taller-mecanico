@@ -1,13 +1,20 @@
 """Pydantic request/response schemas for the work-orders HTTP API."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from taller.customers.domain.entities import Customer, Vehicle, VehicleType
-from taller.workorders.domain.entities import LineKind, Payment, WorkOrder, WorkOrderLine
+from taller.workorders.domain.entities import (
+    CashSummaryEntry,
+    LineKind,
+    Payment,
+    PaymentMethod,
+    WorkOrder,
+    WorkOrderLine,
+)
 from taller.workorders.domain.money import (
     balance_cents,
     line_subtotal_cents,
@@ -319,4 +326,57 @@ class WorkOrderOut(BaseModel):
             completed_at=order.completed_at,
             delivered_at=order.delivered_at,
             cancelled_at=order.cancelled_at,
+        )
+
+
+class CashSummaryTotalsOut(BaseModel):
+    cash: int
+    transfer: int
+    card: int
+    other: int
+
+
+class CashSummaryPaymentOut(BaseModel):
+    id: uuid.UUID
+    order_id: uuid.UUID
+    order_number: int
+    amount_cents: int
+    method: Literal["cash", "transfer", "card", "other"]
+    paid_at: datetime
+
+    @classmethod
+    def from_domain(cls, entry: CashSummaryEntry) -> "CashSummaryPaymentOut":
+        return cls(
+            id=entry.payment.id,
+            order_id=entry.payment.order_id,
+            order_number=entry.order_number,
+            amount_cents=entry.payment.amount_cents,
+            method=entry.payment.method,
+            paid_at=entry.payment.paid_at,
+        )
+
+
+class CashSummaryOut(BaseModel):
+    date: date
+    totals_cents: CashSummaryTotalsOut
+    total_cents: int
+    payments: list[CashSummaryPaymentOut]
+
+    @classmethod
+    def from_domain(
+        cls,
+        day: date,
+        totals_cents: dict[PaymentMethod, int],
+        entries: list[CashSummaryEntry],
+    ) -> "CashSummaryOut":
+        return cls(
+            date=day,
+            totals_cents=CashSummaryTotalsOut(
+                cash=totals_cents[PaymentMethod.cash],
+                transfer=totals_cents[PaymentMethod.transfer],
+                card=totals_cents[PaymentMethod.card],
+                other=totals_cents[PaymentMethod.other],
+            ),
+            total_cents=sum(totals_cents.values()),
+            payments=[CashSummaryPaymentOut.from_domain(entry) for entry in entries],
         )

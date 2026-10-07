@@ -260,6 +260,21 @@ class SqlAlchemyWorkOrderRepository:
         totals = {order_id: int(total) for order_id, total in rows}
         return {order_id: totals.get(order_id, 0) for order_id in order_ids}
 
+    def numbers(
+        self, *, workshop_id: uuid.UUID, order_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, int]:
+        if not order_ids:
+            return {}
+        rows = (
+            self._session.query(WorkOrderModel.id, WorkOrderModel.number)
+            .filter(
+                WorkOrderModel.workshop_id == workshop_id,
+                WorkOrderModel.id.in_(order_ids),
+            )
+            .all()
+        )
+        return {order_id: number for order_id, number in rows}
+
 
 def _payment_from_model(model: PaymentModel) -> Payment:
     return Payment(

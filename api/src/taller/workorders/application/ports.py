@@ -69,6 +69,14 @@ class WorkOrderRepository(Protocol):
         """
         ...
 
+    def numbers(
+        self, *, workshop_id: uuid.UUID, order_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, int]:
+        """Each order's `number`, batched for the daily cash summary's
+        listed payments (phase 3 slice 2). Omits an id with no match.
+        """
+        ...
+
 
 class PaymentRepository(Protocol):
     def get_by_id(

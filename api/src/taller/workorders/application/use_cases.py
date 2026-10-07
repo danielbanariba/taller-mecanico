@@ -10,11 +10,13 @@ status/line change and its movements commit or roll back together.
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Final, Literal
+from zoneinfo import ZoneInfo
 
 from taller.customers.application.ports import VehicleRepository
 from taller.customers.application.use_cases import get_active_vehicle
+from taller.identity.application.ports import Clock
 from taller.inventory.application.ports import ItemRepository, MovementRepository
 from taller.inventory.application.use_cases import record_movement
 from taller.workorders.application.ports import (
@@ -23,6 +25,7 @@ from taller.workorders.application.ports import (
     WorkshopCounterRepository,
 )
 from taller.workorders.domain.entities import (
+    CashSummaryEntry,
     LineKind,
     Payment,
     PaymentMethod,
@@ -52,6 +55,12 @@ from taller.workorders.domain.status import (
     WorkOrderStatus,
 )
 from taller.workorders.domain.stock import plan_reconciliation
+
+#: The fixed day boundary for the daily cash summary (`design.md`'s
+#: AD-20): there is no per-workshop time zone setting, so every workshop's
+#: "today" is Honduras' own calendar day, regardless of server or client
+#: time zone.
+HONDURAS_TZ: Final = ZoneInfo("America/Tegucigalpa")
 
 #: The named counter `create_work_order` bumps for every new order
 #: (`design.md`'s AD-6). One counter per workshop, keyed by this name.
@@ -729,3 +738,51 @@ def void_payment(
     payment.void_reason = reason
     payment_repo.save(payment)
     return payment
+
+
+def daily_cash_summary(
+    *,
+    workshop_id: uuid.UUID,
+    day: date | None,
+    clock: Clock,
+    payment_repo: PaymentRepository,
+    order_repo: WorkOrderRepository,
+) -> tuple[date, dict[PaymentMethod, int], list[CashSummaryEntry]]:
+    """The workshop's recorded payments for one `America/Tegucigalpa`
+    calendar day, broken down by payment method (``design.md``'s AD-20).
+
+    ``day`` defaults to "today" in that time zone. The range queried is
+    the sargable ``[start, end)`` AD-20 specifies, so it uses the
+    ``(workshop_id, paid_at)`` index instead of a per-row timezone
+    conversion. Every voided payment is excluded, both from the totals
+    and from the listed payments, as though it had never been recorded.
+
+    Returns the resolved day (useful when ``day`` was defaulted), the
+    per-method totals in cents (all four `PaymentMethod` keys always
+    present, 0 when a method had no payments that day), and the day's
+    non-voided payments paired with their order number.
+    """
+    resolved_day = day if day is not None else clock.now().astimezone(HONDURAS_TZ).date()
+    start = datetime.combine(resolved_day, time.min, HONDURAS_TZ)
+    end = datetime.combine(resolved_day + timedelta(days=1), time.min, HONDURAS_TZ)
+
+    payments = [
+        payment
+        for payment in payment_repo.list_for_workshop_day(
+            workshop_id=workshop_id, start=start, end=end
+        )
+        if payment.voided_at is None
+    ]
+
+    totals_cents: dict[PaymentMethod, int] = dict.fromkeys(PaymentMethod, 0)
+    for payment in payments:
+        totals_cents[payment.method] += payment.amount_cents
+
+    order_numbers = order_repo.numbers(
+        workshop_id=workshop_id, order_ids=[payment.order_id for payment in payments]
+    )
+    entries = [
+        CashSummaryEntry(payment=payment, order_number=order_numbers[payment.order_id])
+        for payment in payments
+    ]
+    return resolved_day, totals_cents, entries
