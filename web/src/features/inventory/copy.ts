@@ -73,6 +73,7 @@ export const inventoryCopy = {
     pendingCount: (count: number) => `${count} cambio${count === 1 ? "" : "s"} por enviar`,
     createDisabled: "Conéctese a internet para agregar repuestos.",
     editDisabled: "Conéctese a internet para editar repuestos.",
+    archiveDisabled: "Conéctese a internet para archivar repuestos.",
   },
 } as const;
 

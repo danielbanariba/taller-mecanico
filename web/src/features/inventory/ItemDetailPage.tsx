@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { ApiError } from "../../shared/api/http";
+import { useOnlineStatus } from "../../shared/offline/useOnlineStatus";
 import { Alert } from "../../shared/ui/Alert";
 import { Button } from "../../shared/ui/Button";
 import { Dialog } from "../../shared/ui/Dialog";
@@ -12,11 +13,17 @@ import { getInventoryErrorMessage, inventoryCopy } from "./copy";
 import { useArchiveItem, useItem, useMovements, useRecordMovement } from "./hooks";
 import { MovementHistory } from "./MovementHistory";
 
-/** Container: the item detail screen -- stock stepper, physical count, edit and archive. */
+/**
+ * Container: the item detail screen -- stock stepper, physical count, edit
+ * and archive. The stepper and the count keep working offline (they go
+ * through the outbox); archiving needs the server, so it is disabled
+ * offline with an explanation, like creating and editing (T6 decisions).
+ */
 export function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
   const itemId = id ?? "";
   const navigate = useNavigate();
+  const isOffline = useOnlineStatus();
 
   const item = useItem(itemId);
   const movements = useMovements(itemId);
@@ -113,11 +120,13 @@ export function ItemDetailPage() {
         </Button>
       </section>
 
+      {isOffline ? <Alert variant="info">{inventoryCopy.offline.archiveDisabled}</Alert> : null}
+
       <div className="flex gap-3">
         <LinkButton to={`/inventario/${itemId}/editar`} variant="secondary" className="flex-1">
           {inventoryCopy.detail.editAction}
         </LinkButton>
-        <Button variant="destructive" onClick={() => setArchiveOpen(true)}>
+        <Button variant="destructive" onClick={() => setArchiveOpen(true)} disabled={isOffline}>
           {inventoryCopy.detail.archiveAction}
         </Button>
       </div>
@@ -156,11 +165,17 @@ export function ItemDetailPage() {
       >
         <div className="flex flex-col gap-4">
           <p className="text-base text-brand-foreground">{inventoryCopy.detail.archiveConfirmBody}</p>
+          {isOffline ? <Alert variant="info">{inventoryCopy.offline.archiveDisabled}</Alert> : null}
           <div className="flex gap-3">
             <Button variant="secondary" onClick={() => setArchiveOpen(false)}>
               {inventoryCopy.detail.archiveConfirmCancel}
             </Button>
-            <Button variant="destructive" onClick={handleArchiveConfirm} loading={archiveItem.isPending}>
+            <Button
+              variant="destructive"
+              onClick={handleArchiveConfirm}
+              loading={archiveItem.isPending}
+              disabled={isOffline || archiveItem.isPending}
+            >
               {inventoryCopy.detail.archiveConfirmSubmit}
             </Button>
           </div>

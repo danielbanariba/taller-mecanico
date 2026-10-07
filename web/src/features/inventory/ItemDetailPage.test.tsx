@@ -301,4 +301,22 @@ describe("ItemDetailPage offline", () => {
     expect(screen.getByText("10")).toBeInTheDocument();
     expect(screen.queryByText("No se encontró el repuesto.")).not.toBeInTheDocument();
   });
+
+  it("disables archiving with an explanation while offline, but keeps the stock buttons usable", async () => {
+    // Defect this catches: archiving needs the server (it is not an
+    // outbox movement), yet "Archivar" stayed enabled offline with no
+    // message, unlike creating and editing; the stepper and count must
+    // stay usable because they go through the outbox.
+    mockItemAndMovements();
+    renderDetailPage();
+
+    await screen.findByText("10");
+    goOffline();
+
+    expect(await screen.findByText("Conéctese a internet para archivar repuestos.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Archivar" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Agregar una unidad de Filtro de aceite" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Quitar una unidad de Filtro de aceite" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Contar" })).toBeEnabled();
+  });
 });

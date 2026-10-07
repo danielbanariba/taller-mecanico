@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
@@ -10,6 +10,7 @@ import { server } from "../../test/server";
 import { renderWithQueryClient } from "../../test/render";
 import { EditItemPage } from "./EditItemPage";
 import { itemQueryKey, useItem } from "./hooks";
+import { ItemDetailPage } from "./ItemDetailPage";
 import type { ItemOut } from "./api";
 
 const ITEM: ItemOut = {
@@ -109,5 +110,35 @@ describe("EditItemPage", () => {
 
     expect(screen.getByLabelText(/^nombre$/i)).toHaveValue("Filtro de aceite");
     expect(screen.queryByText("No se encontró el repuesto.")).not.toBeInTheDocument();
+  });
+
+  it("disables saving and explains why when opened after the connection dropped", async () => {
+    // Defect this catches (T8): each screen re-read `navigator.onLine` when
+    // it mounted, so an edit form opened after the `offline` event, in a
+    // browser where `navigator.onLine` had not caught up yet, stayed
+    // enabled with no message while the banner already said offline.
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
+      http.get("/api/inventory/items/item-1", () => HttpResponse.json(ITEM)),
+      http.get("/api/inventory/items/item-1/movements", () => HttpResponse.json([])),
+    );
+    const user = userEvent.setup();
+    renderWithQueryClient(
+      <MemoryRouter initialEntries={["/inventario/item-1"]}>
+        <Routes>
+          <Route path="/inventario/:id" element={<ItemDetailPage />} />
+          <Route path="/inventario/:id/editar" element={<EditItemPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByText("10");
+
+    act(() => {
+      window.dispatchEvent(new Event("offline"));
+    });
+    await user.click(screen.getByRole("link", { name: "Editar" }));
+
+    expect(await screen.findByText("Conéctese a internet para editar repuestos.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Guardar cambios" })).toBeDisabled();
   });
 });
