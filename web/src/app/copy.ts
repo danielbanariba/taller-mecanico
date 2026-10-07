@@ -21,6 +21,11 @@ export const appCopy = {
     exportPending: "Exportando...",
     exportOfflineDisabled: "Conéctese a internet para exportar los datos.",
   },
+  error: {
+    title: "Algo salió mal",
+    message: "Ocurrió un error inesperado. Intente recargar la página.",
+    reload: "Recargar",
+  },
 } as const;
 
 /**

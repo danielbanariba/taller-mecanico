@@ -8,6 +8,7 @@ import { InventoryPage } from "../features/inventory/InventoryPage";
 import { ItemDetailPage } from "../features/inventory/ItemDetailPage";
 import { NewItemPage } from "../features/inventory/NewItemPage";
 import { workOrderRoutes } from "../features/workorders/routes";
+import { AppErrorBoundary } from "./AppErrorBoundary";
 import { AppShell } from "./AppShell";
 import { RequireSession } from "./RequireSession";
 
@@ -18,12 +19,17 @@ export const router = createBrowserRouter([
   {
     // Pathless: guards every tab screen below without adding a path
     // segment. `AppShell` nests right under it so the bottom nav and
-    // logout render for every one of them.
+    // logout render for every one of them. `errorElement` at this same
+    // root catches any unexpected render error anywhere in the protected
+    // tree (including inside `AppShell` itself) and shows a short
+    // Spanish message instead of react-router's default English
+    // developer error page.
     element: (
       <RequireSession>
         <Outlet />
       </RequireSession>
     ),
+    errorElement: <AppErrorBoundary />,
     children: [
       {
         element: <AppShell />,
