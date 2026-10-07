@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
 
@@ -72,18 +72,21 @@ describe("AppShell", () => {
     expect(screen.getByText("Detalle de vehículo")).toBeInTheDocument();
   });
 
-  it("renders exactly one logout control, from the shell, not from InventoryPage", async () => {
+  it("renders exactly one logout control, from the shell's 'Más' menu, not from InventoryPage", async () => {
     // Defect this catches: the move out of InventoryPage leaving a second,
     // duplicate logout button behind instead of removing the original.
     mockSession();
     server.use(http.get("/api/inventory/items", () => HttpResponse.json([])));
+    const user = userEvent.setup();
     renderShell("/inventario");
 
     await screen.findByText("Taller Ana");
+    await user.click(screen.getByRole("button", { name: "Más" }));
+
     expect(screen.getAllByRole("button", { name: "Cerrar sesión" })).toHaveLength(1);
   });
 
-  it("logs out from the shell, clears the cached session, and redirects to /login", async () => {
+  it("logs out from the 'Más' menu, clears the cached session, and redirects to /login", async () => {
     // Defect this catches: a logout wired into the shell that forgets to
     // call the logout mutation, clear the cache, or navigate away, any of
     // which would leave the previous session reachable after "logging out"
@@ -105,10 +108,80 @@ describe("AppShell", () => {
     const { queryClient } = renderShell("/inventario");
 
     await screen.findByText("Taller Ana");
+    await user.click(screen.getByRole("button", { name: "Más" }));
     await user.click(screen.getByRole("button", { name: "Cerrar sesión" }));
 
     expect(await screen.findByText("Pantalla de inicio de sesión")).toBeInTheDocument();
     await waitFor(() => expect(queryClient.getQueryData(sessionQueryKey)).not.toEqual(SESSION_RESPONSE));
+  });
+
+  it("'Más' menu offers Caja del día, Exportar todo and Cerrar sesión", async () => {
+    // Defect this catches: the phase-1 lone logout button never actually
+    // replaced with the three phase-3 actions `design.md`'s AD-16 requires.
+    mockSession();
+    server.use(http.get("/api/inventory/items", () => HttpResponse.json([])));
+    const user = userEvent.setup();
+    renderShell("/inventario");
+
+    await screen.findByText("Taller Ana");
+    await user.click(screen.getByRole("button", { name: "Más" }));
+
+    expect(screen.getByRole("link", { name: "Caja del día" })).toHaveAttribute("href", "/ordenes/caja");
+    expect(screen.getByRole("button", { name: "Exportar todo" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cerrar sesión" })).toBeInTheDocument();
+  });
+
+  it("disables 'Exportar todo' while offline, with the Spanish message", async () => {
+    // Defect this catches: exporting attempted (or silently allowed)
+    // offline, when the API it needs is unreachable anyway.
+    mockSession();
+    server.use(http.get("/api/inventory/items", () => HttpResponse.json([])));
+    const user = userEvent.setup();
+    renderShell("/inventario");
+
+    await screen.findByText("Taller Ana");
+    // Flipped after the session has already loaded: a query's default
+    // `networkMode` ("online") pauses its very first fetch while offline
+    // instead of running it, so marking the manager offline before render
+    // would leave the session query paused forever and "Taller Ana" would
+    // never appear.
+    onlineManager.setOnline(false);
+    await user.click(screen.getByRole("button", { name: "Más" }));
+
+    expect(screen.getByRole("button", { name: "Exportar todo" })).toBeDisabled();
+    expect(screen.getByText("Conéctese a internet para exportar los datos.")).toBeInTheDocument();
+  });
+
+  it("'Exportar todo' downloads the ZIP through a temporary link and revokes its object URL", async () => {
+    // Defect this catches: the menu button never actually wired to
+    // `exportData.ts` (or wired to the wrong module), so nothing downloads.
+    mockSession();
+    server.use(
+      http.get("/api/inventory/items", () => HttpResponse.json([])),
+      http.get("/api/export", () =>
+        new HttpResponse(new Blob(["zip-bytes"], { type: "application/zip" }), {
+          headers: { "Content-Disposition": 'attachment; filename="taller-export-2026-10-07.zip"' },
+        }),
+      ),
+    );
+    const createObjectURL = vi.fn<(obj: Blob | MediaSource) => string>(() => "blob:mock-url");
+    const revokeObjectURL = vi.fn<(url: string) => void>();
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL;
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    const user = userEvent.setup();
+    renderShell("/inventario");
+
+    await screen.findByText("Taller Ana");
+    await user.click(screen.getByRole("button", { name: "Más" }));
+    await user.click(screen.getByRole("button", { name: "Exportar todo" }));
+
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledTimes(1));
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
+
+    clickSpy.mockRestore();
   });
 
   it("marks Órdenes active on its route", async () => {

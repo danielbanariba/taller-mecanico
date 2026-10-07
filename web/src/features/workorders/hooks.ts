@@ -1,17 +1,50 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useWorkshopId, workshopQueryKey } from "../auth/hooks";
+import { useOnlineStatus } from "../../shared/offline/useOnlineStatus";
 import { inventoryQueryKey } from "../inventory/hooks";
 import {
   workOrdersApi,
   type ChangeStatusPayload,
   type CreateLinePayload,
+  type CreatePaymentPayload,
   type CreateWorkOrderPayload,
   type StatusGroup,
   type UpdateLinePayload,
+  type VoidPaymentPayload,
   type WorkOrderOut,
   type WorkOrderSummaryOut,
 } from "./api";
+
+/** Shared by every payment mutation: both record and void change the
+ * daily cash summary's totals, so both invalidate it (`design.md`'s
+ * "Query keys" table). Not nested under `workOrdersQueryBase`: the
+ * summary's own key starts straight from `workshopQueryKey`.
+ */
+function cashSummaryQueryBase(workshopId: string | undefined) {
+  return [...workshopQueryKey(workshopId), "cashSummary"] as const;
+}
+
+export const cashSummaryQueryKey = (workshopId: string | undefined, date: string | undefined) =>
+  [...cashSummaryQueryBase(workshopId), date] as const;
+
+/**
+ * The current workshop's daily cash summary (AD-17/AD-20): never
+ * persisted offline (`meta: { persist: false }`, honored by
+ * `shouldPersistQuery` in `web/src/app/providers.tsx`) and only fetched
+ * while online, so a stale total is never shown as current. `date`
+ * defaults to today in Honduras local time, same as the API.
+ */
+export function useCashSummary(date?: string) {
+  const workshopId = useWorkshopId();
+  const isOffline = useOnlineStatus();
+  return useQuery({
+    queryKey: cashSummaryQueryKey(workshopId, date),
+    queryFn: () => workOrdersApi.getCashSummary(date),
+    enabled: workshopId !== undefined && !isOffline,
+    meta: { persist: false },
+  });
+}
 
 const workOrdersQueryBase = (workshopId: string | undefined) =>
   [...workshopQueryKey(workshopId), "workOrders"] as const;
@@ -101,10 +134,11 @@ export function useCreateWorkOrder() {
 }
 
 /**
- * Every line mutation (add, edit, remove) returns the whole order
- * (`design.md`'s "API surface per phase" note), so the detail query is
- * updated from that one round trip instead of a refetch, and every list
- * is invalidated since an edited line can change a summary's total.
+ * Every line and payment mutation (add/edit/remove a line, record/void a
+ * payment) returns the whole order (`design.md`'s "API surface per phase"
+ * note), so the detail query is updated from that one round trip instead
+ * of a refetch, and every list is invalidated since any of them can
+ * change a summary's total or paid amount.
  */
 function useLineMutationCacheUpdate(orderId: string) {
   const queryClient = useQueryClient();
@@ -157,6 +191,33 @@ export function useChangeStatus(orderId: string) {
     onSuccess: (order) => {
       onOrderSuccess(order);
       queryClient.invalidateQueries({ queryKey: inventoryQueryKey(workshopId) });
+    },
+  });
+}
+
+export function useRecordPayment(orderId: string) {
+  const onOrderSuccess = useLineMutationCacheUpdate(orderId);
+  const queryClient = useQueryClient();
+  const workshopId = useWorkshopId();
+  return useMutation({
+    mutationFn: (payload: CreatePaymentPayload) => workOrdersApi.recordPayment(orderId, payload),
+    onSuccess: (order) => {
+      onOrderSuccess(order);
+      queryClient.invalidateQueries({ queryKey: cashSummaryQueryBase(workshopId) });
+    },
+  });
+}
+
+export function useVoidPayment(orderId: string) {
+  const onOrderSuccess = useLineMutationCacheUpdate(orderId);
+  const queryClient = useQueryClient();
+  const workshopId = useWorkshopId();
+  return useMutation({
+    mutationFn: ({ paymentId, payload }: { paymentId: string; payload: VoidPaymentPayload }) =>
+      workOrdersApi.voidPayment(orderId, paymentId, payload),
+    onSuccess: (order) => {
+      onOrderSuccess(order);
+      queryClient.invalidateQueries({ queryKey: cashSummaryQueryBase(workshopId) });
     },
   });
 }

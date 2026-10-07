@@ -3,6 +3,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 
 import { idbPersister } from "../shared/offline/idbPersister";
+import { shouldPersistQuery } from "./shouldPersistQuery";
 
 /**
  * How long a persisted (or in-memory) cache entry is kept. Generous on
@@ -37,18 +38,22 @@ export function AppProviders({ children }: { children: ReactNode }) {
       persistOptions={{
         persister: idbPersister,
         maxAge: PERSISTED_CACHE_MAX_AGE_MS,
-        // Busts any cache left over from a previous deployed version whose
+        // Busts any cache left over from a previous deploy whose
         // dehydrated shape may not match this build's query keys/shapes.
+        // `__APP_VERSION__` (vite.config.ts) carries a per-build id, not
+        // only package.json's version, so every deploy busts the cache --
+        // not only a version bump -- because a deploy that changes a
+        // response shape (e.g. phase 3 adding `payments` to a work order)
+        // must never hydrate an older, incompatible cache.
         buster: __APP_VERSION__,
         dehydrateOptions: {
-          // Keep every query that still holds data, including one whose
-          // latest refetch failed. The default keeps only status
+          // See `shouldPersistQuery` above. The default keeps only status
           // "success", and the whole snapshot is rewritten on every cache
           // change, so a single failed refetch offline (or on a connection
           // that reports online but drops requests) erased the cached
           // session and inventory from IndexedDB while the open page kept
           // working -- the next reload then found nothing to show.
-          shouldDehydrateQuery: (query) => query.state.data !== undefined,
+          shouldDehydrateQuery: shouldPersistQuery,
           // The IndexedDB outbox is the only durable transport for stock
           // movements. A paused mutation restored from this cache has no
           // mutationFn to resume with (no `setMutationDefaults`), so

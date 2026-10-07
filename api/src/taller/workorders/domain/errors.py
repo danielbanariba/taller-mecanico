@@ -71,3 +71,56 @@ class ItemNotFoundForLine(Exception):
     def __init__(self, item_id: uuid.UUID | None) -> None:
         super().__init__(f"Item not found for line: {item_id}")
         self.item_id = item_id
+
+
+class WorkOrderNotPayable(Exception):
+    """Raised when a payment is recorded against an order whose status is
+    not in `PAYABLE` (`quote` or `cancelled`).
+    """
+
+    def __init__(self, order_id: uuid.UUID) -> None:
+        super().__init__(f"Work order does not accept payments: {order_id}")
+        self.order_id = order_id
+
+
+class PaymentExceedsBalance(Exception):
+    """Raised when a payment's amount is more than the order's current
+    balance due, including when the balance is already zero or negative.
+    """
+
+    def __init__(self, order_id: uuid.UUID) -> None:
+        super().__init__(f"Payment exceeds the order's balance: {order_id}")
+        self.order_id = order_id
+
+
+class WorkOrderHasPayments(Exception):
+    """Raised when an order is cancelled while it has one or more
+    non-voided payments.
+    """
+
+    def __init__(self, order_id: uuid.UUID) -> None:
+        super().__init__(f"Work order has non-voided payments: {order_id}")
+        self.order_id = order_id
+
+
+class PaymentIdConflict(Exception):
+    """Raised when a client-supplied payment id exists with different
+    fields.
+    """
+
+    def __init__(self, payment_id: uuid.UUID) -> None:
+        super().__init__(f"Payment id already exists with different fields: {payment_id}")
+        self.payment_id = payment_id
+
+
+class PaymentNotFound(Exception):
+    """Raised when a payment id does not exist on the target order --
+    either nonexistent, or recorded against a different order. Distinct
+    from `WorkOrderNotFound`, which covers a missing or cross-workshop
+    order id. Not present in `specs/payments/spec.md` (a spec delta: see
+    `tasks.md`'s P3.S1.T1).
+    """
+
+    def __init__(self, payment_id: uuid.UUID) -> None:
+        super().__init__(f"Payment not found: {payment_id}")
+        self.payment_id = payment_id

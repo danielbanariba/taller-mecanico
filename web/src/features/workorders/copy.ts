@@ -1,4 +1,4 @@
-import type { LineKind, WorkOrderStatus } from "./api";
+import type { LineKind, PaymentMethod, WorkOrderStatus } from "./api";
 
 /** All Spanish user-facing strings for the work-orders feature live here, in one module. */
 export const workOrdersCopy = {
@@ -14,6 +14,12 @@ export const workOrdersCopy = {
     labor: "Mano de obra",
     inventory_part: "Repuesto de inventario",
     external_part: "Repuesto externo",
+  },
+  paymentMethod: {
+    cash: "Efectivo",
+    transfer: "Transferencia",
+    card: "Tarjeta",
+    other: "Otro",
   },
   list: {
     title: "Órdenes",
@@ -45,6 +51,8 @@ export const workOrdersCopy = {
     createOrderDisabled: "Conéctese a internet para crear órdenes.",
     lineEditDisabled: "Conéctese a internet para editar líneas.",
     statusChangeDisabled: "Conéctese a internet para cambiar el estado de la orden.",
+    paymentDisabled: "Conéctese a internet para registrar un pago.",
+    voidPaymentDisabled: "Conéctese a internet para anular un pago.",
   },
   statusActions: {
     // `quote` is never a reachable target (`TRANSITIONS` has no edge into
@@ -63,6 +71,43 @@ export const workOrdersCopy = {
     bodyInProgress: "Los repuestos que ya consumió esta orden se devolverán al inventario.",
     keep: "No cancelar",
     confirm: "Sí, cancelar orden",
+  },
+  payments: {
+    sectionTitle: "Pagos",
+    paidLabel: "Pagado",
+    balanceLabel: "Saldo pendiente",
+    creditLabel: "Saldo a favor",
+    notPayable: "Esta orden no acepta pagos en su estado actual.",
+    empty: "Todavía no se han registrado pagos.",
+    amountLabel: "Monto del pago",
+    amountInvalid: "El monto no es válido.",
+    methodLabel: "Método de pago",
+    noteLabel: "Nota (opcional)",
+    submit: "Registrar pago",
+    submitPending: "Registrando...",
+    voidAction: "Anular",
+    voidConfirmTitle: "Anular pago",
+    voidConfirmBody: "El pago quedará anulado y no contará en el saldo ni en el corte de caja.",
+    voidReasonLabel: "Motivo de la anulación",
+    voidReasonRequired: "El motivo es obligatorio.",
+    voidKeep: "No anular",
+    voidConfirm: "Sí, anular pago",
+    voidedLabel: (reason: string) => `Anulado: ${reason}`,
+  },
+  receipt: {
+    nonFiscalLabel: "DOCUMENTO NO FISCAL — No válido como factura",
+    notEligible: "El recibo solo está disponible una vez que la orden está terminada o entregada.",
+    print: "Imprimir",
+    link58mm: "Recibo 58 mm",
+    linkLetter: "Recibo carta",
+  },
+  cashSummary: {
+    title: "Caja del día",
+    dateLabel: (date: string) => `Fecha: ${date}`,
+    offlineMessage: "El corte de caja requiere conexión a internet.",
+    totalLabel: "Total",
+    paymentsTitle: "Pagos del día",
+    paymentsEmpty: "Todavía no se han registrado pagos hoy.",
   },
   share: {
     shareButton: "Compartir por WhatsApp",
@@ -118,6 +163,10 @@ export function lineKindLabel(kind: LineKind): string {
   return workOrdersCopy.lineKind[kind];
 }
 
+export function paymentMethodLabel(method: PaymentMethod): string {
+  return workOrdersCopy.paymentMethod[method];
+}
+
 /** The Spanish verb for triggering a transition to `status` (e.g. `in_progress` -> "Iniciar trabajo"), never the status's own name (`statusLabel`). */
 export function statusActionLabel(status: WorkOrderStatus): string {
   return workOrdersCopy.statusActions[status];
@@ -140,6 +189,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_status_transition: "No se puede cambiar la orden a ese estado.",
   movement_id_conflict: "No se pudo registrar el movimiento. Intente de nuevo.",
   stock_out_of_range: "La cantidad está fuera de rango.",
+  payment_exceeds_balance: "El monto supera el saldo pendiente.",
+  work_order_not_payable: workOrdersCopy.payments.notPayable,
+  payment_id_conflict: "No se pudo registrar el pago. Intente de nuevo.",
+  payment_not_found: "No se encontró el pago.",
+  work_order_has_payments: "No se puede cancelar una orden con pagos registrados. Anule los pagos primero.",
   not_authenticated: "Debe iniciar sesión para continuar.",
   network_error: "No se pudo conectar. Verifique su conexión e intente de nuevo.",
 };

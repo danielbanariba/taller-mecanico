@@ -2,17 +2,25 @@
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 
 from sqlalchemy import BigInteger, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from taller.workorders.adapters.models import (
+    PaymentModel,
     WorkOrderLineModel,
     WorkOrderModel,
     WorkshopCounterModel,
 )
-from taller.workorders.domain.entities import LineKind, WorkOrder, WorkOrderLine
+from taller.workorders.domain.entities import (
+    LineKind,
+    Payment,
+    PaymentMethod,
+    WorkOrder,
+    WorkOrderLine,
+)
 from taller.workorders.domain.status import WorkOrderStatus
 
 
@@ -251,3 +259,107 @@ class SqlAlchemyWorkOrderRepository:
         )
         totals = {order_id: int(total) for order_id, total in rows}
         return {order_id: totals.get(order_id, 0) for order_id in order_ids}
+
+    def numbers(
+        self, *, workshop_id: uuid.UUID, order_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, int]:
+        if not order_ids:
+            return {}
+        rows = (
+            self._session.query(WorkOrderModel.id, WorkOrderModel.number)
+            .filter(
+                WorkOrderModel.workshop_id == workshop_id,
+                WorkOrderModel.id.in_(order_ids),
+            )
+            .all()
+        )
+        return {order_id: number for order_id, number in rows}
+
+
+def _payment_from_model(model: PaymentModel) -> Payment:
+    return Payment(
+        id=model.id,
+        workshop_id=model.workshop_id,
+        order_id=model.order_id,
+        amount_cents=model.amount_cents,
+        method=PaymentMethod(model.method),
+        note=model.note,
+        paid_at=model.paid_at,
+        voided_at=model.voided_at,
+        void_reason=model.void_reason,
+        created_by=model.created_by,
+        created_at=model.created_at,
+    )
+
+
+class SqlAlchemyPaymentRepository:
+    """Payment persistence backed by SQLAlchemy."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get_by_id(
+        self, *, workshop_id: uuid.UUID, order_id: uuid.UUID, payment_id: uuid.UUID
+    ) -> Payment | None:
+        model = (
+            self._session.query(PaymentModel)
+            .filter(
+                PaymentModel.id == payment_id,
+                PaymentModel.order_id == order_id,
+                PaymentModel.workshop_id == workshop_id,
+            )
+            .one_or_none()
+        )
+        if model is None:
+            return None
+        return _payment_from_model(model)
+
+    def add(self, payment: Payment) -> None:
+        self._session.add(
+            PaymentModel(
+                id=payment.id,
+                workshop_id=payment.workshop_id,
+                order_id=payment.order_id,
+                amount_cents=payment.amount_cents,
+                method=payment.method.value,
+                note=payment.note,
+                paid_at=payment.paid_at,
+                voided_at=payment.voided_at,
+                void_reason=payment.void_reason,
+                created_by=payment.created_by,
+                created_at=payment.created_at,
+            )
+        )
+        self._session.flush()
+
+    def save(self, payment: Payment) -> None:
+        model = self._session.get(PaymentModel, payment.id)
+        if model is None:
+            return
+        model.voided_at = payment.voided_at
+        model.void_reason = payment.void_reason
+        self._session.flush()
+
+    def list_for_order(self, *, workshop_id: uuid.UUID, order_id: uuid.UUID) -> list[Payment]:
+        rows = (
+            self._session.query(PaymentModel)
+            .filter(PaymentModel.workshop_id == workshop_id, PaymentModel.order_id == order_id)
+            .order_by(PaymentModel.paid_at, PaymentModel.id)
+            .all()
+        )
+        return [_payment_from_model(row) for row in rows]
+
+    def list_for_workshop_day(
+        self, *, workshop_id: uuid.UUID, start: datetime, end: datetime
+    ) -> list[Payment]:
+        rows = (
+            self._session.query(PaymentModel)
+            .filter(
+                PaymentModel.workshop_id == workshop_id,
+                PaymentModel.paid_at >= start,
+                PaymentModel.paid_at < end,
+            )
+            .order_by(PaymentModel.paid_at, PaymentModel.id)
+            .all()
+        )
+        return [_payment_from_model(row) for row in rows]

@@ -10,7 +10,7 @@ import { renderWithQueryClient } from "../../test/render";
 import { server } from "../../test/server";
 import { workOrderQueryKey } from "./hooks";
 import { WorkOrderDetailPage } from "./WorkOrderDetailPage";
-import type { WorkOrderOut } from "./api";
+import type { PaymentOut, WorkOrderOut } from "./api";
 
 const SESSION = {
   user: { id: "u1", full_name: "Ana Pérez", phone: "99998888", role: "owner" },
@@ -43,6 +43,10 @@ const ORDER: WorkOrderOut = {
     },
   ],
   total_cents: 50000,
+  payments: [],
+  paid_cents: 0,
+  balance_cents: 50000,
+  accepts_payments: false,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
   approved_at: null,
@@ -52,10 +56,31 @@ const ORDER: WorkOrderOut = {
   cancelled_at: null,
 };
 
-function mockSessionAndOrder() {
+const PAYMENT: PaymentOut = {
+  id: "payment-1",
+  amount_cents: 20000,
+  method: "cash",
+  note: null,
+  paid_at: "2026-01-02T00:00:00Z",
+  voided_at: null,
+  void_reason: null,
+};
+
+/** Unlike `ORDER` (`quote`, no payments allowed), `approved` accepts payments and already carries one, for the payment/void tests below. */
+const PAYABLE_ORDER: WorkOrderOut = {
+  ...ORDER,
+  status: "approved",
+  allowed_transitions: ["in_progress", "cancelled"],
+  payments: [PAYMENT],
+  paid_cents: 20000,
+  balance_cents: 30000,
+  accepts_payments: true,
+};
+
+function mockSessionAndOrder(order: WorkOrderOut = ORDER) {
   server.use(
     http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
-    http.get("/api/work-orders/order-1", () => HttpResponse.json(ORDER)),
+    http.get("/api/work-orders/order-1", () => HttpResponse.json(order)),
   );
 }
 
@@ -168,5 +193,152 @@ describe("WorkOrderDetailPage", () => {
 
     await user.click(saveButton);
     expect(lineRequestWasSent).toBe(false);
+  });
+
+  it("disables the payment form's submit with its offline message once the connection drops", async () => {
+    // Defect this catches: the payment form keeps "Registrar pago" enabled
+    // after the connection drops, so the mutation would hang on a
+    // `network_error` instead of disabling submit the moment
+    // `useOnlineStatus()` flips (the `payments` spec's "Payments Require A
+    // Live Connection").
+    mockSessionAndOrder(PAYABLE_ORDER);
+    let paymentRequestWasSent = false;
+    server.use(
+      http.post("/api/work-orders/order-1/payments", () => {
+        paymentRequestWasSent = true;
+        return HttpResponse.json({ detail: "unexpected" }, { status: 500 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetailPage();
+
+    await screen.findByRole("heading", { name: "Orden #42" });
+    goOffline();
+
+    expect(screen.getByText("Conéctese a internet para registrar un pago.")).toBeInTheDocument();
+    const submitButton = screen.getByRole("button", { name: "Registrar pago" });
+    expect(submitButton).toBeDisabled();
+
+    await user.click(submitButton);
+    expect(paymentRequestWasSent).toBe(false);
+  });
+
+  it("shows the void-payment offline message without requiring the disabled Anular trigger to open the dialog", async () => {
+    // Defect this catches: the "Anular" trigger disables itself offline,
+    // but the Spanish explanation ("Conéctese a internet para anular un
+    // pago.") only rendered inside the confirm dialog that trigger is the
+    // only way to open -- so an offline mechanic saw a greyed-out button
+    // with no explanation anywhere on screen (the `payments` spec's
+    // "Voiding Requires A Live Connection" scenario).
+    mockSessionAndOrder(PAYABLE_ORDER);
+    renderDetailPage();
+
+    await screen.findByRole("heading", { name: "Orden #42" });
+    goOffline();
+
+    expect(screen.getByText("Conéctese a internet para anular un pago.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Anular" })).toBeDisabled();
+  });
+
+  it("maps a 409 payment_exceeds_balance to its own Spanish message, not the generic fallback", async () => {
+    // Defect this catches: a payment-specific error code falling through
+    // to "Ocurrió un error. Intente de nuevo." instead of a message the
+    // mechanic can act on.
+    mockSessionAndOrder(PAYABLE_ORDER);
+    server.use(
+      http.post("/api/work-orders/order-1/payments", () =>
+        HttpResponse.json({ detail: "payment_exceeds_balance" }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderDetailPage();
+
+    await user.type(await screen.findByLabelText("Monto del pago"), "9999999");
+    await user.click(screen.getByRole("button", { name: "Registrar pago" }));
+
+    expect(await screen.findByText("El monto supera el saldo pendiente.")).toBeInTheDocument();
+  });
+
+  it("maps a 409 work_order_not_payable to its own Spanish message, not the generic fallback", async () => {
+    mockSessionAndOrder(PAYABLE_ORDER);
+    server.use(
+      http.post("/api/work-orders/order-1/payments", () =>
+        HttpResponse.json({ detail: "work_order_not_payable" }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderDetailPage();
+
+    await user.type(await screen.findByLabelText("Monto del pago"), "100");
+    await user.click(screen.getByRole("button", { name: "Registrar pago" }));
+
+    expect(await screen.findByText("Esta orden no acepta pagos en su estado actual.")).toBeInTheDocument();
+  });
+
+  it("maps a 409 payment_id_conflict to its own Spanish message, not the generic fallback", async () => {
+    mockSessionAndOrder(PAYABLE_ORDER);
+    server.use(
+      http.post("/api/work-orders/order-1/payments", () =>
+        HttpResponse.json({ detail: "payment_id_conflict" }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderDetailPage();
+
+    await user.type(await screen.findByLabelText("Monto del pago"), "100");
+    await user.click(screen.getByRole("button", { name: "Registrar pago" }));
+
+    expect(await screen.findByText("No se pudo registrar el pago. Intente de nuevo.")).toBeInTheDocument();
+  });
+
+  it("maps a 404 payment_not_found to its own Spanish message when voiding a payment", async () => {
+    // Defect this catches: `payment_not_found` -- a spec delta this
+    // capability adds beyond `specs/payments/spec.md` -- falling through
+    // to the generic fallback instead of its own message.
+    mockSessionAndOrder(PAYABLE_ORDER);
+    server.use(
+      http.post("/api/work-orders/order-1/payments/payment-1/void", () =>
+        HttpResponse.json({ detail: "payment_not_found" }, { status: 404 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderDetailPage();
+
+    await user.click(await screen.findByRole("button", { name: "Anular" }));
+    const dialog = await screen.findByRole("dialog", { name: "Anular pago" });
+    await user.type(within(dialog).getByLabelText("Motivo de la anulación"), "Pago duplicado");
+    await user.click(within(dialog).getByRole("button", { name: "Sí, anular pago" }));
+
+    expect(await screen.findByText("No se encontró el pago.")).toBeInTheDocument();
+  });
+
+  it("links to both receipt layouts once the order is completed", async () => {
+    // Defect this catches: the receipt routes existing in router.tsx with
+    // no way to reach them from the order detail screen, so a mechanic
+    // can never print a receipt for an order that is actually eligible.
+    mockSessionAndOrder({ ...ORDER, status: "completed", allowed_transitions: ["delivered"] });
+    renderDetailPage();
+
+    expect(await screen.findByRole("heading", { name: "Orden #42" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Recibo 58 mm" })).toHaveAttribute(
+      "href",
+      "/ordenes/order-1/recibo/58mm",
+    );
+    expect(screen.getByRole("link", { name: "Recibo carta" })).toHaveAttribute(
+      "href",
+      "/ordenes/order-1/recibo/carta",
+    );
+  });
+
+  it("hides the receipt links for an order that is not yet completed or delivered", async () => {
+    // Defect this catches: offering a receipt for a quote/in-progress
+    // order, which the non-fiscal-receipt spec forbids rendering at all --
+    // the link itself would be a dead end showing "no disponible".
+    mockSessionAndOrder(ORDER); // status: "quote"
+    renderDetailPage();
+
+    expect(await screen.findByRole("heading", { name: "Orden #42" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Recibo 58 mm" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Recibo carta" })).not.toBeInTheDocument();
   });
 });

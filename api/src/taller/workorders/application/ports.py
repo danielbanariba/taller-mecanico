@@ -2,9 +2,10 @@
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Protocol
 
-from taller.workorders.domain.entities import WorkOrder
+from taller.workorders.domain.entities import Payment, WorkOrder
 from taller.workorders.domain.status import WorkOrderStatus
 
 
@@ -65,5 +66,50 @@ class WorkOrderRepository(Protocol):
     ) -> dict[uuid.UUID, int]:
         """Each order's total in cents (the sum of its non-removed lines'
         subtotals), batched for a list of summaries.
+        """
+        ...
+
+    def numbers(
+        self, *, workshop_id: uuid.UUID, order_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, int]:
+        """Each order's `number`, batched for the daily cash summary's
+        listed payments (phase 3 slice 2). Omits an id with no match.
+        """
+        ...
+
+
+class PaymentRepository(Protocol):
+    def get_by_id(
+        self, *, workshop_id: uuid.UUID, order_id: uuid.UUID, payment_id: uuid.UUID
+    ) -> Payment | None:
+        """Scoped by `(workshop_id, order_id, payment_id)` together, so a
+        payment id that exists but belongs to a different order (or a
+        different workshop) is a clean miss, never a cross-order or
+        cross-tenant leak.
+        """
+        ...
+
+    def add(self, payment: Payment) -> None:
+        """Persist a brand-new payment."""
+        ...
+
+    def save(self, payment: Payment) -> None:
+        """Persist a payment's mutable fields (`voided_at`, `void_reason`
+        -- every other field is immutable after creation)."""
+        ...
+
+    def list_for_order(self, *, workshop_id: uuid.UUID, order_id: uuid.UUID) -> list[Payment]:
+        """Every payment recorded against this order, voided or not. A
+        caller computing a total or a balance filters for non-voided ones
+        itself (`taller.workorders.domain.money.paid_cents`/
+        `balance_cents`).
+        """
+        ...
+
+    def list_for_workshop_day(
+        self, *, workshop_id: uuid.UUID, start: datetime, end: datetime
+    ) -> list[Payment]:
+        """Every payment with `paid_at` in `[start, end)`, for the daily
+        cash summary (phase 3 slice 2).
         """
         ...

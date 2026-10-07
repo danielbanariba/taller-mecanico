@@ -225,3 +225,137 @@ All full checks (API ruff/format/pytest; web lint/typecheck/test/build) pass. No
 - Real-browser check: "Cancelar orden" was a one-tap irreversible action shown first, because `allowed_transitions` is sorted alphabetically. Fixed in `b94f6d8`: forward actions come first, and cancel opens a confirmation dialog. Re-checked on the demo.
 - Still open: the Android Chrome photo-sharing check (P2.S7.T9b) needs a real device.
 - Checks after the fixes: pytest 195 passed; ruff check and format clean; eslint, tsc, vitest (146, stable across repeated runs) and build clean.
+
+---
+
+# Verify report — workshop-core, Phase 3 (P3.S1–P3.S6, plus review-fix slice P3.S7)
+
+Change: `workshop-core`. Scope: phase 3 only — capabilities `payments`, `non-fiscal-receipt`, `daily-cash-summary`, `data-export`. Branch `feat/workshop-core-payments`, stacked on `feat/workshop-core-work-orders`. Verified 2026-10-07.
+
+## 1. Executed checks (real commands, this session)
+
+| Command | Result |
+|---|---|
+| `docker compose up -d db` | Container already running (`taller-mecanico-db-1`) |
+| `cd api && uv run ruff check .` | PASS — "All checks passed!" |
+| `cd api && uv run ruff format --check .` | PASS — 105 files already formatted |
+| `cd api && uv run pytest` | PASS — 236 passed, 1 pre-existing unrelated warning (httpx deprecation) |
+| `cd web && npm run lint` | PASS — eslint clean |
+| `cd web && npm run typecheck` | PASS — `tsc -b --noEmit` clean |
+| `cd web && npm test -- --run` | PASS — 40 files, 177 tests passed |
+| `cd web && npm run build` | PASS — main chunk 451.01 kB / gzip 133.30 kB; `exportData`, `CashSummaryPage`, `Receipt58Page`, `ReceiptLetterPage`, `useReceiptOrder` each split into their own lazy chunk |
+
+All counts match the figures already recorded in `tasks.md` (P3.S7.T4: pytest 236, vitest 177/40 files). Migration round-trip not re-executed this session as a separate step: `test_migrations.py` (`alembic check`) passed as part of the pytest run above, and `tasks.md` P3.S6.T9 already recorded a clean `downgrade → upgrade head` round-trip for revision `ffb1eb564de6`.
+
+Diff vs the phase-2/phase-3 boundary commit `1890c90` (phase-3-only): 60 files changed, +4517/-113. All 9 expected work-unit commits are present on the branch and match `tasks.md`'s list exactly: `bb21b67`, `8c1db0e`, `851a3e2`, `a7b61b8`, `159cca2`, `e60dd10`, `46a4a5f`, `49330e3`, `f90d575`.
+
+## 2. Task completion (observed from `openspec/changes/workshop-core/tasks.md`, not rewritten)
+
+P3.S1 through P3.S7 are fully checked `[x]` except two items in P3.S6, matching the task's own stated deferral:
+- `P3.S6.T11` (deploy phase 3 to the demo, re-run the seed script) — unchecked, deferred to the orchestrator after the PR.
+- `P3.S6.T12` (real-browser check at 390×844 + print-preview check on the demo) — unchecked, deferred to the orchestrator after the PR.
+
+P3.S7 (review-fix slice) is fully checked; all three of its fixes were spot-verified directly in source this session, not just read from `tasks.md`'s own narration:
+- `api/src/taller/export/adapters/sources.py`'s `payments_rows` now exports `voided_at`/`void_reason` columns — confirmed in source.
+- `web/src/features/workorders/payments/PaymentList.tsx` renders the offline void-disabled `<Alert>` outside the confirm `<Dialog>` (line 64), not only inside it (line 105) — confirmed in source.
+- `web/src/features/workorders/copy.ts`'s `ERROR_MESSAGES` now maps `work_order_has_payments` to its own Spanish message, not the generic fallback — confirmed in source.
+
+No other unfinished phase-3 tasks found. `CLAUDE.md` and `deploy/demo/README.md` were independently confirmed to document payments/voiding, the cash summary's timezone handling, the export module, and the receipt routes, as P3.S6.T7/T8 claim.
+
+## 3. Spec-scenario → test mapping
+
+**Capability: payments**
+
+| Scenario | Status | Test evidence |
+|---|---|---|
+| Recording a payment against an existing order / nonexistent/foreign order (404) | COVERED | `test_recording_a_payment_against_an_existing_order_is_saved`, `test_payment_against_a_nonexistent_order_is_not_found`, `test_payment_against_a_foreign_order_is_not_found` |
+| Supported method accepted / unsupported rejected (422) | COVERED | `test_a_supported_method_is_accepted`, `test_an_unsupported_method_is_rejected` (parametrized) |
+| Replay no-op / conflict on create | COVERED | `test_replaying_an_identical_payment_create_is_a_noop`, `test_reusing_a_payment_id_with_a_different_amount_is_a_conflict` |
+| Payment against `quote`/`cancelled` rejected; deposit accepted on `approved` | COVERED | `test_payment_against_a_quote_is_rejected`, `test_payment_against_a_cancelled_order_is_rejected`, `test_a_deposit_is_accepted_while_approved` |
+| Payment exceeding balance / against a settled order rejected | COVERED | `test_a_payment_exceeding_the_balance_is_rejected`, `test_a_payment_against_an_already_settled_order_is_rejected` |
+| Replaying the exact settling payment is a no-op, not an overpayment (AD-14 ordering) | COVERED | `test_replaying_the_settling_payment_is_a_noop_not_an_overpayment` |
+| Full/partial payment(s) zero the balance | COVERED | `test_a_single_full_payment_zeroes_the_balance`, `test_two_partial_payments_accumulate_to_a_zero_balance` |
+| Void requires reason / excludes from totals / idempotent | COVERED | `test_voiding_a_payment_with_no_reason_is_rejected`, `test_voiding_a_payment_excludes_it_from_the_order_totals`, `test_voiding_is_idempotent` |
+| Void of nonexistent/wrong-order payment id (spec-delta 404) | COVERED | `test_voiding_a_nonexistent_payment_id_is_not_found`, `test_voiding_a_payment_id_belonging_to_a_different_order_is_not_found` |
+| Void isolated per workshop | COVERED | `test_workshop_b_voiding_workshop_a_payment_is_not_found` |
+| Voiding requires a live connection (web) | COVERED | `WorkOrderDetailPage.test.tsx::"shows the void-payment offline message without requiring the disabled Anular trigger to open the dialog"` — regression test added by P3.S7.T2 for the exact defect found |
+| Cancelling with non-voided payment rejected / voided-only order cancellable | COVERED | `test_cancelling_an_order_with_a_nonvoided_payment_is_rejected`, `test_cancelling_an_order_whose_only_payment_was_voided_is_allowed` |
+| Concurrent overlapping payments: exactly one succeeds | COVERED | `test_two_concurrent_payments_that_together_exceed_the_balance_let_exactly_one_succeed` (re-run 5× per `tasks.md`, no flake) |
+| Recording a payment disabled while offline (web) | COVERED | `WorkOrderDetailPage.test.tsx::"disables the payment form's submit with its offline message once the connection drops"` |
+| Amount parsing (thousands separator → cents) / zero-amount rejected (web) | COVERED | `PaymentForm.test.tsx` (2 tests) |
+| 409/404 codes mapped to distinct Spanish messages (web) | COVERED | `WorkOrderDetailPage.test.tsx`: `payment_exceeds_balance`, `work_order_not_payable`, `payment_id_conflict`, `payment_not_found` (4 dedicated tests) |
+| `work_order_has_payments` mapped on cancel (web) | COVERED | `StatusActions.test.tsx` — regression test added by P3.S7.T3 |
+| **Another workshop's payments are invisible** (listing one's own order's payments never leaks another workshop's) | **WARNING — not covered** | No dedicated test exercises this; correct by construction (`PaymentRepository.get_by_id`/`list_for_order` are always scoped by `(workshop_id, order_id, payment_id)`, confirmed in source), but the scenario as spec'd (list payments for workshop B's own order and find none of A's) has no regression test of its own — only the cross-workshop 404 case on a *foreign* order id is tested |
+
+**Capability: daily-cash-summary**
+
+| Scenario | Status | Test evidence |
+|---|---|---|
+| Scoped to authenticated workshop | COVERED | `test_only_the_requesting_workshops_payments_contribute` |
+| `America/Tegucigalpa` day boundary (before/after local midnight) | COVERED | `test_a_payment_just_before_local_midnight_is_bucketed_into_the_earlier_day`, `test_a_payment_just_after_local_midnight_is_bucketed_into_the_next_day` |
+| Mixed-method totals, all four keys always present | COVERED | `test_mixed_method_totals_always_report_all_four_methods` |
+| Voided payment excluded from totals and listing | COVERED | `test_a_voided_payment_does_not_contribute_to_the_summary` |
+| Malformed date query param rejected (422) | COVERED (deviation, documented) | `test_a_malformed_date_query_parameter_is_rejected` — added beyond the spec's own scenario list, per `tasks.md` |
+| Summary unavailable offline, no stale totals shown | COVERED | `CashSummaryPage.test.tsx::"shows the offline message instead of a previously-fetched total once the connection drops"` |
+| Summary never served from persisted cache | COVERED | `shouldPersistQuery.test.ts` (drops `meta: { persist: false }` queries) |
+
+**Capability: data-export**
+
+| Scenario | Status | Test evidence |
+|---|---|---|
+| ZIP contains one CSV per entity | COVERED, with a caveat | `test_the_export_contains_exactly_one_csv_per_entity` — asserts all 7 filenames are present, but the fixture only creates a customer; the spec's literal GIVEN ("a workshop with data in every entity") is not exercised end-to-end, only file-presence |
+| Entity with no rows still produces a header-only CSV | COVERED at unit level; **SUGGESTION — not asserted end-to-end for `payments.csv`** | `test_csv_zip.py::test_an_empty_table_still_produces_a_header_only_csv` (pure builder, generic); no `test_export_api.py` test explicitly reads `payments.csv` and asserts a 1-row (header-only) result for a workshop with zero payments, though every export_api test except the P3.S7 addition implicitly exercises that path without asserting it |
+| UTF-8 BOM / accented round-trip | COVERED | `test_every_csv_starts_with_the_utf8_bom`, `test_accented_content_round_trips_byte_for_byte` |
+| Formula-injection guard / negative numbers not escaped | COVERED | `test_a_text_cell_starting_with_a_formula_character_is_escaped`, `test_a_negative_numeric_cell_is_not_escaped` |
+| Scoped only by authenticated workshop; client-supplied workshop id ignored | COVERED | `test_only_the_requesting_workshops_rows_appear`, `test_a_client_supplied_workshop_id_parameter_is_ignored` |
+| Repeating export is side-effect free | COVERED | `test_two_consecutive_exports_yield_the_same_rows_with_no_side_effects` |
+| Export requires a live connection (web) | COVERED | `AppShell.test.tsx::"disables 'Exportar todo' while offline, with the Spanish message"` |
+| Voided payment exported with void columns, distinct from `work_orders.csv`'s non-voided-only `paid_hnl` | COVERED | `test_a_voided_payment_is_exported_with_its_void_columns` — regression test added by P3.S7.T1 for the exact defect found |
+
+**Capability: non-fiscal-receipt**
+
+| Scenario | Status | Test evidence |
+|---|---|---|
+| Receipt only for `completed`/`delivered`; other statuses show no data + message | COVERED | `Receipt58Page.test.tsx`, `ReceiptLetterPage.test.tsx`: `"renders a completed/delivered order's content..."`, `"does not render order data for an order that is not completed or delivered, and explains why"` |
+| Two independent layouts render in print preview | COVERED | Same two files' first test each |
+| 58 mm page height matches measured content, with a fallback before measurement | COVERED | `Receipt58Page.test.tsx::"falls back to the default page height when the measured content height is zero"`, `"applies the measured page height once a valid rendered height is available"` |
+| Non-fiscal label visible on both layouts | COVERED | `ReceiptBody.test.tsx::"shows the mandatory non-fiscal label..."` (shared by both page components) |
+| Receipt shows total/paid/balance for fully and partially paid orders | COVERED | `ReceiptBody.test.tsx`: `"shows a fully paid order's total, paid total and a zero balance due"`, `"shows a partially paid order's balance due, not a zero or the full total"` |
+| Receipt shows order number, vehicle, customer, lines | COVERED | `ReceiptBody.test.tsx::"renders the order number, vehicle, customer and each line's own subtotal"` |
+| Another workshop's order not rendered (404, no leak) | COVERED | Both `Receipt58Page.test.tsx` and `ReceiptLetterPage.test.tsx::"renders not-found for another workshop's order, with no order data leaked"` |
+
+## 4. Findings summary
+
+- **CRITICAL: 0**
+- **WARNING: 1** — the `payments` spec's "Another workshop's payments are invisible" scenario has no dedicated regression test; the mechanism is correct by construction (every payment lookup is scoped by `(workshop_id, order_id, payment_id)` together, the same pattern already heavily tested elsewhere in this change), but untested directly, same shape as WARNING/SUGGESTION gaps the phase-1 and phase-2 reports already flagged for other capabilities in this change.
+- **SUGGESTION: 2**
+  1. `data-export`'s "entity with no rows still produces a header-only CSV" scenario is proven at the pure-builder unit level, not asserted end-to-end against `payments.csv` specifically for a workshop with zero payments.
+  2. `test_the_export_contains_exactly_one_csv_per_entity` checks file presence only; it does not populate every entity with data as the spec's literal GIVEN states, so "one CSV per populated entity" is not exercised end-to-end in a single test (it is covered piecewise: non-empty customers via that test, non-empty payments via the P3.S7 void-columns test, non-empty work orders/lines via other `test_export_api.py`/`test_csv_zip.py` tests not enumerated above).
+- All real commands pass: ruff check/format, pytest (236), eslint, tsc, vitest (177/40 files), vite build. No regressions against the phase-2 baseline.
+- Three review findings from this phase's own review-fix slice (`P3.S7`) — the `payments.csv` missing void indicator, `PaymentList`'s offline alert hidden inside an unreachable dialog, and the unmapped `work_order_has_payments` copy — were already fixed with test-first regression coverage before this verify pass began, and are independently confirmed present in source this session (not just read from `tasks.md`'s narration).
+- `P3.S6.T11` (demo deploy) and `P3.S6.T12` (real-browser + print-preview check) are explicitly deferred to the orchestrator after the PR, per the task's own text — this does not block archive, consistent with the expected-pending-items note the orchestrator gave for this verify pass.
+
+## 5. Recommendation
+
+Phase 3 is functionally complete; every automated check is green, and the diff is phase-3-scoped (boundary confirmed against the phase-2 branch tip). The 1 WARNING and 2 SUGGESTION findings are narrow coverage gaps on already-correctly-implemented code paths, not functional defects, and do not block archiving phase 3. The three review findings already caught and fixed during apply (`P3.S7`) are independently confirmed resolved in source. Recommend `sdd-archive` for phase 3, optionally filing a follow-up task to add the one missing payment-visibility regression test and the payments-CSV-empty end-to-end assertion before this capability set sees further changes.
+
+## 6. Resolution after verify (phase 3)
+
+- Review majors (P3.S7):
+  - `payments.csv` exported voided payments with no marker. Fixed in `49330e3`.
+  - The void-offline message sat inside a dialog the disabled trigger could never open, and `work_order_has_payments` had no Spanish copy. Both fixed in `f90d575`.
+  - All three were test-first.
+- Build: the cash-summary day uses `zoneinfo` for America/Tegucigalpa, which needs a time-zone database. `tzdata` is now an API dependency, so it works where the OS ships none (`8f97273`).
+- Real-browser check (P3.S6.T12) found four defects:
+  - A stale persisted cache crashed the order detail after the deploy, because the buster never changed between builds. Fixed in `4dfcd56`.
+  - Nothing linked to the receipts. Fixed in `cc15d06`.
+  - A crash showed react-router's English error page. Fixed in `a78cb88`.
+  - "Recargar" crashed again when the stale cache shared the current buster. Fixed in `f1d132d`.
+- Verify WARNING (payments invisible across workshops): no test added.
+  - Payments are listed by order id, and a foreign order id already returns 404 (tested).
+  - Even with the workshop filter dropped from the payment query, the order-id filter still excludes another workshop's payments. A test of this scenario would stay green under any realistic change, so it fails the Test Value Gate.
+  - Accepted as correct by construction.
+- SUGGESTIONs: not acted on. The builder's unit test covers the header-only CSV, and the export test covers file presence. A second end-to-end copy adds no new failure mode.
+- Still open: the Android Chrome photo-sharing check (P2.S7.T9b) needs a real device.
+- Checks after the fixes: pytest 236 passed; ruff check and format clean; eslint, tsc, vitest (185, 42 files) and build clean.
+

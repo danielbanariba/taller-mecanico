@@ -35,6 +35,7 @@ from taller.workorders.adapters.models import (
     WorkshopCounterModel,
 )
 from taller.workorders.adapters.repositories import (
+    SqlAlchemyPaymentRepository,
     SqlAlchemyWorkOrderRepository,
     SqlAlchemyWorkshopCounterRepository,
 )
@@ -351,6 +352,7 @@ def test_update_work_order_does_not_revert_a_concurrently_committed_status_chang
             order_repo=SqlAlchemyWorkOrderRepository(holder_session),
             item_repo=SqlAlchemyItemRepository(holder_session),
             movement_repo=SqlAlchemyMovementRepository(holder_session),
+            payment_repo=SqlAlchemyPaymentRepository(holder_session),
         )
 
         thread = threading.Thread(target=_patch)
@@ -535,6 +537,7 @@ def committed_deadlock_orders(test_engine: Engine) -> Generator[dict[str, uuid.U
                 order_repo=order_repo,
                 item_repo=item_repo,
                 movement_repo=movement_repo,
+                payment_repo=SqlAlchemyPaymentRepository(setup),
             )
         setup.commit()
     try:
@@ -591,6 +594,7 @@ def test_two_orders_consuming_the_same_items_in_reverse_order_do_not_deadlock(
                     order_repo=SqlAlchemyWorkOrderRepository(session),
                     item_repo=SqlAlchemyItemRepository(session),
                     movement_repo=SqlAlchemyMovementRepository(session),
+                    payment_repo=SqlAlchemyPaymentRepository(session),
                 )
                 session.commit()
         except BaseException as exc:  # noqa: BLE001
