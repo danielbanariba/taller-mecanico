@@ -1,3 +1,6 @@
+/// <reference types="vitest/importMeta" />
+import { execSync } from "node:child_process";
+
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -14,12 +17,42 @@ const previewAllowedHosts = (process.env.TALLER_PREVIEW_ALLOWED_HOSTS ?? "")
   .map((host) => host.trim())
   .filter((host) => host.length > 0);
 
+/**
+ * A per-build identifier appended to the app version for the persisted
+ * query cache's buster (see `src/app/providers.tsx`). `package.json`'s
+ * `version` alone stayed `0.1.0` across every phase of this change, so a
+ * deploy that changed a response shape (phase 3 added `payments` to a
+ * work order) never busted a browser's previously persisted,
+ * now-incompatible IndexedDB cache -- the app crashed reading a field the
+ * cached shape never had. Falls back to a timestamp when `git` is
+ * unavailable (e.g. a build context with no `.git` checkout), so the
+ * buster still changes on every build instead of crashing the build.
+ *
+ * Exported with injectable dependencies so the fallback path is unit
+ * testable without a real git checkout (see the in-source test below).
+ */
+export function resolveBuildId(
+  readGitShortSha: () => string = () => execSync("git rev-parse --short HEAD").toString(),
+  currentTimestamp: () => number = () => Date.now(),
+): string {
+  try {
+    const sha = readGitShortSha().trim();
+    if (sha) {
+      return sha;
+    }
+  } catch {
+    // No git checkout, or the `git` binary is unavailable -- fall through
+    // to the timestamp fallback below.
+  }
+  return String(currentTimestamp());
+}
+
 export default defineConfig({
   define: {
-    // Ties the persisted query cache's buster (see src/app/providers.tsx)
-    // to the app version, so a new release never hydrates an old,
-    // incompatible IndexedDB cache shape.
-    __APP_VERSION__: JSON.stringify(packageJson.version),
+    // See `resolveBuildId` above: the buster is the app version plus a
+    // per-build id, so every build -- not just every version bump -- is
+    // a cache bust.
+    __APP_VERSION__: JSON.stringify(`${packageJson.version}+${resolveBuildId()}`),
   },
   plugins: [
     react(),
@@ -102,5 +135,33 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     css: true,
+    // Lets `resolveBuildId`'s in-source test below run under `npm test`;
+    // `vite.config.ts` is never part of the shipped app bundle (the web
+    // app never imports it), so `import.meta.vitest` below is always
+    // `undefined` outside the test runner and this block is a no-op for
+    // `vite dev`/`vite build`.
+    includeSource: ["vite.config.ts"],
   },
 });
+
+if (import.meta.vitest) {
+  const { describe, it, expect } = import.meta.vitest;
+
+  describe("resolveBuildId", () => {
+    it("returns the trimmed git short SHA when git succeeds", () => {
+      expect(resolveBuildId(() => "abc1234\n")).toBe("abc1234");
+    });
+
+    it("falls back to a timestamp when git fails", () => {
+      const failingGit = () => {
+        throw new Error("not a git repository");
+      };
+
+      expect(resolveBuildId(failingGit, () => 1700000000000)).toBe("1700000000000");
+    });
+
+    it("falls back to a timestamp when git succeeds but prints nothing", () => {
+      expect(resolveBuildId(() => "   ", () => 1700000000000)).toBe("1700000000000");
+    });
+  });
+}

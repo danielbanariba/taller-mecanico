@@ -38,8 +38,13 @@ export function AppProviders({ children }: { children: ReactNode }) {
       persistOptions={{
         persister: idbPersister,
         maxAge: PERSISTED_CACHE_MAX_AGE_MS,
-        // Busts any cache left over from a previous deployed version whose
+        // Busts any cache left over from a previous deploy whose
         // dehydrated shape may not match this build's query keys/shapes.
+        // `__APP_VERSION__` (vite.config.ts) carries a per-build id, not
+        // only package.json's version, so every deploy busts the cache --
+        // not only a version bump -- because a deploy that changes a
+        // response shape (e.g. phase 3 adding `payments` to a work order)
+        // must never hydrate an older, incompatible cache.
         buster: __APP_VERSION__,
         dehydrateOptions: {
           // See `shouldPersistQuery` above. The default keeps only status
