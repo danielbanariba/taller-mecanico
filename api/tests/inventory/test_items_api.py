@@ -26,7 +26,10 @@ Defects these catch:
   wildcards instead of matching literally;
 - a PATCH that reports any database integrity error as `item_name_taken`,
   hiding a real bug behind a misleading "name already used" message, or
-  that no longer maps a rename losing the race to a concurrent one to 409.
+  that no longer maps a rename losing the race to a concurrent one to 409;
+- a create replay that accepts whatever movement sits at the derived
+  initial-stock id as "the same initial stock", even one recorded with a
+  different kind or note.
 """
 
 import uuid
@@ -37,6 +40,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from taller.inventory.adapters.repositories import SqlAlchemyItemRepository
+from taller.inventory.application.use_cases import INITIAL_STOCK_NOTE, _initial_movement_id
 
 
 def _create_item(client: TestClient, **overrides: object) -> dict:
@@ -302,6 +306,33 @@ def test_replay_that_adds_an_initial_stock_not_present_originally_is_a_conflict(
     replay = authenticated_client.post(
         "/api/inventory/items",
         json={"id": item_id, "name": "Empaque", "initial_stock": 10},
+    )
+
+    assert replay.status_code == 409, replay.text
+    assert replay.json()["detail"] == "item_id_conflict"
+
+
+@pytest.mark.parametrize(
+    ("kind", "note"),
+    [("in", INITIAL_STOCK_NOTE), ("adjust", "Conteo fisico")],
+)
+def test_replay_does_not_take_another_movement_at_the_initial_stock_id_as_the_initial_stock(
+    authenticated_client: TestClient, kind: str, note: str
+) -> None:
+    item_id = uuid.uuid4()
+    first = authenticated_client.post(
+        "/api/inventory/items", json={"id": str(item_id), "name": "Amortiguador"}
+    )
+    assert first.status_code == 201, first.text
+    recorded = authenticated_client.put(
+        f"/api/inventory/movements/{_initial_movement_id(item_id)}",
+        json={"item_id": str(item_id), "kind": kind, "quantity": 5, "note": note},
+    )
+    assert recorded.status_code == 201, recorded.text
+
+    replay = authenticated_client.post(
+        "/api/inventory/items",
+        json={"id": str(item_id), "name": "Amortiguador", "initial_stock": 5},
     )
 
     assert replay.status_code == 409, replay.text

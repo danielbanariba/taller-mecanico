@@ -48,13 +48,23 @@ def _initial_stock_matches(
     Compares both presence (was an initial movement recorded at all) and
     quantity, since `initial_stock=None` (no movement) and `initial_stock=0`
     (a recorded zero-quantity adjustment) are different, observable states.
+    The movement must also be exactly what `create_item` records (an
+    `adjust` with the initial-stock note, for this item): the id is
+    derivable, so a client could have recorded some other movement there
+    first, and that is not this item's initial stock.
     """
     existing_movement = movement_repo.get_by_id(
         workshop_id=workshop_id, movement_id=_initial_movement_id(item_id)
     )
     if initial_stock is None:
         return existing_movement is None
-    return existing_movement is not None and existing_movement.quantity == initial_stock
+    return existing_movement is not None and _movement_matches(
+        existing_movement,
+        item_id=item_id,
+        kind="adjust",
+        quantity=initial_stock,
+        note=INITIAL_STOCK_NOTE,
+    )
 
 
 def _normalize_unit(raw: str | None) -> str:
