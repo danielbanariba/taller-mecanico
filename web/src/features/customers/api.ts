@@ -29,6 +29,55 @@ export interface UpdateCustomerPayload {
   notes?: string | null;
 }
 
+export type VehicleType = "car" | "motorcycle" | "other";
+
+export interface VehicleOut {
+  id: string;
+  customer_id: string;
+  vehicle_type: VehicleType;
+  make: string;
+  model: string | null;
+  year: number | null;
+  color: string | null;
+  plate: string | null;
+  notes: string | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** `GET /vehicles/{id}` only -- embeds the owner, unlike every other vehicle shape. */
+export interface VehicleDetailOut extends VehicleOut {
+  owner: CustomerOut;
+}
+
+export interface ListVehiclesParams {
+  includeArchived?: boolean;
+}
+
+export interface CreateVehiclePayload {
+  id: string;
+  customer_id: string;
+  vehicle_type: VehicleType;
+  make: string;
+  model?: string;
+  year?: number;
+  color?: string;
+  plate?: string;
+  notes?: string;
+}
+
+/** `customer_id` is intentionally absent: a vehicle's owner never changes after creation. */
+export interface UpdateVehiclePayload {
+  vehicle_type?: VehicleType;
+  make?: string;
+  model?: string | null;
+  year?: number | null;
+  color?: string | null;
+  plate?: string | null;
+  notes?: string | null;
+}
+
 function buildListQuery(params: ListCustomersParams): string {
   const query = new URLSearchParams();
   if (params.q) {
@@ -41,6 +90,10 @@ function buildListQuery(params: ListCustomersParams): string {
   return queryString ? `?${queryString}` : "";
 }
 
+function buildVehicleListQuery(params: ListVehiclesParams): string {
+  return params.includeArchived ? "?include_archived=true" : "";
+}
+
 export const customersApi = {
   listCustomers: (params: ListCustomersParams = {}) =>
     http.get<CustomerOut[]>(`/api/customers${buildListQuery(params)}`),
@@ -49,4 +102,11 @@ export const customersApi = {
   updateCustomer: (id: string, payload: UpdateCustomerPayload) =>
     http.patch<CustomerOut>(`/api/customers/${id}`, payload),
   archiveCustomer: (id: string) => http.post<void>(`/api/customers/${id}/archive`),
+  listVehiclesForCustomer: (customerId: string, params: ListVehiclesParams = {}) =>
+    http.get<VehicleOut[]>(`/api/customers/${customerId}/vehicles${buildVehicleListQuery(params)}`),
+  getVehicle: (id: string) => http.get<VehicleDetailOut>(`/api/vehicles/${id}`),
+  createVehicle: (payload: CreateVehiclePayload) => http.post<VehicleOut>("/api/vehicles", payload),
+  updateVehicle: (id: string, payload: UpdateVehiclePayload) =>
+    http.patch<VehicleOut>(`/api/vehicles/${id}`, payload),
+  archiveVehicle: (id: string) => http.post<void>(`/api/vehicles/${id}/archive`),
 };

@@ -47,6 +47,60 @@ export const customersCopy = {
     editDisabled: "Conéctese a internet para editar clientes.",
     archiveDisabled: "Conéctese a internet para archivar clientes.",
   },
+  detail: {
+    backToList: "Volver a clientes",
+    editCustomer: "Editar cliente",
+    vehiclesTitle: "Vehículos",
+    addVehicle: "Agregar vehículo",
+  },
+  vehicles: {
+    form: {
+      typeLabel: "Tipo de vehículo",
+      makeLabel: "Marca",
+      makeRequired: "La marca es obligatoria.",
+      makeTooLong: "La marca no puede tener más de 60 caracteres.",
+      modelLabel: "Modelo",
+      yearLabel: "Año",
+      yearHelper: "Opcional. Por ejemplo 2015.",
+      yearInvalid: "El año no es válido.",
+      colorLabel: "Color",
+      plateLabel: "Placa",
+      plateHelper: "Opcional. Por ejemplo HAB-1234.",
+      notesLabel: "Notas",
+    },
+    typeLabels: {
+      car: "Automóvil",
+      motorcycle: "Motocicleta",
+      other: "Otro",
+    },
+    emptyTitle: "Todavía no hay vehículos",
+    emptyBody: "Agregue el primer vehículo de este cliente.",
+    create: {
+      title: "Agregar vehículo",
+      submit: "Guardar vehículo",
+      submitPending: "Guardando...",
+    },
+    edit: {
+      title: "Editar vehículo",
+      submit: "Guardar cambios",
+      submitPending: "Guardando...",
+      backToDetail: "Volver al cliente",
+      archiveAction: "Archivar vehículo",
+      archiveConfirmTitle: "Archivar vehículo",
+      archiveConfirmBody: "El vehículo se archivará y su placa quedará disponible para otro vehículo.",
+      archiveConfirmCancel: "Cancelar",
+      archiveConfirmSubmit: "Archivar",
+    },
+    detail: {
+      ownerPrefix: "Propietario:",
+      editVehicle: "Editar vehículo",
+    },
+    offline: {
+      createDisabled: "Conéctese a internet para agregar vehículos.",
+      editDisabled: "Conéctese a internet para editar vehículos.",
+      archiveDisabled: "Conéctese a internet para archivar vehículos.",
+    },
+  },
 };
 
 /**

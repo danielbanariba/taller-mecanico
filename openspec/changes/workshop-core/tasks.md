@@ -222,26 +222,26 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
 
 ### Slice P1.S5 — Web: vehicle create, edit, archive and detail
 
-- [ ] **P1.S5.T1 (RED)** Write tests under `web/src/features/customers/` for the vehicle containers:
+- [x] **P1.S5.T1 (RED)** Write tests under `web/src/features/customers/` for the vehicle containers:
   - Submitting the new-vehicle form while offline is disabled with the Spanish message.
   - A previously visited vehicle detail renders offline from the persisted cache.
   - A duplicate-plate 409 and an invalid-plate 422 each render their Spanish message.
   - Double submit of a new vehicle reuses one client id.
   - `CustomerDetailPage` lists that customer's vehicles (not yet their orders — phase 2).
 
-- [ ] **P1.S5.T2 (GREEN)** Modify `web/src/features/customers/api.ts`/`copy.ts`/`hooks.ts`: vehicle endpoints and messages (`useVehiclesForCustomer`, `useVehicle`, `useCreateVehicle`, `useUpdateVehicle`, `useArchiveVehicle`), query keys per the "Query keys" table.
+- [x] **P1.S5.T2 (GREEN)** Modify `web/src/features/customers/api.ts`/`copy.ts`/`hooks.ts`: vehicle endpoints and messages (`useVehiclesForCustomer`, `useVehicle`, `useCreateVehicle`, `useUpdateVehicle`, `useArchiveVehicle`), query keys per the "Query keys" table.
 
-- [ ] **P1.S5.T3 (GREEN)** Create presentational `VehicleList.tsx`, `VehicleForm.tsx`.
+- [x] **P1.S5.T3 (GREEN)** Create presentational `VehicleList.tsx`, `VehicleForm.tsx`.
 
-- [ ] **P1.S5.T4 (GREEN)** Create containers `CustomerDetailPage.tsx` (lists vehicles), `NewVehiclePage.tsx`, `EditVehiclePage.tsx`, `VehicleDetailPage.tsx`.
+- [x] **P1.S5.T4 (GREEN)** Create containers `CustomerDetailPage.tsx` (lists vehicles), `NewVehiclePage.tsx`, `EditVehiclePage.tsx`, `VehicleDetailPage.tsx`.
 
-- [ ] **P1.S5.T5 (GREEN)** Modify `web/src/features/customers/routes.tsx`/`router.tsx`: nest vehicle routes under `/clientes/:customerId/vehiculos/...` per AD-16.
+- [x] **P1.S5.T5 (GREEN)** Modify `web/src/features/customers/routes.tsx`/`router.tsx`: nest vehicle routes under `/clientes/:customerId/vehiculos/...` per AD-16.
 
-- [ ] **P1.S5.T6** Run T1 and confirm every scenario is green.
+- [x] **P1.S5.T6** Run T1 and confirm every scenario is green.
 
-- [ ] **P1.S5.T7** Run this slice's verification: `npm run lint && npm run typecheck && npm test -- --run && npm run build` (record the chunk sizes per `design.md`'s "Lazy boundaries" note, even though phase 1 adds no lazy route yet).
+- [x] **P1.S5.T7** Run this slice's verification: `npm run lint && npm run typecheck && npm test -- --run && npm run build` (record the chunk sizes per `design.md`'s "Lazy boundaries" note, even though phase 1 adds no lazy route yet).
 
-- [ ] **P1.S5.T8** Work-unit commit: `:sparkles: feat(customers): add vehicle create, edit, archive and detail screens`.
+- [x] **P1.S5.T8** Work-unit commit: `:sparkles: feat(customers): add vehicle create, edit, archive and detail screens`.
 
 ### Slice P1.S6 — Phase 1 closing: seed, docs, migration round-trip, real-browser check
 

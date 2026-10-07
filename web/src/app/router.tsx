@@ -38,8 +38,6 @@ export const router = createBrowserRouter([
             ],
           },
           {
-            // "/clientes/:customerId" (detail) and every vehicle route
-            // land in Slice 5.
             path: "/clientes",
             children: customerRoutes,
           },

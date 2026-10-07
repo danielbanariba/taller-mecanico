@@ -38,7 +38,7 @@ export function CustomersPage() {
         <CustomerList
           customers={customers.data ?? []}
           isFiltered={isFiltered}
-          onOpen={(customer) => navigate(`/clientes/${customer.id}/editar`)}
+          onOpen={(customer) => navigate(`/clientes/${customer.id}`)}
         />
       )}
     </>
