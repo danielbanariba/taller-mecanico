@@ -89,6 +89,10 @@ Creating or editing an item requires a live connection (disabled in the UI with 
 
 The service worker (`vite-plugin-pwa`, configured in `vite.config.ts`) precaches the app shell but routes every `/api/` request `NetworkOnly` — API responses are never served from the service worker's cache, because the persisted query cache above is the one offline data source, and a stale cached API response must never win a race against the real backend.
 
+## Public test deployment
+
+A shareable test instance runs at https://inventario-taller.danielbanariba.com from a detached worktree on the dev machine (its own Postgres container, two systemd user units, the `ceiba-demos` Cloudflare tunnel). `deploy/demo/README.md` is the runbook: what runs where, how to deploy an update, stop it, and read its logs.
+
 ## Gotchas
 
 - Local Postgres/API ports: `5432`–`5434` and `8000`–`8001` are taken on the usual dev machine, hence Postgres on `5440` and the API on `8010` (`docker-compose.yml`, `api/env.example`).

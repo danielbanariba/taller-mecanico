@@ -1,0 +1,23 @@
+# systemd user unit for the public test deployment's web app.
+# Template: replace __DEMO_WORKTREE__ with the absolute path of the demo
+# worktree and __NODE_BIN__ with the absolute path of `node` (`command -v
+# node`; user units do not load nvm/fnm, so PATH lookups fail), then install
+# as ~/.config/systemd/user/taller-demo-web.service.
+# See deploy/demo/README.md.
+
+[Unit]
+Description=Taller Mecanico - public test deployment web (vite preview)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__DEMO_WORKTREE__/web
+# Supplies TALLER_PREVIEW_ALLOWED_HOSTS, read by web/vite.config.ts.
+EnvironmentFile=%h/.config/taller-mecanico/demo.env
+ExecStart=__NODE_BIN__ __DEMO_WORKTREE__/web/node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 3012 --strictPort
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

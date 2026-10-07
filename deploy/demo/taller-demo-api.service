@@ -1,0 +1,23 @@
+# systemd user unit for the public test deployment's API.
+# Template: replace __DEMO_WORKTREE__ with the absolute path of the demo
+# worktree, then install as ~/.config/systemd/user/taller-demo-api.service.
+# See deploy/demo/README.md.
+
+[Unit]
+Description=Taller Mecanico - public test deployment API (FastAPI)
+# Ordering against the system docker.service is advisory from a user unit;
+# Restart=always covers the database container not being up yet.
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__DEMO_WORKTREE__/api
+EnvironmentFile=%h/.config/taller-mecanico/demo.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=__DEMO_WORKTREE__/api/.venv/bin/uvicorn taller.main:app --host 127.0.0.1 --port 3013
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

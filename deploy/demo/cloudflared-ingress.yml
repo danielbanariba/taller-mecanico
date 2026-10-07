@@ -1,0 +1,18 @@
+# Ingress entries for the public test deployment, added to the named
+# Cloudflare tunnel's config (`ceiba-demos`, ~/.cloudflared/ceiba-demos.yml).
+# Paste them under `ingress:`, BEFORE the catch-all `- service: http_status:404`.
+#
+# Order matters: cloudflared uses the first matching rule, so the `/api/`
+# path rule must come before the hostname-only rule. Splitting by path at
+# the tunnel keeps web and API on one origin, which is what the session
+# cookie (SameSite=Lax, no CORS) relies on.
+
+  - hostname: inventario-taller.danielbanariba.com
+    path: ^/api/
+    service: http://localhost:3013
+    originRequest:
+      httpHostHeader: inventario-taller.danielbanariba.com
+  - hostname: inventario-taller.danielbanariba.com
+    service: http://localhost:3012
+    originRequest:
+      httpHostHeader: inventario-taller.danielbanariba.com

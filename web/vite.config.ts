@@ -5,6 +5,15 @@ import { VitePWA } from "vite-plugin-pwa";
 
 import packageJson from "./package.json" with { type: "json" };
 
+// Public hostnames `vite preview` may answer for (comma-separated), e.g. the
+// test deployment in deploy/demo/. Vite rejects any request whose Host
+// header is not listed, so a tunnel forwarding the public hostname would get
+// a 403 otherwise. Empty by default: local preview needs no extra hosts.
+const previewAllowedHosts = (process.env.TALLER_PREVIEW_ALLOWED_HOSTS ?? "")
+  .split(",")
+  .map((host) => host.trim())
+  .filter((host) => host.length > 0);
+
 export default defineConfig({
   define: {
     // Ties the persisted query cache's buster (see src/app/providers.tsx)
@@ -77,6 +86,9 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+  },
+  preview: {
+    allowedHosts: previewAllowedHosts,
   },
   test: {
     environment: "jsdom",
