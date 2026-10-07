@@ -72,11 +72,27 @@ still works.
   expires.
 
 `seed-demo-account.sh` registers the account (or logs in if it already
-exists) and creates eight sample parts through the API, three of them at or
-below their minimum stock so the low-stock alert shows. Item ids are
-deterministic, so rerunning it never duplicates anything, and it leaves
-items that testers edited alone. Run it after the first deploy, or after
-wiping the demo database, once the public URL answers:
+exists) and creates eight sample parts, five customers and six vehicles
+through the API, three of the parts at or below their minimum stock so the
+low-stock alert shows. Every id is deterministic, so rerunning it never
+duplicates anything, and it leaves rows that testers edited alone. Run it
+after the first deploy, or after wiping the demo database, once the public
+URL answers:
+
+Seeded customers and vehicles (all fictional; the phone numbers are
+patterned test data and **must never be messaged**):
+
+| Customer | Phone | Vehicle(s) |
+| --- | --- | --- |
+| María Hernández | `9000-0001` (mobile) | Toyota Corolla 2012, plate `DEM0001` |
+| José Núñez | `3000-0002` (mobile) | Honda CG 150 2019, plate `DEM0002`; Bajaj Pulsar, unplated |
+| Carlos Mejía | `2200-0003` (landline) | Nissan Frontier 2015, plate `DEM0003` |
+| Ana Castillo | none | Suzuki AX100, unplated |
+| Luis Zelaya | `8000-0005` (mobile) | Hyundai Accent 2010, plate `DEM0004` |
+
+The seed submits the vehicle plates raw (`DEM-0001`, `DEM 0002`, `dem0003`,
+`DEM0004`) to exercise the API's plate normalization; they all land
+normalized as shown above.
 
 ```sh
 bash -c 'set -a; . ~/.config/taller-mecanico/demo.env; set +a; \

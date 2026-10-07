@@ -51,7 +51,7 @@ Tests mock the API with MSW (`web/src/test/server.ts`, `web/src/test/handlers.ts
 
 ### API: hexagonal per feature
 
-`api/src/taller/<feature>/` (`identity`, `inventory`; `health` is just a router) each split into:
+`api/src/taller/<feature>/` (`identity`, `inventory`, `customers`; `health` is just a router) each split into:
 
 - `domain/` — entities and errors, no framework imports.
 - `application/` — use cases (plain functions) and `Protocol` ports (`UserRepository`, `ItemRepository`, `MovementRepository`, `TokenService`, ...) that the use cases depend on without knowing the implementation.
@@ -59,11 +59,17 @@ Tests mock the API with MSW (`web/src/test/server.ts`, `web/src/test/handlers.ts
 
 `taller/shared/` holds cross-feature plumbing (`db.py` session factory, `config.py` settings). `taller/main.py` is the only place routers get assembled into the `FastAPI` app, each mounted under `/api`.
 
+`customers` (phase 1 of the `workshop-core` change, see "Planning and history") holds customers and their vehicles. A customer's phone reuses identity's `PhoneNumber` value object unchanged — `phone_is_mobile` is a derived property (`phone[0] != "2"`), not a stored column. A vehicle's plate is normalized in Python (`domain/plate.py`) and kept unique per workshop among active vehicles through a partial index; archiving a customer cascades to its own active vehicles in one transaction, freeing their plates.
+
 ### Web: container/presentational + shared UI kit
 
-`web/src/features/<feature>/` (`auth`, `inventory`) hold screens (containers, wired to TanStack Query and the API client) and presentational components (props in, JSX out, no fetching) side by side, plus one `api.ts` and one `copy.ts` per feature. `web/src/shared/ui/` is the atomic kit (`Button`, `Spinner`, ...) shared across features. `web/src/app/` wires routing (`router.tsx`) and the session guard (`RequireSession.tsx`).
+`web/src/features/<feature>/` (`auth`, `inventory`, `customers`) hold screens (containers, wired to TanStack Query and the API client) and presentational components (props in, JSX out, no fetching) side by side, plus one `api.ts` and one `copy.ts` per feature. `web/src/shared/ui/` is the atomic kit (`Button`, `Spinner`, ...) shared across features. `web/src/app/` wires routing (`router.tsx`) and the session guard (`RequireSession.tsx`).
 
 `copy.ts` holds every Spanish user-facing string for its feature in one object, plus a map from an API error `code` (the `detail` string FastAPI returns) to the Spanish message shown for it. The API itself never returns Spanish — it returns English error codes in `detail`, and the web layer is solely responsible for localizing them.
+
+### App shell and navigation
+
+`web/src/app/AppShell.tsx` is a layout route (`Inventario · Clientes · Órdenes`) rendered inside `RequireSession`, wrapping every protected screen's `<Outlet/>` with `web/src/app/BottomNav.tsx`'s three tabs. It owns the logout mutation, moved out of `InventoryPage` (which no longer renders its own header or logout control). The active tab tracks the first path segment, so nested routes like a vehicle's own detail screen under `/clientes/...` still highlight `Clientes`. The `Órdenes` tab is a placeholder (`web/src/features/workorders/WorkOrdersComingSoon.tsx`) until work orders ship.
 
 ### Tenancy
 
@@ -121,3 +127,5 @@ Add or update a skill with `DO_NOT_TRACK=1 npx skills add <owner/repo> --skill <
 
 - `odd/tasks/` — feature documents: objective, decisions, task-by-task progress and verification evidence for each feature.
 - `docs/research/` — the market research (Honduran workshop needs, adoption barriers, competitors) that the product decisions in `odd/tasks/` are based on.
+- `openspec/changes/` — active spec-driven changes in progress (e.g. `workshop-core`): each change's `proposal.md`, capability `specs/`, `design.md` and `tasks.md`.
+- `openspec/specs/` — archived baseline specs for already-shipped capabilities, once their change completes.

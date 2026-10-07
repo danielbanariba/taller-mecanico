@@ -245,22 +245,22 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
 
 ### Slice P1.S6 — Phase 1 closing: seed, docs, migration round-trip, real-browser check
 
-- [ ] **P1.S6.T1** Extend `deploy/demo/seed-demo-account.sh`: add the five seeded customers and their vehicles from `design.md`'s "Demo seed growth" table (`maria-hernandez`, `jose-nunez`, `carlos-mejia`, `ana-castillo`, `luis-zelaya`, each with the vehicles listed, exercising raw/lowercase/spaced plate normalization and at least two unplated vehicles). Use the existing idiom: `uuidgen --sha1 --namespace @url --name "$id_namespace/customer/<key>"` (and `/vehicle/<key>`); treat 201/200/409 as normal outcomes; print a one-line summary per entity. **Idempotency/rerun check:** add an explicit step that runs the seed script twice in a row against the same database and asserts the second run creates zero new rows (count customers/vehicles before and after, or rely on the script's own 200/409 accounting) before this task is checked off.
+- [x] **P1.S6.T1** Extend `deploy/demo/seed-demo-account.sh`: add the five seeded customers and their vehicles from `design.md`'s "Demo seed growth" table (`maria-hernandez`, `jose-nunez`, `carlos-mejia`, `ana-castillo`, `luis-zelaya`, each with the vehicles listed, exercising raw/lowercase/spaced plate normalization and at least two unplated vehicles). Use the existing idiom: `uuidgen --sha1 --namespace @url --name "$id_namespace/customer/<key>"` (and `/vehicle/<key>`); treat 201/200/409 as normal outcomes; print a one-line summary per entity. **Idempotency/rerun check:** add an explicit step that runs the seed script twice in a row against the same database and asserts the second run creates zero new rows (count customers/vehicles before and after, or rely on the script's own 200/409 accounting) before this task is checked off. **Verification note:** the orchestrator deferred a live rerun of this script to the deployment step (T6, not run in this apply pass — no demo deployment yet); verified here with `bash -n` plus a manual read-through, which caught and fixed a variable-shadowing bug (the customer loop's `phone` was clobbering the demo account's own `phone` used in the final summary line).
 
-- [ ] **P1.S6.T2** Update `deploy/demo/README.md`: document the seeded customers/vehicles, and that seeded mobile numbers are fictional and must not be messaged (this phase adds no WhatsApp action yet, but the data is already in place for phase 2).
+- [x] **P1.S6.T2** Update `deploy/demo/README.md`: document the seeded customers/vehicles, and that seeded mobile numbers are fictional and must not be messaged (this phase adds no WhatsApp action yet, but the data is already in place for phase 2).
 
-- [ ] **P1.S6.T3** Update `CLAUDE.md`:
+- [x] **P1.S6.T3** Update `CLAUDE.md`:
   - **Architecture** section: add a subsection for the new `customers` feature (mirroring the existing "API: hexagonal per feature" and "Web: container/presentational" descriptions) and the new app shell (`AppShell`/`BottomNav`, logout relocated from `InventoryPage`).
   - **Planning and history** section: add a bullet for `openspec/changes/` (active SDD changes: proposal/specs/design/tasks per change) and `openspec/specs/` (archived baseline specs), alongside the existing `odd/tasks/` and `docs/research/` bullets.
 
-- [ ] **P1.S6.T4** Exercise the phase-1 migration round-trip locally: `uv run alembic upgrade head`, `uv run alembic downgrade -1`, `uv run alembic upgrade head` against the dev database; confirm no error and that `uv run pytest tests/test_migrations.py` (`alembic check`) is green.
+- [x] **P1.S6.T4** Exercise the phase-1 migration round-trip locally: `uv run alembic upgrade head`, `uv run alembic downgrade -1`, `uv run alembic upgrade head` against the dev database; confirm no error and that `uv run pytest tests/test_migrations.py` (`alembic check`) is green. **Result:** upgrade → downgrade -1 (1b224b5a2186 → 1e94ffe69058) → upgrade head, no errors; `test_migrations.py` passed.
 
-- [ ] **P1.S6.T5** Run the full phase-1 verification suite and record each result:
-  - API: `docker compose up -d db`; `cd api && uv run ruff check . && uv run ruff format --check . && uv run pytest`.
-  - Web: `cd web && npm run lint && npm run typecheck && npm test -- --run && npm run build`.
-  - Migrations: upgrade → downgrade → upgrade (T4).
+- [x] **P1.S6.T5** Run the full phase-1 verification suite and record each result:
+  - API: `docker compose up -d db`; `cd api && uv run ruff check . && uv run ruff format --check . && uv run pytest`. **Result:** ruff check clean; ruff format clean (72 files); pytest 136 passed.
+  - Web: `cd web && npm run lint && npm run typecheck && npm test -- --run && npm run build`. **Result:** eslint clean; tsc clean; vitest 117 passed (25 files); build succeeded (main chunk 416.00 kB / gzip 125.16 kB).
+  - Migrations: upgrade → downgrade → upgrade (T4). **Result:** see T4.
 
-- [ ] **P1.S6.T6** Deploy phase 1 to the demo (`deploy/demo/README.md` procedure) and re-run the seed script against it.
+- [ ] **P1.S6.T6** Deploy phase 1 to the demo (`deploy/demo/README.md` procedure) and re-run the seed script against it. **Deferred:** not run in this apply pass per explicit orchestrator instruction — the orchestrator deploys after the PR.
 
 - [ ] **P1.S6.T7** Real-browser check at **390×844** against the deployed demo, covering phase 1's success criteria from `proposal.md`:
   - Every protected screen shows `Inventario · Clientes · Órdenes`; logout works from the shell; existing inventory flows (list, detail, movement, count, offline tap) still work.
@@ -269,8 +269,9 @@ Each slice below is one chainable work unit. If the user picks `stacked-to-main`
   - A vehicle saved with plate `hab-1234` shows `HAB1234`; a second active vehicle with `HAB 1234` in the same workshop is rejected with a Spanish duplicate message; several unplated vehicles are allowed.
   - With the device offline, a previously visited customer list/detail still renders; create/edit is disabled with a message.
   - Rerunning the seed script creates no duplicates (confirmed via T1, re-verified against the demo database).
+  **Deferred:** not run in this apply pass per explicit orchestrator instruction — the orchestrator runs the real-browser check after the PR.
 
-- [ ] **P1.S6.T8** Work-unit commit: `:hammer: chore(deploy): seed phase 1 customers and vehicles, document the shell` (covers T1–T3; T4–T7 are verification evidence, not code changes, recorded in this change's history/PR description).
+- [x] **P1.S6.T8** Work-unit commit: `:hammer: chore(deploy): seed phase 1 customers and vehicles, document the shell` (covers T1–T3; T4–T7 are verification evidence, not code changes, recorded in this change's history/PR description).
 
 ---
 
