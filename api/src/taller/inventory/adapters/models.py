@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from taller.shared.db import Base
@@ -48,6 +48,10 @@ class StockMovementModel(Base):
     """
 
     __tablename__ = "inventory_movements"
+    # Speeds up "an item's history, newest first" (GET /items/{id}/movements).
+    __table_args__ = (
+        Index("ix_inventory_movements_item_id_recorded_at", "item_id", "recorded_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     workshop_id: Mapped[uuid.UUID] = mapped_column(

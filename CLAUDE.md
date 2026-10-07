@@ -92,6 +92,7 @@ The service worker (`vite-plugin-pwa`, configured in `vite.config.ts`) precaches
 ## Gotchas
 
 - Local Postgres/API ports: `5432`–`5434` and `8000`–`8001` are taken on the usual dev machine, hence Postgres on `5440` and the API on `8010` (`docker-compose.yml`, `api/env.example`).
+- `api/tests/test_migrations.py` runs `alembic check` and fails on any drift between the models and the migrations. Declare indexes on the models; an index the models cannot express (the functional, partial active-name index) must be listed in `MIGRATION_ONLY_INDEXES` in `api/migrations/env.py`, or autogenerate emits a `drop_index` for it.
 - TypeScript is pinned to `6.0.x` (`web/package.json`) because `typescript-eslint@8.71.x` requires `<6.1`.
 - FastAPI deprecates `HTTP_422_UNPROCESSABLE_ENTITY` in favor of `HTTP_422_UNPROCESSABLE_CONTENT` — the latter is what this codebase uses (`api/src/taller/inventory/adapters/router.py`); don't reach for the deprecated name out of habit.
 - This agent sandbox denies writes to any path matching `.env*` by its own permission settings, regardless of content — `api/env.example` is the checked-in, writable template; `cp api/env.example api/.env` (shell copy, not a direct write to the `.env` path) then edit the values the task needs.

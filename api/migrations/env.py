@@ -25,6 +25,21 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+# Indexes only the migrations define, because the models cannot express them
+# (the active-name unique index is functional and partial, over the
+# taller_unaccent_lower() SQL function). Without this list, autogenerate reads
+# them as "removed" and emits drop_index for them.
+MIGRATION_ONLY_INDEXES = frozenset({"ix_inventory_items_active_name"})
+
+
+def include_object(
+    obj: object, name: str | None, type_: str, reflected: bool, compare_to: object
+) -> bool:
+    return not (
+        type_ == "index" and reflected and compare_to is None and name in MIGRATION_ONLY_INDEXES
+    )
+
+
 def get_url() -> str:
     """Resolve the database URL from application Settings.
 
@@ -51,6 +66,7 @@ def run_migrations_offline() -> None:
     context.configure(
         url=get_url(),
         target_metadata=target_metadata,
+        include_object=include_object,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -75,7 +91,11 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=include_object,
+        )
 
         with context.begin_transaction():
             context.run_migrations()
