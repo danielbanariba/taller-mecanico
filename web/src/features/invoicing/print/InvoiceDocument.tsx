@@ -11,6 +11,24 @@ export interface InvoiceDocumentProps {
 }
 
 /**
+ * Formats `issued_at` (a UTC ISO timestamp from the server) as the
+ * Honduran local date and time a Factura must print (Art. 10-11): always
+ * `America/Tegucigalpa`, never the device's own time zone, which would
+ * show a different clock hour -- or, past 18:00 local, the wrong day --
+ * depending on where the browser happens to be configured.
+ */
+const issuedAtFormatter = new Intl.DateTimeFormat("es-HN", {
+  timeZone: "America/Tegucigalpa",
+  dateStyle: "long",
+  timeStyle: "short",
+  hour12: false,
+});
+
+function formatIssuedAt(isoTimestamp: string): string {
+  return issuedAtFormatter.format(new Date(isoTimestamp));
+}
+
+/**
  * One full printable copy ("ORIGINAL: CLIENTE" or "COPIA: EMISOR") of an
  * issued Factura, rendering every Art. 10-11 mandatory field
  * (design.md's "Printed field map"). Used by both `Invoice58Page` and
@@ -54,7 +72,7 @@ export function InvoiceDocument({ invoice, copy }: InvoiceDocumentProps) {
           {invoicingCopy.print.dateLabel}: {invoice.issue_date}
         </p>
         <p>
-          {invoicingCopy.print.issuedAtLabel}: {invoice.issued_at}
+          {invoicingCopy.print.issuedAtLabel}: {formatIssuedAt(invoice.issued_at)}
         </p>
       </section>
 

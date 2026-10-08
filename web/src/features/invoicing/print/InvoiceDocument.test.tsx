@@ -67,7 +67,7 @@ describe("InvoiceDocument", () => {
     ).toBeInTheDocument(); // rango autorizado
     expect(screen.getByText(/2026-12-31/)).toBeInTheDocument(); // fecha límite de emisión
     expect(screen.getAllByText(/001-001-01-00000001/).length).toBeGreaterThan(0); // document number
-    expect(screen.getByText(/2026-01-02T15:30:00Z/)).toBeInTheDocument(); // date and time
+    expect(screen.getByText(/09:30/)).toBeInTheDocument(); // date and time, in Tegucigalpa local time
     expect(screen.getByText(/María Hernández/)).toBeInTheDocument(); // buyer name
     expect(screen.getByText(/08011990123456/)).toBeInTheDocument(); // buyer RTN
     expect(screen.getByText("Cambio de aceite")).toBeInTheDocument(); // line description
@@ -80,6 +80,21 @@ describe("InvoiceDocument", () => {
     expect(screen.getByText(/L 65.22/)).toBeInTheDocument(); // ISV 15%
     expect(screen.getByText("QUINIENTOS LEMPIRAS CON 00/100")).toBeInTheDocument(); // total in words
     expect(screen.getByText(/42/)).toBeInTheDocument(); // order reference
+  });
+
+  it("prints the issuance time in Tegucigalpa local time, never the raw UTC ISO string", () => {
+    // Defect this catches: printing `invoice.issued_at` verbatim -- a raw
+    // UTC ISO timestamp with microseconds -- instead of the Honduran
+    // local date and time Art. 10-11 requires on every Factura.
+    // Tegucigalpa is UTC-6, so 02:00 UTC on the 10th is 20:00 local on
+    // the 9th; a UTC rendering would show the wrong hour and the wrong
+    // day.
+    render(<InvoiceDocument invoice={{ ...INVOICE, issued_at: "2026-10-10T02:00:00Z" }} copy="original" />);
+
+    const issuedAtRow = screen.getByText(/Fecha y hora de emisión/);
+    expect(issuedAtRow.textContent).toMatch(/\b0?9\b/); // the 9th, not the 10th
+    expect(issuedAtRow.textContent).toMatch(/20:00|8:00/); // 20:00 local, 24h or 12h rendering
+    expect(issuedAtRow.textContent).not.toMatch(/2026-10-10T02:00:00Z/);
   });
 
   it("renders 'CONSUMIDOR FINAL' instead of a blank when the invoice has no buyer", () => {
