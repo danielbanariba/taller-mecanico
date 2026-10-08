@@ -36,6 +36,7 @@ from taller.customers.domain.errors import (
     CustomerIdConflict,
     CustomerNotFound,
     InvalidPlate,
+    InvalidRtn,
     PlateTaken,
     VehicleIdConflict,
     VehicleNotFound,
@@ -102,6 +103,8 @@ def create_customer_route(
             full_name=payload.full_name,
             phone=payload.phone,
             notes=payload.notes,
+            billing_name=payload.billing_name,
+            rtn=payload.rtn,
             customer_repo=customer_repo,
         )
         db.commit()
@@ -112,6 +115,9 @@ def create_customer_route(
     except InvalidPhoneNumber as exc:
         db.rollback()
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid_phone") from exc
+    except InvalidRtn as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid_rtn") from exc
     except CustomerIdConflict as exc:
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, detail="customer_id_conflict") from exc
@@ -186,6 +192,9 @@ def update_customer_route(
     except InvalidPhoneNumber as exc:
         db.rollback()
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid_phone") from exc
+    except InvalidRtn as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid_rtn") from exc
     return CustomerOut.from_domain(customer)
 
 

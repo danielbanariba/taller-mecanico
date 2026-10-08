@@ -25,16 +25,21 @@ class CustomerCreateRequest(BaseModel):
     full_name: str = Field(min_length=1, max_length=120)
     phone: str | None = None
     notes: str | None = None
+    billing_name: str | None = None
+    rtn: str | None = None
 
 
 class CustomerUpdateRequest(BaseModel):
     """Only explicitly set fields are applied; an explicit `null` clears
-    `phone` or `notes`. `full_name` is required and cannot be cleared.
+    `phone`, `notes`, `billing_name`, or `rtn`. `full_name` is required
+    and cannot be cleared.
     """
 
     full_name: str | None = Field(default=None, min_length=1, max_length=120)
     phone: str | None = None
     notes: str | None = None
+    billing_name: str | None = None
+    rtn: str | None = None
 
     @field_validator("full_name")
     @classmethod
@@ -59,6 +64,8 @@ class CustomerOut(BaseModel):
     phone: str | None
     phone_is_mobile: bool | None
     notes: str | None
+    billing_name: str | None
+    rtn: str | None
     archived_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -71,6 +78,8 @@ class CustomerOut(BaseModel):
             phone=customer.phone,
             phone_is_mobile=customer.phone_is_mobile,
             notes=customer.notes,
+            billing_name=customer.billing_name,
+            rtn=customer.rtn,
             archived_at=customer.archived_at,
             created_at=customer.created_at,
             updated_at=customer.updated_at,

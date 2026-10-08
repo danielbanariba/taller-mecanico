@@ -22,6 +22,11 @@ class Customer:
     feature's ``PhoneNumber`` value object (AD-8). A customer's phone and a
     user's login phone are otherwise unrelated data; this entity just
     reuses the same normalization rule, unchanged.
+
+    ``billing_name`` (razón social) and ``rtn`` are optional fiscal fields
+    (`sar-invoicing`'s `customers` delta, AD-11): both are ``None`` until a
+    workshop needs them to identify a buyer on a Factura. ``rtn`` stores
+    only the normalized 14 digits from ``taller.customers.domain.rtn.Rtn``.
     """
 
     id: uuid.UUID
@@ -29,6 +34,8 @@ class Customer:
     full_name: str
     phone: str | None
     notes: str | None
+    billing_name: str | None
+    rtn: str | None
     archived_at: datetime | None
     created_at: datetime
     updated_at: datetime

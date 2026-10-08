@@ -18,7 +18,12 @@ Defects these catch:
   or a search term with `%`/`_` is used as a raw `LIKE` wildcard instead
   of matching those characters literally;
 - a missing `workshop_id` filter leaks or mutates another workshop's
-  customer.
+  customer;
+- a malformed RTN (wrong digit count after stripping separators) is
+  stored instead of rejected with `invalid_rtn`;
+- billing name and RTN are not sent, not editable independently of the
+  other fields, or do not participate in create idempotency like every
+  other customer field (`sar-invoicing`'s `customers` delta).
 """
 
 from collections.abc import Generator
@@ -266,3 +271,73 @@ def test_another_workshops_customer_cannot_be_mutated(
     unaffected = authenticated_client.get(f"/api/customers/{customer['id']}")
     assert unaffected.json()["full_name"] == "Maria Hernandez"
     assert unaffected.json()["archived_at"] is None
+
+
+def test_an_rtn_with_separators_is_normalized_and_stored(authenticated_client: TestClient) -> None:
+    body = _create_customer(authenticated_client, rtn="0801-1990-123456")
+
+    assert body["rtn"] == "08011990123456"
+
+
+@pytest.mark.parametrize(
+    "rtn",
+    ["0801-1990-12345", "0801-1990-1234567"],
+    ids=["thirteen_digits", "fifteen_digits"],
+)
+def test_an_rtn_with_the_wrong_digit_count_is_rejected(
+    authenticated_client: TestClient, rtn: str
+) -> None:
+    response = authenticated_client.post(
+        "/api/customers", json={"full_name": "Jose Nunez", "rtn": rtn}
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "invalid_rtn"
+    assert authenticated_client.get("/api/customers").json() == []
+
+
+def test_billing_name_and_rtn_are_both_optional(authenticated_client: TestClient) -> None:
+    body = _create_customer(authenticated_client)
+
+    assert body["billing_name"] is None
+    assert body["rtn"] is None
+
+
+def test_billing_name_and_rtn_are_editable_independently_of_phone(
+    authenticated_client: TestClient,
+) -> None:
+    customer = _create_customer(authenticated_client, full_name="Maria Hernandez", phone="98765432")
+
+    response = authenticated_client.patch(
+        f"/api/customers/{customer['id']}",
+        json={"billing_name": "Maria Hernandez S. de R.L.", "rtn": "0801-1990-123456"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["billing_name"] == "Maria Hernandez S. de R.L."
+    assert body["rtn"] == "08011990123456"
+    assert body["full_name"] == "Maria Hernandez"
+    assert body["phone"] == "98765432"
+    assert body["phone_is_mobile"] is True
+
+
+def test_billing_name_and_rtn_participate_in_create_idempotency(
+    authenticated_client: TestClient,
+) -> None:
+    client_id = "44444444-4444-4444-4444-444444444444"
+    original = authenticated_client.post(
+        "/api/customers",
+        json={"id": client_id, "full_name": "Luis Zelaya", "rtn": "0801-1990-123456"},
+    )
+    assert original.status_code == 201
+
+    conflicting = authenticated_client.post(
+        "/api/customers",
+        json={"id": client_id, "full_name": "Luis Zelaya", "rtn": "0801-1990-654321"},
+    )
+    assert conflicting.status_code == 409
+    assert conflicting.json()["detail"] == "customer_id_conflict"
+
+    fetched = authenticated_client.get(f"/api/customers/{client_id}")
+    assert fetched.json()["rtn"] == "08011990123456"

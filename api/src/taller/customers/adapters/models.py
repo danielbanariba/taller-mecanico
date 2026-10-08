@@ -19,9 +19,17 @@ from taller.shared.db import Base
 
 
 class CustomerModel(Base):
-    """A workshop's customer."""
+    """A workshop's customer.
+
+    ``billing_name``/``rtn`` are optional fiscal fields (`sar-invoicing`'s
+    `customers` delta): the check mirrors `taller.customers.domain.rtn.Rtn`,
+    the real guarantee behind the application layer's normalization.
+    """
 
     __tablename__ = "customers"
+    __table_args__ = (
+        CheckConstraint("rtn IS NULL OR rtn ~ '^[0-9]{14}$'", name="ck_customers_rtn_digits"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     workshop_id: Mapped[uuid.UUID] = mapped_column(
@@ -30,6 +38,8 @@ class CustomerModel(Base):
     full_name: Mapped[str] = mapped_column(String(120), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(8), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    rtn: Mapped[str | None] = mapped_column(String(14), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
