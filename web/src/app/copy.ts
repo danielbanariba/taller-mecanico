@@ -17,6 +17,7 @@ export const appCopy = {
     trigger: "Más",
     title: "Más opciones",
     cashSummary: "Caja del día",
+    invoicing: "Facturación",
     exportAction: "Exportar todo",
     exportPending: "Exportando...",
     exportOfflineDisabled: "Conéctese a internet para exportar los datos.",

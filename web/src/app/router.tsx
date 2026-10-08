@@ -7,6 +7,7 @@ import { EditItemPage } from "../features/inventory/EditItemPage";
 import { InventoryPage } from "../features/inventory/InventoryPage";
 import { ItemDetailPage } from "../features/inventory/ItemDetailPage";
 import { NewItemPage } from "../features/inventory/NewItemPage";
+import { invoicingShellRoutes } from "../features/invoicing/routes";
 import { workOrderRoutes } from "../features/workorders/routes";
 import { AppErrorBoundary } from "./AppErrorBoundary";
 import { AppShell } from "./AppShell";
@@ -49,7 +50,11 @@ export const router = createBrowserRouter([
           },
           {
             path: "/ordenes",
-            children: workOrderRoutes,
+            // Invoicing's own routes (`facturacion`, ...) are spread in
+            // after `workOrderRoutes`, after the `caja` precedent
+            // (`design.md`'s AD-15): static segments outrank `:orderId`
+            // regardless of declaration order.
+            children: [...workOrderRoutes, ...invoicingShellRoutes],
           },
         ],
       },
