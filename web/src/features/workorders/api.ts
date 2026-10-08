@@ -62,12 +62,20 @@ export interface WorkOrderSummaryOut {
   updated_at: string;
 }
 
+/** `WorkOrderOut.active_invoice` -- mirrors the API's `InvoiceRefOut`. */
+export interface WorkOrderActiveInvoiceOut {
+  id: string;
+  number: string;
+}
+
 export interface WorkOrderOut {
   id: string;
   number: number;
   status: WorkOrderStatus;
   allowed_transitions: WorkOrderStatus[];
   lines_editable: boolean;
+  /** The order's own active (non-credited) Factura, or `null`. Locks line edits while present (the `work-orders` spec's "Line Edits Are Rejected While The Order Has A Non-Credited Factura"). */
+  active_invoice: WorkOrderActiveInvoiceOut | null;
   vehicle: WorkOrderVehicleOut;
   customer: WorkOrderCustomerDetailOut;
   complaint: string | null;

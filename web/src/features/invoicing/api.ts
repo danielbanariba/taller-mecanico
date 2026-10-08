@@ -81,6 +81,65 @@ export interface UpdateCaiRangePayload {
   issue_deadline?: string;
 }
 
+export interface FiscalInvoiceLineOut {
+  id: string;
+  position: number;
+  source_line_id: string;
+  kind: string;
+  description: string;
+  quantity: number;
+  unit_price_cents: number;
+  line_total_cents: number;
+}
+
+/** The full Factura snapshot (AD-10): every field was copied at issuance and never recomputed on read. Mirrors the API's `FiscalInvoiceOut`. */
+export interface FiscalInvoiceOut {
+  id: string;
+  order_id: string;
+  order_number: number;
+  number: string;
+  issued_at: string;
+  issue_date: string;
+  issuer_rtn: string;
+  issuer_legal_name: string;
+  issuer_trade_name: string;
+  issuer_address: string;
+  issuer_phone: string;
+  issuer_email: string;
+  cai: string;
+  range_first_number: string;
+  range_last_number: string;
+  issue_deadline: string;
+  buyer_name: string | null;
+  buyer_rtn: string | null;
+  exempt_cents: number;
+  exonerated_cents: number;
+  discount_cents: number;
+  taxable_15_cents: number;
+  isv_15_cents: number;
+  total_cents: number;
+  total_in_words: string;
+  credited_at: string | null;
+  lines: FiscalInvoiceLineOut[];
+  created_at: string;
+}
+
+/** The list shape for `GET /invoicing/invoices?order_id=`: no lines, matching the API's `FiscalInvoiceSummaryOut`. */
+export interface FiscalInvoiceSummaryOut {
+  id: string;
+  number: string;
+  issued_at: string;
+  total_cents: number;
+  credited_at: string | null;
+}
+
+export interface IssueInvoicePayload {
+  id: string;
+  order_id: string;
+  buyer_name?: string;
+  buyer_rtn?: string;
+}
+
 export const invoicingApi = {
   getSettings: () => http.get<InvoicingSettingsOut>("/api/invoicing/settings"),
   saveProfile: (payload: FiscalProfileSavePayload) =>
@@ -89,4 +148,9 @@ export const invoicingApi = {
     http.post<CaiRangeOut>("/api/invoicing/cai-ranges", payload),
   updateCaiRange: (id: string, payload: UpdateCaiRangePayload) =>
     http.patch<CaiRangeOut>(`/api/invoicing/cai-ranges/${id}`, payload),
+  issueInvoice: (payload: IssueInvoicePayload) =>
+    http.post<FiscalInvoiceOut>("/api/invoicing/invoices", payload),
+  getInvoice: (id: string) => http.get<FiscalInvoiceOut>(`/api/invoicing/invoices/${id}`),
+  listOrderInvoices: (orderId: string) =>
+    http.get<FiscalInvoiceSummaryOut[]>(`/api/invoicing/invoices?order_id=${orderId}`),
 };

@@ -33,4 +33,10 @@ export const invoicingShellRoutes: RouteObject[] = [
       Component: (await import("./settings/CaiRangePage")).CaiRangePage,
     }),
   },
+  {
+    path: ":orderId/factura/:invoiceId",
+    lazy: async () => ({
+      Component: (await import("./documents/InvoiceDetailPage")).InvoiceDetailPage,
+    }),
+  },
 ];

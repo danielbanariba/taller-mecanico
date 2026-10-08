@@ -194,6 +194,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   payment_id_conflict: "No se pudo registrar el pago. Intente de nuevo.",
   payment_not_found: "No se encontró el pago.",
   work_order_has_payments: "No se puede cancelar una orden con pagos registrados. Anule los pagos primero.",
+  work_order_invoiced: "La orden tiene una factura emitida y no se pueden editar sus líneas.",
   not_authenticated: "Debe iniciar sesión para continuar.",
   network_error: "No se pudo conectar. Verifique su conexión e intente de nuevo.",
 };

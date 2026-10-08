@@ -23,6 +23,7 @@ const ORDER: WorkOrderOut = {
   status: "quote",
   allowed_transitions: ["approved", "cancelled"],
   lines_editable: true,
+  active_invoice: null,
   vehicle: { id: "v1", vehicle_type: "car", make: "Toyota", model: "Corolla", year: 2015, plate: "HAB1234" },
   customer: { id: "c1", full_name: "María Hernández", phone: "98765432", phone_is_mobile: true },
   complaint: "Ruido en motor",
@@ -77,10 +78,47 @@ const PAYABLE_ORDER: WorkOrderOut = {
   accepts_payments: true,
 };
 
+/** `InvoiceSection` always reads this; every test needs a response, even one that stays hidden with no fiscal profile (its own previous, pre-invoicing default). */
+const NO_FISCAL_PROFILE_SETTINGS = {
+  profile: null,
+  codes_locked: false,
+  ranges: [],
+  documents: [
+    { document_type: "01", ready: false, blocked_reason: "fiscal_profile_missing", active_range_id: null, next_number: null },
+  ],
+};
+
+const FISCAL_PROFILE = {
+  rtn: "08019999123456",
+  legal_name: "Taller Ana S. de R.L.",
+  trade_name: "Taller Ana",
+  address: "Col. Kennedy, Tegucigalpa",
+  phone: "22223333",
+  email: "taller@example.com",
+  establishment_code: "001",
+  emission_point_code: "001",
+  updated_at: "2026-01-01T00:00:00Z",
+};
+
+const READY_SETTINGS = {
+  ...NO_FISCAL_PROFILE_SETTINGS,
+  profile: FISCAL_PROFILE,
+  documents: [
+    {
+      document_type: "01",
+      ready: true,
+      blocked_reason: null,
+      active_range_id: "range-1",
+      next_number: "001-001-01-00000001",
+    },
+  ],
+};
+
 function mockSessionAndOrder(order: WorkOrderOut = ORDER) {
   server.use(
     http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
     http.get("/api/work-orders/order-1", () => HttpResponse.json(order)),
+    http.get("/api/invoicing/settings", () => HttpResponse.json(NO_FISCAL_PROFILE_SETTINGS)),
   );
 }
 
@@ -117,6 +155,7 @@ function renderDetailPageFromCacheWithoutConnection() {
   server.use(
     http.get("/api/auth/me", () => HttpResponse.error()),
     http.get("/api/work-orders/order-1", () => HttpResponse.error()),
+    http.get("/api/invoicing/settings", () => HttpResponse.error()),
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   queryClient.setQueryData(sessionQueryKey, SESSION);
@@ -340,5 +379,88 @@ describe("WorkOrderDetailPage", () => {
     expect(await screen.findByRole("heading", { name: "Orden #42" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Recibo 58 mm" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Recibo carta" })).not.toBeInTheDocument();
+  });
+
+  it("shows no invoicing action for a workshop with no fiscal profile, the receipt unaffected", async () => {
+    // Defect this catches: `InvoiceSection` rendering "Emitir factura" (or
+    // crashing on a null profile) for a workshop that never configured
+    // fiscal invoicing, which would change every workshop's order screen
+    // the moment this capability shipped, not just the ones that opted in
+    // (`fiscal-invoices` spec's "A workshop with no fiscal profile sees no
+    // Factura action, and the receipt is unaffected").
+    mockSessionAndOrder({ ...ORDER, status: "completed", allowed_transitions: ["delivered"] });
+    renderDetailPage();
+
+    expect(await screen.findByRole("heading", { name: "Orden #42" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Emitir factura" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Ver factura/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Recibo 58 mm" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Recibo carta" })).toBeInTheDocument();
+  });
+
+  it("shows 'Emitir factura' ahead of the receipt links for a ready, uninvoiced, eligible order", async () => {
+    // Defect this catches: a ready, uninvoiced order never offering a way
+    // to issue its Factura, or offering it after the receipt links instead
+    // of before them (`fiscal-invoices` spec's "An eligible, uninvoiced
+    // order shows the Factura action first").
+    mockSessionAndOrder({ ...ORDER, status: "completed", allowed_transitions: ["delivered"] });
+    server.use(http.get("/api/invoicing/settings", () => HttpResponse.json(READY_SETTINGS)));
+    renderDetailPage();
+
+    expect(await screen.findByRole("heading", { name: "Orden #42" })).toBeInTheDocument();
+    const issueButton = await screen.findByRole("button", { name: "Emitir factura" });
+    const receiptLink = screen.getByRole("link", { name: "Recibo 58 mm" });
+    expect(issueButton.compareDocumentPosition(receiptLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Recibo carta" })).toBeInTheDocument();
+  });
+
+  it("links to the issued Factura ahead of the receipt links for an invoiced order", async () => {
+    // Defect this catches: an already-invoiced order still offering
+    // "Emitir factura" (which would let a mechanic try to double-invoice),
+    // or not linking to the Factura at all, or placing it after the
+    // receipt links (`fiscal-invoices` spec's "An invoiced order links to
+    // the Factura, still ahead of the receipt").
+    mockSessionAndOrder({
+      ...ORDER,
+      status: "completed",
+      allowed_transitions: ["delivered"],
+      active_invoice: { id: "invoice-1", number: "001-001-01-00000001" },
+    });
+    server.use(http.get("/api/invoicing/settings", () => HttpResponse.json(READY_SETTINGS)));
+    renderDetailPage();
+
+    expect(await screen.findByRole("heading", { name: "Orden #42" })).toBeInTheDocument();
+    const invoiceLink = await screen.findByRole("link", { name: "Ver factura 001-001-01-00000001" });
+    expect(invoiceLink).toHaveAttribute("href", "/ordenes/order-1/factura/invoice-1");
+    expect(screen.queryByRole("button", { name: "Emitir factura" })).not.toBeInTheDocument();
+    const receiptLink = screen.getByRole("link", { name: "Recibo 58 mm" });
+    expect(invoiceLink.compareDocumentPosition(receiptLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("maps a 409 work_order_invoiced to its own Spanish message when a stale line action is sent", async () => {
+    // Defect this catches: the order was fetched while `lines_editable`
+    // was still true, then invoiced from another tab before this add-line
+    // request landed -- the mechanic's screen still shows "Agregar línea",
+    // and the resulting 409 must render the invoicing lock's own message
+    // (`work-orders` spec's "Adding a line to an invoiced, completed order
+    // is rejected"), not the generic fallback.
+    mockSessionAndOrder(ORDER); // lines_editable: true
+    server.use(
+      http.post("/api/work-orders/order-1/lines", () =>
+        HttpResponse.json({ detail: "work_order_invoiced" }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderDetailPage();
+
+    await user.click(await screen.findByRole("button", { name: "Agregar línea" }));
+    const dialog = await screen.findByRole("dialog", { name: "Agregar línea" });
+    await user.type(within(dialog).getByLabelText("Descripción"), "Cambio de filtro");
+    await user.type(within(dialog).getByLabelText("Precio unitario"), "100");
+    await user.click(within(dialog).getByRole("button", { name: "Guardar línea" }));
+
+    expect(
+      await screen.findByText("La orden tiene una factura emitida y no se pueden editar sus líneas."),
+    ).toBeInTheDocument();
   });
 });
