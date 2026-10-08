@@ -6,6 +6,8 @@ export interface CustomerOut {
   phone: string | null;
   phone_is_mobile: boolean | null;
   notes: string | null;
+  billing_name: string | null;
+  rtn: string | null;
   archived_at: string | null;
   created_at: string;
   updated_at: string;
@@ -21,12 +23,16 @@ export interface CreateCustomerPayload {
   full_name: string;
   phone?: string;
   notes?: string;
+  billing_name?: string;
+  rtn?: string;
 }
 
 export interface UpdateCustomerPayload {
   full_name?: string;
   phone?: string | null;
   notes?: string | null;
+  billing_name?: string | null;
+  rtn?: string | null;
 }
 
 export type VehicleType = "car" | "motorcycle" | "other";

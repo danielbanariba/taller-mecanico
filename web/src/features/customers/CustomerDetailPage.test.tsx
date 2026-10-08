@@ -19,6 +19,8 @@ const CUSTOMER: CustomerOut = {
   phone: "98765432",
   phone_is_mobile: true,
   notes: null,
+  billing_name: null,
+  rtn: null,
   archived_at: null,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
@@ -91,5 +93,41 @@ describe("CustomerDetailPage", () => {
     // its key, or `WorkOrderList`'s render) silently showing nothing for
     // this customer's own work orders.
     expect(await screen.findByText("Orden #7")).toBeInTheDocument();
+  });
+
+  it("renders the billing name and RTN when the customer has them", async () => {
+    // Defect this catches: the new fiscal fields never wired into the
+    // detail screen at all, leaving a workshop no way to confirm what
+    // will print on a Factura issued for this customer.
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION_RESPONSE)),
+      http.get("/api/customers/c1", () =>
+        HttpResponse.json({ ...CUSTOMER, billing_name: "María Hernández S. de R.L.", rtn: "08011990123456" }),
+      ),
+      http.get("/api/customers/c1/vehicles", () => HttpResponse.json([])),
+      http.get("/api/work-orders", () => HttpResponse.json([])),
+    );
+    renderCustomerDetailPage();
+
+    expect(await screen.findByText(/María Hernández S\. de R\.L\./)).toBeInTheDocument();
+    expect(screen.getByText(/08011990123456/)).toBeInTheDocument();
+  });
+
+  it("renders neither billing name nor RTN -- not a literal 'null' -- when the customer has neither", async () => {
+    // Defect this catches: an absent optional field rendered as the
+    // literal string "null" or "undefined" instead of not rendering at
+    // all.
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION_RESPONSE)),
+      http.get("/api/customers/c1", () => HttpResponse.json(CUSTOMER)),
+      http.get("/api/customers/c1/vehicles", () => HttpResponse.json([])),
+      http.get("/api/work-orders", () => HttpResponse.json([])),
+    );
+    renderCustomerDetailPage();
+
+    await screen.findByRole("heading", { name: "María Hernández" });
+    expect(screen.queryByText(/null/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/undefined/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/RTN/)).not.toBeInTheDocument();
   });
 });

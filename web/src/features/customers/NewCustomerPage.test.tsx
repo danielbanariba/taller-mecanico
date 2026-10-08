@@ -94,6 +94,20 @@ describe("NewCustomerPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows the Spanish message for invalid_rtn on a 422, not the generic fallback", async () => {
+    // Defect this catches: the `sar-invoicing` customers delta's new
+    // `invalid_rtn` code falling through copy.ts's map to the generic
+    // message instead of its own Spanish text.
+    server.use(http.post("/api/customers", () => HttpResponse.json({ detail: "invalid_rtn" }, { status: 422 })));
+    const user = userEvent.setup();
+    renderNewCustomerPage();
+
+    await user.type(screen.getByLabelText(/nombre completo/i), "María Hernández");
+    await user.click(screen.getByRole("button", { name: /guardar cliente/i }));
+
+    expect(await screen.findByText("El RTN no es válido. Debe tener 14 dígitos.")).toBeInTheDocument();
+  });
+
   it("shows the Spanish message for plate_taken on a 409, not the generic fallback", async () => {
     // Defect this catches: copy.ts's error-code map is shared by customers
     // and (from Slice 5) vehicles -- a missing plate_taken entry would
