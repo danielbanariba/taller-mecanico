@@ -66,6 +66,16 @@ export function CustomerDetailPage() {
                 : ""}
           </p>
         ) : null}
+        {data.billing_name ? (
+          <p className="text-base text-brand-muted-foreground">
+            {customersCopy.detail.billingNameLabel}: {data.billing_name}
+          </p>
+        ) : null}
+        {data.rtn ? (
+          <p className="text-base text-brand-muted-foreground">
+            {customersCopy.detail.rtnLabel}: {data.rtn}
+          </p>
+        ) : null}
       </header>
 
       <LinkButton to={`/clientes/${customerId}/editar`} variant="secondary">

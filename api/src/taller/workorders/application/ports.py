@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Protocol
 
-from taller.workorders.domain.entities import Payment, WorkOrder
+from taller.workorders.domain.entities import InvoiceRef, Payment, WorkOrder
 from taller.workorders.domain.status import WorkOrderStatus
 
 
@@ -74,6 +74,14 @@ class WorkOrderRepository(Protocol):
     ) -> dict[uuid.UUID, int]:
         """Each order's `number`, batched for the daily cash summary's
         listed payments (phase 3 slice 2). Omits an id with no match.
+        """
+        ...
+
+    def active_invoice(self, *, workshop_id: uuid.UUID, order_id: uuid.UUID) -> InvoiceRef | None:
+        """The order's non-credited Factura, if it has one.
+
+        Reads `fiscal_invoices` by table name only (`design.md`'s
+        AD-1/AD-12): `work-orders` never imports the `invoicing` feature.
         """
         ...
 

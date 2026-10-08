@@ -13,6 +13,7 @@ from taller.customers.domain.errors import (
     VehicleNotFound,
 )
 from taller.customers.domain.plate import normalize_plate
+from taller.customers.domain.rtn import Rtn
 from taller.identity.domain.phone_number import PhoneNumber
 
 
@@ -35,10 +36,33 @@ def _normalize_phone(raw: str | None) -> str | None:
     return PhoneNumber.from_raw(raw).value
 
 
+def _normalize_rtn(raw: str | None) -> str | None:
+    """Normalize an optional RTN through `Rtn.from_raw` (AD-11).
+
+    Raises:
+        InvalidRtn: ``raw`` is present but not a valid 14-digit RTN.
+    """
+    if raw is None:
+        return None
+    return Rtn.from_raw(raw)
+
+
 def _customer_fields_match(
-    customer: Customer, *, full_name: str, phone: str | None, notes: str | None
+    customer: Customer,
+    *,
+    full_name: str,
+    phone: str | None,
+    notes: str | None,
+    billing_name: str | None,
+    rtn: str | None,
 ) -> bool:
-    return customer.full_name == full_name and customer.phone == phone and customer.notes == notes
+    return (
+        customer.full_name == full_name
+        and customer.phone == phone
+        and customer.notes == notes
+        and customer.billing_name == billing_name
+        and customer.rtn == rtn
+    )
 
 
 def create_customer(
@@ -48,9 +72,15 @@ def create_customer(
     full_name: str,
     phone: str | None,
     notes: str | None,
+    billing_name: str | None = None,
+    rtn: str | None = None,
     customer_repo: CustomerRepository,
 ) -> tuple[Customer, bool]:
     """Create a customer, or replay an idempotent create.
+
+    ``billing_name`` and ``rtn`` are fiscal fields (`sar-invoicing`'s
+    `customers` delta): both optional, and both participate in the
+    replay comparison below exactly like every other field.
 
     Returns ``(customer, is_new)``: ``is_new`` is False when ``customer_id``
     already existed with identical fields (the caller should respond 200,
@@ -59,18 +89,26 @@ def create_customer(
     Raises:
         InvalidPhoneNumber: ``phone`` is present but not a valid Honduran
             phone number.
+        InvalidRtn: ``rtn`` is present but not a valid 14-digit RTN.
         CustomerIdConflict: ``customer_id`` already exists with different
             fields.
     """
     normalized_name = full_name.strip()
     normalized_phone = _normalize_phone(phone)
     normalized_notes = _normalize_optional_text(notes)
+    normalized_billing_name = _normalize_optional_text(billing_name)
+    normalized_rtn = _normalize_rtn(rtn)
 
     if customer_id is not None:
         existing = customer_repo.get_by_id(workshop_id=workshop_id, customer_id=customer_id)
         if existing is not None:
             if not _customer_fields_match(
-                existing, full_name=normalized_name, phone=normalized_phone, notes=normalized_notes
+                existing,
+                full_name=normalized_name,
+                phone=normalized_phone,
+                notes=normalized_notes,
+                billing_name=normalized_billing_name,
+                rtn=normalized_rtn,
             ):
                 raise CustomerIdConflict(customer_id)
             return existing, False
@@ -82,6 +120,8 @@ def create_customer(
         full_name=normalized_name,
         phone=normalized_phone,
         notes=normalized_notes,
+        billing_name=normalized_billing_name,
+        rtn=normalized_rtn,
         archived_at=None,
         created_at=now,
         updated_at=now,
@@ -124,11 +164,13 @@ def update_customer(
 
     ``fields`` only contains keys the caller explicitly set (e.g. via
     Pydantic's ``exclude_unset``), so omitted fields are left untouched and
-    an explicit null clears an optional field (phone or notes).
+    an explicit null clears an optional field (phone, notes, billing_name,
+    or rtn).
 
     Raises:
         CustomerNotFound: no such customer in this workshop.
         InvalidPhoneNumber: ``fields["phone"]`` is present but invalid.
+        InvalidRtn: ``fields["rtn"]`` is present but invalid.
     """
     customer = customer_repo.get_by_id(workshop_id=workshop_id, customer_id=customer_id)
     if customer is None:
@@ -140,6 +182,10 @@ def update_customer(
         customer.phone = _normalize_phone(fields["phone"])
     if "notes" in fields:
         customer.notes = _normalize_optional_text(fields["notes"])
+    if "billing_name" in fields:
+        customer.billing_name = _normalize_optional_text(fields["billing_name"])
+    if "rtn" in fields:
+        customer.rtn = _normalize_rtn(fields["rtn"])
 
     customer.updated_at = datetime.now(UTC)
     customer_repo.save(customer)

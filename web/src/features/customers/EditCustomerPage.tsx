@@ -28,6 +28,14 @@ function diffCustomer(customer: CustomerOut, values: CustomerFormValues): Update
   if (values.notes !== originalNotes) {
     payload.notes = values.notes === "" ? null : values.notes;
   }
+  const originalBillingName = customer.billing_name ?? "";
+  if (values.billingName !== originalBillingName) {
+    payload.billing_name = values.billingName === "" ? null : values.billingName;
+  }
+  const originalRtn = customer.rtn ?? "";
+  if (values.rtn !== originalRtn) {
+    payload.rtn = values.rtn === "" ? null : values.rtn;
+  }
 
   return payload;
 }
@@ -90,7 +98,13 @@ export function EditCustomerPage() {
       <h1 className="text-3xl font-bold text-brand-primary">{customersCopy.edit.title}</h1>
       <CustomerForm
         mode="edit"
-        initialValues={{ fullName: data.full_name, phone: data.phone ?? "", notes: data.notes ?? "" }}
+        initialValues={{
+          fullName: data.full_name,
+          phone: data.phone ?? "",
+          notes: data.notes ?? "",
+          billingName: data.billing_name ?? "",
+          rtn: data.rtn ?? "",
+        }}
         onSubmit={handleSubmit}
         pending={updateCustomer.isPending}
         errorMessage={errorMessage}

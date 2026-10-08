@@ -10,6 +10,7 @@ from sqlalchemy import engine_from_config, pool
 import taller.customers.adapters.models  # noqa: F401,E402
 import taller.identity.adapters.models  # noqa: F401,E402
 import taller.inventory.adapters.models  # noqa: F401,E402
+import taller.invoicing.adapters.models  # noqa: F401,E402
 import taller.workorders.adapters.models  # noqa: F401,E402
 from taller.shared.config import Settings
 from taller.shared.db import Base

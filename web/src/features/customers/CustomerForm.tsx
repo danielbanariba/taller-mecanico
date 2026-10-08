@@ -13,12 +13,16 @@ export interface CustomerFormInitialValues {
   fullName: string;
   phone: string;
   notes: string;
+  billingName: string;
+  rtn: string;
 }
 
 export interface CustomerFormValues {
   fullName: string;
   phone: string;
   notes: string;
+  billingName: string;
+  rtn: string;
 }
 
 export interface CustomerFormProps {
@@ -52,6 +56,8 @@ export function CustomerForm({
   const [fullName, setFullName] = useState(initialValues?.fullName ?? "");
   const [phone, setPhone] = useState(initialValues?.phone ?? "");
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
+  const [billingName, setBillingName] = useState(initialValues?.billingName ?? "");
+  const [rtn, setRtn] = useState(initialValues?.rtn ?? "");
   const [nameTouched, setNameTouched] = useState(false);
 
   const trimmedName = fullName.trim();
@@ -68,7 +74,13 @@ export function CustomerForm({
     if (offline) {
       return;
     }
-    onSubmit({ fullName: trimmedName, phone: phone.trim(), notes: notes.trim() });
+    onSubmit({
+      fullName: trimmedName,
+      phone: phone.trim(),
+      notes: notes.trim(),
+      billingName: billingName.trim(),
+      rtn: rtn.trim(),
+    });
   }
 
   return (
@@ -102,6 +114,20 @@ export function CustomerForm({
         value={phone}
         onChange={(event) => setPhone(event.target.value)}
         helperText={customersCopy.form.phoneHelper}
+      />
+      <TextField
+        label={customersCopy.form.billingNameLabel}
+        name="billing_name"
+        value={billingName}
+        onChange={(event) => setBillingName(event.target.value)}
+        helperText={customersCopy.form.billingNameHelper}
+      />
+      <TextField
+        label={customersCopy.form.rtnLabel}
+        name="rtn"
+        value={rtn}
+        onChange={(event) => setRtn(event.target.value)}
+        helperText={customersCopy.form.rtnHelper}
       />
       <TextArea
         label={customersCopy.form.notesLabel}

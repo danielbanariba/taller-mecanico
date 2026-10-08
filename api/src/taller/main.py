@@ -7,6 +7,7 @@ from taller.export.adapters.router import export_router
 from taller.health.router import router as health_router
 from taller.identity.adapters.router import router as identity_router
 from taller.inventory.adapters.router import router as inventory_router
+from taller.invoicing.adapters.router import invoicing_router
 from taller.workorders.adapters.router import work_orders_router
 
 
@@ -19,6 +20,7 @@ def create_app() -> FastAPI:
     app.include_router(customers_router, prefix="/api")
     app.include_router(vehicles_router, prefix="/api")
     app.include_router(work_orders_router, prefix="/api")
+    app.include_router(invoicing_router, prefix="/api")
     app.include_router(export_router, prefix="/api")
     return app
 

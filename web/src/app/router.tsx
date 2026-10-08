@@ -7,6 +7,7 @@ import { EditItemPage } from "../features/inventory/EditItemPage";
 import { InventoryPage } from "../features/inventory/InventoryPage";
 import { ItemDetailPage } from "../features/inventory/ItemDetailPage";
 import { NewItemPage } from "../features/inventory/NewItemPage";
+import { invoicingShellRoutes } from "../features/invoicing/routes";
 import { workOrderRoutes } from "../features/workorders/routes";
 import { AppErrorBoundary } from "./AppErrorBoundary";
 import { AppShell } from "./AppShell";
@@ -49,7 +50,11 @@ export const router = createBrowserRouter([
           },
           {
             path: "/ordenes",
-            children: workOrderRoutes,
+            // Invoicing's own routes (`facturacion`, ...) are spread in
+            // after `workOrderRoutes`, after the `caja` precedent
+            // (`design.md`'s AD-15): static segments outrank `:orderId`
+            // regardless of declaration order.
+            children: [...workOrderRoutes, ...invoicingShellRoutes],
           },
         ],
       },
@@ -68,6 +73,22 @@ export const router = createBrowserRouter([
         path: "/ordenes/:orderId/recibo/carta",
         lazy: async () => ({
           Component: (await import("../features/workorders/receipt/ReceiptLetterPage")).ReceiptLetterPage,
+        }),
+      },
+      // The Factura's own print routes (`fiscal-document-print` spec),
+      // siblings of the receipt routes above for the same reason (AD-16):
+      // no navigation chrome ever prints, and a workshop that never
+      // prints a Factura never downloads this chunk.
+      {
+        path: "/ordenes/:orderId/factura/:invoiceId/58mm",
+        lazy: async () => ({
+          Component: (await import("../features/invoicing/print/Invoice58Page")).Invoice58Page,
+        }),
+      },
+      {
+        path: "/ordenes/:orderId/factura/:invoiceId/carta",
+        lazy: async () => ({
+          Component: (await import("../features/invoicing/print/InvoiceLetterPage")).InvoiceLetterPage,
         }),
       },
     ],

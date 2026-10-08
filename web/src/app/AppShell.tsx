@@ -84,6 +84,13 @@ export function AppShell() {
             {appCopy.more.cashSummary}
           </LinkButton>
 
+          {/* Visible regardless of fiscal-profile state (`fiscal-profile`
+              spec's "The menu entry is visible with no profile yet"): it is
+              also the only way to reach the form that creates the first one. */}
+          <LinkButton to="/ordenes/facturacion" variant="secondary" onClick={() => setMoreOpen(false)}>
+            {appCopy.more.invoicing}
+          </LinkButton>
+
           {isOffline ? <Alert variant="info">{appCopy.more.exportOfflineDisabled}</Alert> : null}
           {exportError ? <Alert variant="error">{exportError}</Alert> : null}
           <Button

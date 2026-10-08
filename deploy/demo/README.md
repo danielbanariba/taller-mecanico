@@ -134,6 +134,36 @@ amount and balance. The "Más" menu's "Caja del día" shows both payments
 (bucketed by their `America/Tegucigalpa` local day); "Exportar todo"
 downloads a ZIP with one CSV per entity, including both payments.
 
+### Fiscal invoicing (phase A, `sar-invoicing`)
+
+**Real (non-demo) invoicing is out of scope for v1.** Nothing here, in
+the seed script, or anywhere else in this phase's configuration invites
+a real workshop to issue a real Factura with this module: phase A's only
+deployment target is this public demo. Real issuance waits for phase B
+plus a Honduran contador's review of a printed sample of both layouts
+(`openspec/changes/sar-invoicing/proposal.md`, open questions 1 and 2).
+
+The seed also saves an obviously fictional fiscal profile ("Taller
+Demostración S. de R.L." / "Taller Demo", RTN `99999999999999`,
+establecimiento/punto de emisión `001`/`001`), gives María Hernández's
+customer record a billing name and RTN (`99999999990001`), registers one
+fictional Factura (`01`) CAI range (bounds 1-500), and issues a Factura
+on the Corolla alignment order (`001-001-01-00000001`, L400.00: gravado
+L347.83 / ISV L52.17). Both print layouts
+(`/ordenes/<id>/factura/<id>/58mm` and `/carta`, by URL) carry the
+"DEMOSTRACIÓN — SIN VALOR FISCAL" watermark (`design.md`'s AD-17).
+
+**Yearly re-registration.** The seeded range's `issue_deadline` is a date
+fixed in the seed script itself (`range_deadline`), not computed from
+"today": the registration payload must be byte-identical on every rerun
+for the server's replay check to succeed, and a deadline computed from
+"today" would change every day the script runs. Once that fixed date
+passes, issuing a new Factura on the demo needs a *new* range with a
+later deadline -- a used range is immutable (AD-4), so the existing one
+cannot simply be edited. Register it the same way the seed script does
+(`POST /api/invoicing/cai-ranges`), or bump `range_deadline` in
+`seed-demo-account.sh` and rerun the script with a fresh `range_id`.
+
 ```sh
 bash -c 'set -a; . ~/.config/taller-mecanico/demo.env; set +a; \
   /home/banar/Desktop/taller-mecanico-worktrees/demo/deploy/demo/seed-demo-account.sh'
@@ -166,6 +196,32 @@ curl -s https://inventario-taller.danielbanariba.com/api/health
 
 A new build changes the service worker, so testers get the new version on
 their next visit (`registerType: "autoUpdate"`).
+
+## Rolling back a deployment
+
+Every fiscal document this demo has ever issued is fictional (see
+"Fiscal invoicing" above), so rolling back a phase that already seeded
+invoicing data is safe -- but only through this exact sequence, never a
+bare `alembic downgrade` once any such document exists:
+
+1. Dump the demo database first, every time:
+   `docker exec taller-demo-db pg_dump -U taller taller_demo > taller_demo-<phase>.sql`.
+   Also record `alembic current` and the deployed commit.
+2. With the phase's code checked out in the demo worktree, downgrade:
+   `uv run --frozen --env-file ~/.config/taller-mecanico/demo.env alembic downgrade <previous revision>`.
+   From phase A on, once any row exists in `fiscal_invoices` (phase B:
+   also `fiscal_credit_notes`), this refuses by itself
+   (`design.md`'s AD-20) unless re-run with
+   `-x discard_fiscal_documents=demo` -- which is safe here specifically
+   because every document in this database is fictional and was just
+   dumped in step 1. **Never pass that flag against a database holding
+   real fiscal documents**; on one of those, revert the code only and
+   keep the tables, per the Rollback Plan in
+   `openspec/changes/sar-invoicing/proposal.md`.
+3. `git -C /home/banar/Desktop/taller-mecanico-worktrees/demo checkout --detach <previous commit>`,
+   rebuild the web with `demo.env`, and restart both units (the same
+   three steps as "Deploying an update" above, with the older commit).
+4. Phase B rolls back before phase A.
 
 ## Stopping and starting
 

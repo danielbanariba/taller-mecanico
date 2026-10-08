@@ -24,6 +24,8 @@ def _customer(phone: str | None) -> Customer:
         full_name="Maria Hernandez",
         phone=phone,
         notes=None,
+        billing_name=None,
+        rtn=None,
         archived_at=None,
         created_at=now,
         updated_at=now,

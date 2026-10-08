@@ -23,6 +23,10 @@ export const customersCopy = {
     nameTooLong: "El nombre no puede tener más de 120 caracteres.",
     phoneLabel: "Teléfono",
     phoneHelper: "Opcional. Por ejemplo 9876-5432.",
+    billingNameLabel: "Nombre de facturación (razón social)",
+    billingNameHelper: "Opcional. Se usa para emitir facturas a nombre del cliente.",
+    rtnLabel: "RTN",
+    rtnHelper: "Opcional. 14 dígitos, con o sin guiones.",
     notesLabel: "Notas",
   },
   create: {
@@ -50,6 +54,8 @@ export const customersCopy = {
   detail: {
     backToList: "Volver a clientes",
     editCustomer: "Editar cliente",
+    billingNameLabel: "Nombre de facturación",
+    rtnLabel: "RTN",
     vehiclesTitle: "Vehículos",
     addVehicle: "Agregar vehículo",
     ordersTitle: "Órdenes",
@@ -120,6 +126,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   customer_id_conflict: "No se pudo guardar el cliente. Intente de nuevo.",
   customer_not_found: "No se encontró el cliente.",
   invalid_phone: "El teléfono no es válido. Use un número hondureño de 8 dígitos.",
+  invalid_rtn: "El RTN no es válido. Debe tener 14 dígitos.",
   vehicle_id_conflict: "No se pudo guardar el vehículo. Intente de nuevo.",
   vehicle_not_found: "No se encontró el vehículo.",
   plate_taken: "Ya existe un vehículo activo con esa placa.",

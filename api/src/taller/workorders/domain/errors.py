@@ -124,3 +124,16 @@ class PaymentNotFound(Exception):
     def __init__(self, payment_id: uuid.UUID) -> None:
         super().__init__(f"Payment not found: {payment_id}")
         self.payment_id = payment_id
+
+
+class WorkOrderInvoiced(Exception):
+    """Raised when a line is added, edited or removed on an order that
+    has a non-credited Factura (`design.md`'s AD-2). Distinct from
+    `WorkOrderLocked`: a `completed` order with an active invoice is
+    still editable by status, but its lines are frozen because a fiscal
+    document already snapshotted them.
+    """
+
+    def __init__(self, order_id: uuid.UUID) -> None:
+        super().__init__(f"Work order has an active Factura: {order_id}")
+        self.order_id = order_id

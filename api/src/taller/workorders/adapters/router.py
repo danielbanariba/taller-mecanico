@@ -51,7 +51,7 @@ from taller.workorders.adapters.schemas import (
     WorkOrderSummaryOut,
     WorkOrderUpdateRequest,
 )
-from taller.workorders.application.ports import PaymentRepository
+from taller.workorders.application.ports import PaymentRepository, WorkOrderRepository
 from taller.workorders.application.use_cases import (
     add_line,
     change_status,
@@ -74,6 +74,7 @@ from taller.workorders.domain.errors import (
     PaymentNotFound,
     WorkOrderHasPayments,
     WorkOrderIdConflict,
+    WorkOrderInvoiced,
     WorkOrderLineIdConflict,
     WorkOrderLineNotFound,
     WorkOrderLocked,
@@ -122,6 +123,7 @@ def _to_out(
     order: WorkOrder,
     *,
     workshop_id: uuid.UUID,
+    order_repo: WorkOrderRepository,
     vehicle_repo: VehicleRepository,
     customer_repo: CustomerRepository,
     payment_repo: PaymentRepository,
@@ -130,7 +132,14 @@ def _to_out(
         order, workshop_id=workshop_id, vehicle_repo=vehicle_repo, customer_repo=customer_repo
     )
     payments = payment_repo.list_for_order(workshop_id=workshop_id, order_id=order.id)
-    return WorkOrderOut.from_domain(order, vehicle=vehicle, customer=customer, payments=payments)
+    active_invoice = order_repo.active_invoice(workshop_id=workshop_id, order_id=order.id)
+    return WorkOrderOut.from_domain(
+        order,
+        vehicle=vehicle,
+        customer=customer,
+        payments=payments,
+        active_invoice=active_invoice,
+    )
 
 
 @work_orders_router.get("/work-orders", response_model=list[WorkOrderSummaryOut])
@@ -244,6 +253,7 @@ def create_work_order_route(
     return _to_out(
         order,
         workshop_id=workshop_id,
+        order_repo=order_repo,
         vehicle_repo=vehicle_repo,
         customer_repo=customer_repo,
         payment_repo=payment_repo,
@@ -267,6 +277,7 @@ def get_work_order_route(
     return _to_out(
         order,
         workshop_id=workshop_id,
+        order_repo=order_repo,
         vehicle_repo=vehicle_repo,
         customer_repo=customer_repo,
         payment_repo=payment_repo,
@@ -299,6 +310,7 @@ def update_work_order_route(
     return _to_out(
         order,
         workshop_id=workshop_id,
+        order_repo=order_repo,
         vehicle_repo=vehicle_repo,
         customer_repo=customer_repo,
         payment_repo=payment_repo,
@@ -351,6 +363,7 @@ def change_status_route(
     return _to_out(
         order,
         workshop_id=workshop_id,
+        order_repo=order_repo,
         vehicle_repo=vehicle_repo,
         customer_repo=customer_repo,
         payment_repo=payment_repo,
@@ -398,6 +411,9 @@ def add_line_route(
     except WorkOrderLocked as exc:
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, detail="work_order_locked") from exc
+    except WorkOrderInvoiced as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="work_order_invoiced") from exc
     except WorkOrderLineIdConflict as exc:
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, detail="work_order_line_id_conflict") from exc
@@ -417,6 +433,7 @@ def add_line_route(
     return _to_out(
         order,
         workshop_id=workshop_id,
+        order_repo=order_repo,
         vehicle_repo=vehicle_repo,
         customer_repo=customer_repo,
         payment_repo=payment_repo,
@@ -460,6 +477,9 @@ def update_line_route(
     except WorkOrderLocked as exc:
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, detail="work_order_locked") from exc
+    except WorkOrderInvoiced as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="work_order_invoiced") from exc
     except MovementIdConflict as exc:
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, detail="movement_id_conflict") from exc
@@ -471,6 +491,7 @@ def update_line_route(
     return _to_out(
         order,
         workshop_id=workshop_id,
+        order_repo=order_repo,
         vehicle_repo=vehicle_repo,
         customer_repo=customer_repo,
         payment_repo=payment_repo,
@@ -511,6 +532,9 @@ def remove_line_route(
     except WorkOrderLocked as exc:
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, detail="work_order_locked") from exc
+    except WorkOrderInvoiced as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="work_order_invoiced") from exc
     except MovementIdConflict as exc:
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, detail="movement_id_conflict") from exc
@@ -522,6 +546,7 @@ def remove_line_route(
     return _to_out(
         order,
         workshop_id=workshop_id,
+        order_repo=order_repo,
         vehicle_repo=vehicle_repo,
         customer_repo=customer_repo,
         payment_repo=payment_repo,
@@ -577,6 +602,7 @@ def record_payment_route(
     return _to_out(
         order,
         workshop_id=workshop_id,
+        order_repo=order_repo,
         vehicle_repo=vehicle_repo,
         customer_repo=customer_repo,
         payment_repo=payment_repo,
@@ -618,6 +644,7 @@ def void_payment_route(
     return _to_out(
         order,
         workshop_id=workshop_id,
+        order_repo=order_repo,
         vehicle_repo=vehicle_repo,
         customer_repo=customer_repo,
         payment_repo=payment_repo,

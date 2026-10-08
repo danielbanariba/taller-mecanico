@@ -9,6 +9,7 @@ import { Alert } from "../../shared/ui/Alert";
 import { Button } from "../../shared/ui/Button";
 import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
+import { InvoiceSection } from "../invoicing/issue/InvoiceSection";
 import { isReceiptEligible } from "./receipt/useReceiptOrder";
 import { ShareWhatsAppButton } from "./ShareWhatsAppButton";
 import { StatusActions } from "./StatusActions";
@@ -155,6 +156,10 @@ export function WorkOrderDetailPage() {
 
       <StatusActions order={data} />
       <ShareWhatsAppButton order={data} workshopName={workshopName} />
+
+      {/* Ahead of the receipt links, never hiding them (`fiscal-invoices`
+          spec's "The Factura Action Is Offered First..."). */}
+      <InvoiceSection order={data} />
 
       {isReceiptEligible(data.status) ? (
         <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">

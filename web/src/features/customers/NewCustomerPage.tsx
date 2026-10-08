@@ -21,6 +21,8 @@ export function NewCustomerPage() {
         full_name: values.fullName,
         phone: values.phone || undefined,
         notes: values.notes || undefined,
+        billing_name: values.billingName || undefined,
+        rtn: values.rtn || undefined,
       },
       {
         onSuccess: () => navigate("/clientes", { replace: true }),

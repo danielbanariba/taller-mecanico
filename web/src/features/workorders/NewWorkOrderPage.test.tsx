@@ -21,6 +21,7 @@ function orderResponse(id: string, vehicleId: string): WorkOrderOut {
     status: "quote",
     allowed_transitions: ["approved", "cancelled"],
     lines_editable: true,
+    active_invoice: null,
     vehicle: { id: vehicleId, vehicle_type: "car", make: "Toyota", model: "Corolla", year: 2015, plate: "HAB1234" },
     customer: { id: "c1", full_name: "María Hernández", phone: "98765432", phone_is_mobile: true },
     complaint: null,

@@ -131,6 +131,22 @@ describe("AppShell", () => {
     expect(screen.getByRole("button", { name: "Cerrar sesión" })).toBeInTheDocument();
   });
 
+  it("'Más' menu shows a 'Facturación' entry regardless of fiscal-profile state", async () => {
+    // Defect this catches: the entry hidden until a profile exists, which
+    // would block the only path a workshop has to create its first one
+    // (`fiscal-profile` spec, "The menu entry is visible with no profile
+    // yet").
+    mockSession();
+    server.use(http.get("/api/inventory/items", () => HttpResponse.json([])));
+    const user = userEvent.setup();
+    renderShell("/inventario");
+
+    await screen.findByText("Taller Ana");
+    await user.click(screen.getByRole("button", { name: "Más" }));
+
+    expect(screen.getByRole("link", { name: "Facturación" })).toHaveAttribute("href", "/ordenes/facturacion");
+  });
+
   it("disables 'Exportar todo' while offline, with the Spanish message", async () => {
     // Defect this catches: exporting attempted (or silently allowed)
     // offline, when the API it needs is unreachable anyway.

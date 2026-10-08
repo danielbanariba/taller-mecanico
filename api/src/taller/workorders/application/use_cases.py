@@ -40,6 +40,7 @@ from taller.workorders.domain.errors import (
     PaymentNotFound,
     WorkOrderHasPayments,
     WorkOrderIdConflict,
+    WorkOrderInvoiced,
     WorkOrderLineIdConflict,
     WorkOrderLineNotFound,
     WorkOrderLocked,
@@ -462,6 +463,8 @@ def add_line(
 
     if order.status not in EDITABLE:
         raise WorkOrderLocked(order_id)
+    if order_repo.active_invoice(workshop_id=workshop_id, order_id=order_id) is not None:
+        raise WorkOrderInvoiced(order_id)
 
     if kind == LineKind.inventory_part:
         item = item_repo.get_by_id(workshop_id=workshop_id, item_id=item_id)
@@ -542,6 +545,8 @@ def update_line(
 
     if order.status not in EDITABLE:
         raise WorkOrderLocked(order_id)
+    if order_repo.active_invoice(workshop_id=workshop_id, order_id=order_id) is not None:
+        raise WorkOrderInvoiced(order_id)
 
     if "description" in fields:
         line.description = fields["description"].strip()
@@ -605,6 +610,8 @@ def remove_line(
 
     if order.status not in EDITABLE:
         raise WorkOrderLocked(order_id)
+    if order_repo.active_invoice(workshop_id=workshop_id, order_id=order_id) is not None:
+        raise WorkOrderInvoiced(order_id)
 
     now = datetime.now(UTC)
     line.removed_at = now

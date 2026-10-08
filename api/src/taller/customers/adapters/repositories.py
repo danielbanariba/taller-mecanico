@@ -16,6 +16,8 @@ def _customer_from_model(model: CustomerModel) -> Customer:
         full_name=model.full_name,
         phone=model.phone,
         notes=model.notes,
+        billing_name=model.billing_name,
+        rtn=model.rtn,
         archived_at=model.archived_at,
         created_at=model.created_at,
         updated_at=model.updated_at,
@@ -66,6 +68,8 @@ class SqlAlchemyCustomerRepository:
                 full_name=customer.full_name,
                 phone=customer.phone,
                 notes=customer.notes,
+                billing_name=customer.billing_name,
+                rtn=customer.rtn,
                 archived_at=customer.archived_at,
                 created_at=customer.created_at,
                 updated_at=customer.updated_at,
@@ -80,6 +84,8 @@ class SqlAlchemyCustomerRepository:
         model.full_name = customer.full_name
         model.phone = customer.phone
         model.notes = customer.notes
+        model.billing_name = customer.billing_name
+        model.rtn = customer.rtn
         model.archived_at = customer.archived_at
         model.updated_at = customer.updated_at
         self._session.flush()

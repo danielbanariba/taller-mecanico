@@ -56,3 +56,11 @@ class InvalidPlate(ValueError):
     def __init__(self, raw: str) -> None:
         super().__init__(f"Invalid plate: {raw!r}")
         self.raw = raw
+
+
+class InvalidRtn(ValueError):
+    """Raised when a value cannot be normalized into a valid 14-digit RTN."""
+
+    def __init__(self, raw: str) -> None:
+        super().__init__(f"Invalid RTN: {raw!r}")
+        self.raw = raw

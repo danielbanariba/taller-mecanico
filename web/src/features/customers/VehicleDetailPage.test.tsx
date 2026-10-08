@@ -35,6 +35,8 @@ const VEHICLE: VehicleDetailOut = {
     phone: null,
     phone_is_mobile: null,
     notes: null,
+    billing_name: null,
+    rtn: null,
     archived_at: null,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",

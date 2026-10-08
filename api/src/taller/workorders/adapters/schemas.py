@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from taller.customers.domain.entities import Customer, Vehicle, VehicleType
 from taller.workorders.domain.entities import (
     CashSummaryEntry,
+    InvoiceRef,
     LineKind,
     Payment,
     PaymentMethod,
@@ -264,6 +265,15 @@ class WorkOrderSummaryOut(BaseModel):
         )
 
 
+class InvoiceRefOut(BaseModel):
+    id: uuid.UUID
+    number: str
+
+    @classmethod
+    def from_domain(cls, invoice_ref: InvoiceRef) -> "InvoiceRefOut":
+        return cls(id=invoice_ref.id, number=invoice_ref.number)
+
+
 class WorkOrderOut(BaseModel):
     id: uuid.UUID
     number: int
@@ -277,6 +287,7 @@ class WorkOrderOut(BaseModel):
     total_cents: int
     allowed_transitions: list[WorkOrderStatus]
     lines_editable: bool
+    active_invoice: InvoiceRefOut | None
     payments: list[PaymentOut]
     paid_cents: int
     balance_cents: int
@@ -297,6 +308,7 @@ class WorkOrderOut(BaseModel):
         vehicle: Vehicle,
         customer: Customer,
         payments: list[Payment],
+        active_invoice: InvoiceRef | None,
     ) -> "WorkOrderOut":
         return cls(
             id=order.id,
@@ -314,7 +326,10 @@ class WorkOrderOut(BaseModel):
             ],
             total_cents=order_total_cents(order.lines),
             allowed_transitions=sorted(TRANSITIONS[order.status]),
-            lines_editable=order.status in EDITABLE,
+            lines_editable=order.status in EDITABLE and active_invoice is None,
+            active_invoice=(
+                InvoiceRefOut.from_domain(active_invoice) if active_invoice is not None else None
+            ),
             payments=[PaymentOut.from_domain(payment) for payment in payments],
             paid_cents=paid_cents(payments),
             balance_cents=balance_cents(order.lines, payments),
