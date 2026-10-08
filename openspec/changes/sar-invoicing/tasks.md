@@ -210,7 +210,7 @@ Each row is one work-unit commit inside its phase's single PR (no separate PR pe
 - [x] **PA.S6.T6 (RED)** [inline] Add to `test_issue_invoice_api.py`: no status in `INVOICEABLE` has `CANCELLED` reachable from it in `TRANSITIONS`. **Defect it catches:** a future back-edge (`completed → cancelled`) would let an invoiced order be cancelled with no guard. **Evidence:** `test_no_invoiceable_status_can_reach_cancelled` added; passed immediately against the existing `TRANSITIONS`/`INVOICEABLE` tables (both already acyclic by AD-7's design) — no red phase, as task text itself anticipates (see T7).
 - [x] **PA.S6.T7 (GREEN)** [inline] Confirm T6 passes against the existing `TRANSITIONS` table (no production change expected). **Evidence:** confirmed — passed with zero production changes, exactly as anticipated.
 - [x] **PA.S6.T8** [inline] Run this slice's verification: `uv run ruff check . && uv run ruff format --check . && uv run pytest`. **Evidence:** `uv run ruff check .` → "All checks passed!" (after removing one dead `for target in (...): pass` loop artifact from an earlier draft of `test_invoiced_lock.py`, caught as `B007`). `uv run ruff format --check .` → clean (after `uv run ruff format .` reformatted 2 files: `workorders/adapters/repositories.py` and `workorders/application/ports.py`, both just-added `active_invoice` signatures). `uv run pytest` → 359 passed.
-- [ ] **PA.S6.T9** [inline] Work-unit commit: `:sparkles: feat(workorders): lock lines while an order has a non-credited Factura`.
+- [x] **PA.S6.T9** [inline] Work-unit commit: `:sparkles: feat(workorders): lock lines while an order has a non-credited Factura`.
 
 ### Slice PA.S7 — Web: customer billing name and RTN in the form and detail
 
