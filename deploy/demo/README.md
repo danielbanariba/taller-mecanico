@@ -141,7 +141,7 @@ the seed script, or anywhere else in this phase's configuration invites
 a real workshop to issue a real Factura with this module: phase A's only
 deployment target is this public demo. Real issuance waits for phase B
 plus a Honduran contador's review of a printed sample of both layouts
-(`openspec/changes/sar-invoicing/proposal.md`, open questions 1 and 2).
+(`openspec/changes/archive/2026-10-08-sar-invoicing/proposal.md`, open questions 1 and 2).
 
 The seed also saves an obviously fictional fiscal profile ("Taller
 Demostración S. de R.L." / "Taller Demo", RTN `99999999999999`,
@@ -235,7 +235,7 @@ bare `alembic downgrade` once any such document exists:
    dumped in step 1. **Never pass that flag against a database holding
    real fiscal documents**; on one of those, revert the code only and
    keep the tables, per the Rollback Plan in
-   `openspec/changes/sar-invoicing/proposal.md`.
+   `openspec/changes/archive/2026-10-08-sar-invoicing/proposal.md`.
 3. `git -C /home/banar/Desktop/taller-mecanico-worktrees/demo checkout --detach <previous commit>`,
    rebuild the web with `demo.env`, and restart both units (the same
    three steps as "Deploying an update" above, with the older commit).
