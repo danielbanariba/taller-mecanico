@@ -54,11 +54,11 @@ export function Invoice58Page() {
       <PrintActionBar onlyOriginal={onlyOriginal} onToggleOnlyOriginal={setOnlyOriginal} />
       <ThermalPageStyle>
         <div className="flex flex-col gap-3">
-          <InvoiceDocument invoice={data} copy="original" />
+          <InvoiceDocument invoice={data} copy="original" layout="thermal" />
           {onlyOriginal ? null : (
             <>
               <p className="text-center text-xs">{invoicingCopy.print.cutHereLabel}</p>
-              <InvoiceDocument invoice={data} copy="issuer" />
+              <InvoiceDocument invoice={data} copy="issuer" layout="thermal" />
             </>
           )}
         </div>

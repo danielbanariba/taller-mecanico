@@ -120,6 +120,19 @@ describe("InvoiceDocument", () => {
     expect(screen.getAllByText(/L 0.00/).length).toBe(3);
   });
 
+  it("still shows each line's quantity and unit price on the 58 mm (thermal) layout, without a wide table", () => {
+    // Defect this catches: the 58 mm article (about 181px) is narrower
+    // than the three-column lines table (about 223px), so the table
+    // overflows the paper and the "Precio unitario" column runs past the
+    // edge. Restructuring the thermal layout to fit must not silently
+    // drop a line's quantity or unit value (Art. 10 requires both).
+    render(<InvoiceDocument invoice={INVOICE} copy="original" layout="thermal" />);
+
+    expect(screen.getByText("Cambio de aceite")).toBeInTheDocument();
+    expect(screen.getByText("1 × L 500.00")).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
   it("prints the original-to-customer legend for the 'original' copy and the copy-to-issuer legend for 'issuer'", () => {
     // Defect this catches: both printed copies carrying the same
     // destination legend, which would leave the customer or the issuer

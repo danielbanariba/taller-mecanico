@@ -5,9 +5,45 @@ import { DemoBand } from "./DemoBand";
 
 export type InvoiceCopyKind = "original" | "issuer";
 
+/**
+ * "letter" (the default) keeps the full-width lines table the letter
+ * layout has room for. "thermal" is `Invoice58Page`'s 58 mm paper, whose
+ * printable article is far narrower than the table (`fiscal-document-
+ * print` spec's print layouts): it stacks each line's fields instead of
+ * a `<table>`, and keeps a short value like `invoice.number` or an ISO
+ * date on its own line below its label, since the label's own width
+ * would otherwise push the value past the paper edge and wrap it
+ * mid-token.
+ */
+export type InvoiceDocumentLayout = "letter" | "thermal";
+
 export interface InvoiceDocumentProps {
   invoice: FiscalInvoiceOut;
   copy: InvoiceCopyKind;
+  layout?: InvoiceDocumentLayout;
+}
+
+interface MetaFieldProps {
+  label: string;
+  value: string;
+  layout: InvoiceDocumentLayout;
+}
+
+/** Renders "label: value" inline on the letter layout, or the value on its own line below the label on the thermal layout (see `InvoiceDocumentLayout`). */
+function MetaField({ label, value, layout }: MetaFieldProps) {
+  if (layout === "thermal") {
+    return (
+      <>
+        <p>{label}:</p>
+        <p className="whitespace-nowrap font-semibold">{value}</p>
+      </>
+    );
+  }
+  return (
+    <p>
+      {label}: {value}
+    </p>
+  );
 }
 
 /**
@@ -38,7 +74,7 @@ function formatIssuedAt(isoTimestamp: string): string {
  * go through `formatCents` ("L 0.00"), never a blank or omitted row
  * (`fiscal-document-print` spec's "Zero-Value Fields Print As L 0.00").
  */
-export function InvoiceDocument({ invoice, copy }: InvoiceDocumentProps) {
+export function InvoiceDocument({ invoice, copy, layout = "letter" }: InvoiceDocumentProps) {
   const destinationLabel =
     copy === "original" ? invoicingCopy.print.originalLabel : invoicingCopy.print.issuerCopyLabel;
 
@@ -58,19 +94,13 @@ export function InvoiceDocument({ invoice, copy }: InvoiceDocumentProps) {
       </section>
 
       <section className="flex flex-col">
-        <p>
-          {invoicingCopy.print.numberLabel}: {invoice.number}
-        </p>
+        <MetaField label={invoicingCopy.print.numberLabel} value={invoice.number} layout={layout} />
         <p>CAI: {invoice.cai}</p>
         <p>
           {invoicingCopy.print.rangeLabel}: {invoice.range_first_number} - {invoice.range_last_number}
         </p>
-        <p>
-          {invoicingCopy.print.deadlineLabel}: {invoice.issue_deadline}
-        </p>
-        <p>
-          {invoicingCopy.print.dateLabel}: {invoice.issue_date}
-        </p>
+        <MetaField label={invoicingCopy.print.deadlineLabel} value={invoice.issue_deadline} layout={layout} />
+        <MetaField label={invoicingCopy.print.dateLabel} value={invoice.issue_date} layout={layout} />
         <p>
           {invoicingCopy.print.issuedAtLabel}: {formatIssuedAt(invoice.issued_at)}
         </p>
@@ -83,24 +113,42 @@ export function InvoiceDocument({ invoice, copy }: InvoiceDocumentProps) {
         {invoice.buyer_rtn ? <p>RTN: {invoice.buyer_rtn}</p> : null}
       </section>
 
-      <table className="w-full text-left">
-        <thead>
-          <tr>
-            <th>{invoicingCopy.print.descriptionLabel}</th>
-            <th>{invoicingCopy.print.quantityLabel}</th>
-            <th>{invoicingCopy.print.unitPriceLabel}</th>
-          </tr>
-        </thead>
-        <tbody>
+      {layout === "thermal" ? (
+        // The 58 mm article is far narrower than a three-column table
+        // (`fiscal-document-print` spec's print layouts), so each line
+        // stacks its description above its quantity and unit value,
+        // keeping all three Art. 10 mandatory fields without overflowing
+        // the paper width.
+        <div className="flex flex-col gap-1">
           {invoice.lines.map((line) => (
-            <tr key={line.id}>
-              <td>{line.description}</td>
-              <td>{line.quantity}</td>
-              <td>{formatCents(line.unit_price_cents)}</td>
-            </tr>
+            <div key={line.id} className="flex flex-col">
+              <span>{line.description}</span>
+              <span>
+                {line.quantity} × {formatCents(line.unit_price_cents)}
+              </span>
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      ) : (
+        <table className="w-full text-left">
+          <thead>
+            <tr>
+              <th>{invoicingCopy.print.descriptionLabel}</th>
+              <th>{invoicingCopy.print.quantityLabel}</th>
+              <th>{invoicingCopy.print.unitPriceLabel}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoice.lines.map((line) => (
+              <tr key={line.id}>
+                <td>{line.description}</td>
+                <td>{line.quantity}</td>
+                <td>{formatCents(line.unit_price_cents)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       <section className="flex flex-col">
         <p>
