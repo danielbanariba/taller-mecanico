@@ -83,7 +83,7 @@ A work order's non-fiscal receipt (`web/src/features/workorders/receipt/`) is a 
 
 ### Web: container/presentational + shared UI kit
 
-`web/src/features/<feature>/` (`auth`, `inventory`, `customers`, `workorders`) hold screens (containers, wired to TanStack Query and the API client) and presentational components (props in, JSX out, no fetching) side by side, plus one `api.ts` and one `copy.ts` per feature. `web/src/shared/ui/` is the atomic kit (`Button`, `Spinner`, ...) shared across features; `web/src/shared/format/money.ts` holds the lempira formatting/parsing helpers once a second feature needed them. `web/src/app/` wires routing (`router.tsx`) and the session guard (`RequireSession.tsx`).
+`web/src/features/<feature>/` (`auth`, `inventory`, `customers`, `workorders`) hold screens (containers, wired to TanStack Query and the API client) and presentational components (props in, JSX out, no fetching) side by side, plus one `api.ts` and one `copy.ts` per feature. `web/src/shared/ui/` is the atomic kit (`Button`, `Spinner`, ...) shared across features; `web/src/shared/format/money.ts` holds the lempira formatting/parsing helpers and `web/src/shared/format/phone.ts` the Honduran phone formatter, each moved there once a second feature needed it. `web/src/app/` wires routing (`router.tsx`) and the session guard (`RequireSession.tsx`).
 
 `copy.ts` holds every Spanish user-facing string for its feature in one object, plus a map from an API error `code` (the `detail` string FastAPI returns) to the Spanish message shown for it. The API itself never returns Spanish — it returns English error codes in `detail`, and the web layer is solely responsible for localizing them.
 

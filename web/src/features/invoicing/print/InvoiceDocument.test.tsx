@@ -58,7 +58,7 @@ describe("InvoiceDocument", () => {
     expect(screen.getByText("Taller Ana S. de R.L.")).toBeInTheDocument(); // razón social
     expect(screen.getByText("Taller Ana")).toBeInTheDocument(); // nombre comercial
     expect(screen.getByText("Col. Kennedy, Tegucigalpa")).toBeInTheDocument(); // address
-    expect(screen.getByText("22223333")).toBeInTheDocument(); // phone
+    expect(screen.getByText("2222-3333")).toBeInTheDocument(); // phone, grouped like every other phone in the app
     expect(screen.getByText("taller@example.com")).toBeInTheDocument(); // email
     expect(screen.getByText("FACTURA")).toBeInTheDocument(); // document name
     expect(screen.getByText(/A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3/)).toBeInTheDocument(); // CAI
@@ -104,6 +104,17 @@ describe("InvoiceDocument", () => {
     render(<InvoiceDocument invoice={{ ...INVOICE, buyer_name: null, buyer_rtn: null }} copy="original" />);
 
     expect(screen.getByText(/CONSUMIDOR FINAL/)).toBeInTheDocument();
+  });
+
+  it("formats the issuer phone instead of printing it as unformatted digits", () => {
+    // Defect this catches: printing `invoice.issuer_phone` verbatim
+    // ("22000000") instead of grouped the way every other phone in the
+    // app reads ("2200-0000"), the same `formatPhone` helper
+    // `customers` already uses.
+    render(<InvoiceDocument invoice={{ ...INVOICE, issuer_phone: "22000000" }} copy="original" />);
+
+    expect(screen.getByText("2200-0000")).toBeInTheDocument();
+    expect(screen.queryByText("22000000")).not.toBeInTheDocument();
   });
 
   it("renders zero exento, exonerado and discount amounts as 'L 0.00', never blank", () => {

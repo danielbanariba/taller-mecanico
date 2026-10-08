@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatPhone } from "./format";
+import { formatPhone } from "./phone";
 
 describe("formatPhone", () => {
   it("groups a normalized phone as 4-4 so it reads like a local number", () => {

@@ -1,4 +1,5 @@
 import { formatCents } from "../../../shared/format/money";
+import { formatPhone } from "../../../shared/format/phone";
 import { invoicingCopy } from "../copy";
 import type { FiscalInvoiceOut } from "../api";
 import { DemoBand } from "./DemoBand";
@@ -89,7 +90,7 @@ export function InvoiceDocument({ invoice, copy, layout = "letter" }: InvoiceDoc
         <p>{invoice.issuer_trade_name}</p>
         <p>RTN: {invoice.issuer_rtn}</p>
         <p>{invoice.issuer_address}</p>
-        <p>{invoice.issuer_phone}</p>
+        <p>{formatPhone(invoice.issuer_phone)}</p>
         <p>{invoice.issuer_email}</p>
       </section>
 
