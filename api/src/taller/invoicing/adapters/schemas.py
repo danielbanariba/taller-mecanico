@@ -7,6 +7,7 @@ from pydantic import BaseModel, field_validator
 
 from taller.invoicing.application.use_cases import DocumentReadiness, InvoicingSettings
 from taller.invoicing.domain.document_number import DocumentNumber, DocumentType
+from taller.invoicing.domain.documents import FiscalInvoice, FiscalInvoiceLine
 from taller.invoicing.domain.profile import FiscalProfile
 from taller.invoicing.domain.ranges import CaiRange, RangeState
 
@@ -197,4 +198,126 @@ class InvoicingSettingsOut(BaseModel):
                 for r in settings.ranges
             ],
             documents=[DocumentReadinessOut.from_domain(d) for d in settings.documents],
+        )
+
+
+class FiscalInvoiceCreateRequest(BaseModel):
+    id: uuid.UUID
+    order_id: uuid.UUID
+    buyer_name: str | None = None
+    buyer_rtn: str | None = None
+
+
+class FiscalInvoiceLineOut(BaseModel):
+    id: uuid.UUID
+    position: int
+    source_line_id: uuid.UUID
+    kind: str
+    description: str
+    quantity: int
+    unit_price_cents: int
+    line_total_cents: int
+
+    @classmethod
+    def from_domain(cls, line: FiscalInvoiceLine) -> "FiscalInvoiceLineOut":
+        return cls(
+            id=line.id,
+            position=line.position,
+            source_line_id=line.source_line_id,
+            kind=line.kind,
+            description=line.description,
+            quantity=line.quantity,
+            unit_price_cents=line.unit_price_cents,
+            line_total_cents=line.line_total_cents,
+        )
+
+
+class FiscalInvoiceOut(BaseModel):
+    """The full Factura snapshot (AD-10): every field is copied at
+    issuance and never recomputed on read, so a later profile or
+    customer edit never changes what an already-issued document shows.
+    """
+
+    id: uuid.UUID
+    order_id: uuid.UUID
+    order_number: int
+    number: str
+    issued_at: datetime
+    issue_date: date
+    issuer_rtn: str
+    issuer_legal_name: str
+    issuer_trade_name: str
+    issuer_address: str
+    issuer_phone: str
+    issuer_email: str
+    cai: str
+    range_first_number: str
+    range_last_number: str
+    issue_deadline: date
+    buyer_name: str | None
+    buyer_rtn: str | None
+    exempt_cents: int
+    exonerated_cents: int
+    discount_cents: int
+    taxable_15_cents: int
+    isv_15_cents: int
+    total_cents: int
+    total_in_words: str
+    credited_at: datetime | None
+    lines: list[FiscalInvoiceLineOut]
+    created_at: datetime
+
+    @classmethod
+    def from_domain(cls, invoice: FiscalInvoice) -> "FiscalInvoiceOut":
+        return cls(
+            id=invoice.id,
+            order_id=invoice.order_id,
+            order_number=invoice.order_number,
+            number=invoice.number,
+            issued_at=invoice.issued_at,
+            issue_date=invoice.issue_date,
+            issuer_rtn=invoice.issuer_rtn,
+            issuer_legal_name=invoice.issuer_legal_name,
+            issuer_trade_name=invoice.issuer_trade_name,
+            issuer_address=invoice.issuer_address,
+            issuer_phone=invoice.issuer_phone,
+            issuer_email=invoice.issuer_email,
+            cai=invoice.cai,
+            range_first_number=invoice.range_first_number,
+            range_last_number=invoice.range_last_number,
+            issue_deadline=invoice.issue_deadline,
+            buyer_name=invoice.buyer_name,
+            buyer_rtn=invoice.buyer_rtn,
+            exempt_cents=invoice.exempt_cents,
+            exonerated_cents=invoice.exonerated_cents,
+            discount_cents=invoice.discount_cents,
+            taxable_15_cents=invoice.taxable_15_cents,
+            isv_15_cents=invoice.isv_15_cents,
+            total_cents=invoice.total_cents,
+            total_in_words=invoice.total_in_words,
+            credited_at=invoice.credited_at,
+            lines=[FiscalInvoiceLineOut.from_domain(line) for line in invoice.lines],
+            created_at=invoice.created_at,
+        )
+
+
+class FiscalInvoiceSummaryOut(BaseModel):
+    """The list shape for `GET /invoicing/invoices?order_id=`: no lines,
+    matching every other summary schema in this codebase.
+    """
+
+    id: uuid.UUID
+    number: str
+    issued_at: datetime
+    total_cents: int
+    credited_at: datetime | None
+
+    @classmethod
+    def from_domain(cls, invoice: FiscalInvoice) -> "FiscalInvoiceSummaryOut":
+        return cls(
+            id=invoice.id,
+            number=invoice.number,
+            issued_at=invoice.issued_at,
+            total_cents=invoice.total_cents,
+            credited_at=invoice.credited_at,
         )

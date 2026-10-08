@@ -6,8 +6,14 @@ from datetime import datetime
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
-from taller.invoicing.adapters.models import CaiRangeModel, FiscalProfileModel
+from taller.invoicing.adapters.models import (
+    CaiRangeModel,
+    FiscalInvoiceLineModel,
+    FiscalInvoiceModel,
+    FiscalProfileModel,
+)
 from taller.invoicing.domain.document_number import DocumentType
+from taller.invoicing.domain.documents import FiscalInvoice, FiscalInvoiceLine
 from taller.invoicing.domain.profile import FiscalProfile
 from taller.invoicing.domain.ranges import CaiRange
 
@@ -162,3 +168,162 @@ class SqlAlchemyCaiRangeRepository:
         )
         row = self._session.execute(statement).first()
         return row[0] if row is not None else None
+
+
+def _invoice_line_from_model(model: FiscalInvoiceLineModel) -> FiscalInvoiceLine:
+    return FiscalInvoiceLine(
+        id=model.id,
+        position=model.position,
+        source_line_id=model.source_line_id,
+        kind=model.kind,
+        description=model.description,
+        quantity=model.quantity,
+        unit_price_cents=model.unit_price_cents,
+        line_total_cents=model.line_total_cents,
+    )
+
+
+def _invoice_from_model(model: FiscalInvoiceModel, lines: list[FiscalInvoiceLine]) -> FiscalInvoice:
+    return FiscalInvoice(
+        id=model.id,
+        workshop_id=model.workshop_id,
+        order_id=model.order_id,
+        order_number=model.order_number,
+        cai_range_id=model.cai_range_id,
+        correlative=model.correlative,
+        number=model.number,
+        issued_at=model.issued_at,
+        issue_date=model.issue_date,
+        issuer_rtn=model.issuer_rtn,
+        issuer_legal_name=model.issuer_legal_name,
+        issuer_trade_name=model.issuer_trade_name,
+        issuer_address=model.issuer_address,
+        issuer_phone=model.issuer_phone,
+        issuer_email=model.issuer_email,
+        cai=model.cai,
+        range_first_number=model.range_first_number,
+        range_last_number=model.range_last_number,
+        issue_deadline=model.issue_deadline,
+        buyer_name=model.buyer_name,
+        buyer_rtn=model.buyer_rtn,
+        exempt_cents=model.exempt_cents,
+        exonerated_cents=model.exonerated_cents,
+        discount_cents=model.discount_cents,
+        taxable_15_cents=model.taxable_15_cents,
+        isv_15_cents=model.isv_15_cents,
+        total_cents=model.total_cents,
+        total_in_words=model.total_in_words,
+        credited_at=model.credited_at,
+        created_by=model.created_by,
+        created_at=model.created_at,
+        lines=lines,
+    )
+
+
+class SqlAlchemyFiscalInvoiceRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def _lines_for(self, invoice_id: uuid.UUID) -> list[FiscalInvoiceLine]:
+        models = (
+            self._session.query(FiscalInvoiceLineModel)
+            .filter(FiscalInvoiceLineModel.invoice_id == invoice_id)
+            .order_by(FiscalInvoiceLineModel.position)
+            .all()
+        )
+        return [_invoice_line_from_model(model) for model in models]
+
+    def get_by_id(self, *, workshop_id: uuid.UUID, invoice_id: uuid.UUID) -> FiscalInvoice | None:
+        model = (
+            self._session.query(FiscalInvoiceModel)
+            .filter(
+                FiscalInvoiceModel.id == invoice_id,
+                FiscalInvoiceModel.workshop_id == workshop_id,
+            )
+            .one_or_none()
+        )
+        if model is None:
+            return None
+        return _invoice_from_model(model, self._lines_for(invoice_id))
+
+    def has_active_for_order(self, *, workshop_id: uuid.UUID, order_id: uuid.UUID) -> bool:
+        return (
+            self._session.query(FiscalInvoiceModel)
+            .filter(
+                FiscalInvoiceModel.workshop_id == workshop_id,
+                FiscalInvoiceModel.order_id == order_id,
+                FiscalInvoiceModel.credited_at.is_(None),
+            )
+            .first()
+            is not None
+        )
+
+    def list_for_order(self, *, workshop_id: uuid.UUID, order_id: uuid.UUID) -> list[FiscalInvoice]:
+        models = (
+            self._session.query(FiscalInvoiceModel)
+            .filter(
+                FiscalInvoiceModel.workshop_id == workshop_id,
+                FiscalInvoiceModel.order_id == order_id,
+            )
+            .order_by(FiscalInvoiceModel.issued_at.desc())
+            .all()
+        )
+        return [_invoice_from_model(model, self._lines_for(model.id)) for model in models]
+
+    def add(self, invoice: FiscalInvoice) -> None:
+        self._session.add(
+            FiscalInvoiceModel(
+                id=invoice.id,
+                workshop_id=invoice.workshop_id,
+                order_id=invoice.order_id,
+                order_number=invoice.order_number,
+                cai_range_id=invoice.cai_range_id,
+                correlative=invoice.correlative,
+                number=invoice.number,
+                issued_at=invoice.issued_at,
+                issue_date=invoice.issue_date,
+                issuer_rtn=invoice.issuer_rtn,
+                issuer_legal_name=invoice.issuer_legal_name,
+                issuer_trade_name=invoice.issuer_trade_name,
+                issuer_address=invoice.issuer_address,
+                issuer_phone=invoice.issuer_phone,
+                issuer_email=invoice.issuer_email,
+                cai=invoice.cai,
+                range_first_number=invoice.range_first_number,
+                range_last_number=invoice.range_last_number,
+                issue_deadline=invoice.issue_deadline,
+                buyer_name=invoice.buyer_name,
+                buyer_rtn=invoice.buyer_rtn,
+                exempt_cents=invoice.exempt_cents,
+                exonerated_cents=invoice.exonerated_cents,
+                discount_cents=invoice.discount_cents,
+                taxable_15_cents=invoice.taxable_15_cents,
+                isv_15_cents=invoice.isv_15_cents,
+                total_cents=invoice.total_cents,
+                total_in_words=invoice.total_in_words,
+                credited_at=invoice.credited_at,
+                created_by=invoice.created_by,
+                created_at=invoice.created_at,
+            )
+        )
+        # Flushed before the lines so the invoice row exists for their FK
+        # (mirrors `SqlAlchemyWorkOrderRepository.add`'s order-then-lines
+        # ordering): no `relationship()` connects the two mapped classes,
+        # so the unit of work has no dependency to sort insertion by.
+        self._session.flush()
+        for line in invoice.lines:
+            self._session.add(
+                FiscalInvoiceLineModel(
+                    id=line.id,
+                    workshop_id=invoice.workshop_id,
+                    invoice_id=invoice.id,
+                    position=line.position,
+                    source_line_id=line.source_line_id,
+                    kind=line.kind,
+                    description=line.description,
+                    quantity=line.quantity,
+                    unit_price_cents=line.unit_price_cents,
+                    line_total_cents=line.line_total_cents,
+                )
+            )
+        self._session.flush()

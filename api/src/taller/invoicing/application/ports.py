@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Protocol
 
 from taller.invoicing.domain.document_number import DocumentType
+from taller.invoicing.domain.documents import FiscalInvoice
 from taller.invoicing.domain.profile import FiscalProfile
 from taller.invoicing.domain.ranges import CaiRange
 
@@ -51,4 +52,25 @@ class CaiRangeRepository(Protocol):
         the workshop's fiscal profile lock, which serializes this
         against every other fiscal write for the same workshop.
         """
+        ...
+
+
+class FiscalInvoiceRepository(Protocol):
+    def get_by_id(
+        self, *, workshop_id: uuid.UUID, invoice_id: uuid.UUID
+    ) -> FiscalInvoice | None: ...
+
+    def has_active_for_order(self, *, workshop_id: uuid.UUID, order_id: uuid.UUID) -> bool:
+        """Whether the order has a non-credited Factura right now
+        (`uq_fiscal_invoices_order_active`'s partial index backs this
+        at the database level too).
+        """
+        ...
+
+    def list_for_order(self, *, workshop_id: uuid.UUID, order_id: uuid.UUID) -> list[FiscalInvoice]:
+        """Newest first, credited ones included."""
+        ...
+
+    def add(self, invoice: FiscalInvoice) -> None:
+        """Persist a brand-new, immutable invoice together with its lines."""
         ...

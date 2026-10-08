@@ -193,3 +193,61 @@ class CaiRangeNotFound(Exception):
     def __init__(self, range_id: uuid.UUID) -> None:
         super().__init__(f"CAI range not found: {range_id}")
         self.range_id = range_id
+
+
+class WorkOrderNotInvoiceable(Exception):
+    """Raised when issuance is requested against an order whose status
+    is not `completed` or `delivered` (`fiscal-invoices` spec).
+    """
+
+    def __init__(self, order_id: uuid.UUID) -> None:
+        super().__init__(f"Work order is not invoiceable: {order_id}")
+        self.order_id = order_id
+
+
+class WorkOrderAlreadyInvoiced(Exception):
+    """Raised when an order already has a non-credited Factura
+    (`fiscal-invoices` spec: at most one live Factura per order).
+    """
+
+    def __init__(self, order_id: uuid.UUID) -> None:
+        super().__init__(f"Work order already has a non-credited Factura: {order_id}")
+        self.order_id = order_id
+
+
+class InvoiceAmountZero(Exception):
+    """Raised when the order's total is zero at the moment of issuance."""
+
+    def __init__(self, order_id: uuid.UUID) -> None:
+        super().__init__(f"Order total is zero: {order_id}")
+        self.order_id = order_id
+
+
+class InvoiceAmountTooLarge(Exception):
+    """Raised when the order's total exceeds `amount_in_words`'s own
+    bound (AD-9): checked before the words function ever runs.
+    """
+
+    def __init__(self, total_cents: int) -> None:
+        super().__init__(f"Order total too large to invoice: {total_cents!r}")
+        self.total_cents = total_cents
+
+
+class FiscalInvoiceIdConflict(Exception):
+    """Raised when a client-supplied invoice id exists with different fields."""
+
+    def __init__(self, invoice_id: uuid.UUID) -> None:
+        super().__init__(f"Invoice id already exists with different fields: {invoice_id}")
+        self.invoice_id = invoice_id
+
+
+class FiscalInvoiceNotFound(Exception):
+    """Raised when an invoice id does not exist in the caller's workshop.
+
+    Also used when the invoice exists but belongs to another workshop,
+    so tenant isolation never leaks whether the invoice exists at all.
+    """
+
+    def __init__(self, invoice_id: uuid.UUID) -> None:
+        super().__init__(f"Invoice not found: {invoice_id}")
+        self.invoice_id = invoice_id
