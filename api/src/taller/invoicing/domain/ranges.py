@@ -3,14 +3,24 @@ derived state, and which usable range correlatives are allocated from
 next.
 """
 
+import re
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from enum import StrEnum
+from typing import Final
 
 from taller.invoicing.domain.document_number import DocumentType
-from taller.invoicing.domain.errors import CaiRangeExhausted, CaiRangeExpired, CaiRangeMissing
+from taller.invoicing.domain.errors import (
+    CaiDeadlinePassed,
+    CaiDeadlineTooFar,
+    CaiRangeExhausted,
+    CaiRangeExpired,
+    CaiRangeMissing,
+    InvalidCai,
+    InvalidCaiRange,
+)
 
 
 class RangeState(StrEnum):
@@ -140,3 +150,53 @@ def overlaps(candidate: CaiRange, others: Sequence[CaiRange]) -> bool:
         and other.range_start <= candidate.range_end
         for other in others
     )
+
+
+#: A CAI is uppercased and stripped of whitespace, then must look like a
+#: dash-separated run of alphanumerics (AD-4). SAR's exact format is
+#: unconfirmed (design's Open Questions), so this is a loose shape check,
+#: not the commonly seen 37-character grouping.
+_CAI_PATTERN: Final = re.compile(r"^[0-9A-Z]+(-[0-9A-Z]+)*$")
+MIN_CAI_LENGTH: Final = 10
+MAX_CAI_LENGTH: Final = 50
+
+#: `range_end` fits the fixed 8-digit correlative (AD-12).
+MAX_RANGE_END: Final = 99_999_999
+
+#: A CAI is valid for at most one year (Art. 62): a fecha límite further
+#: out than this can only be a typo (AD-4).
+MAX_DEADLINE_DAYS_AHEAD: Final = 366
+
+
+def normalize_cai(raw: str) -> str:
+    """Uppercase and strip every whitespace character from a CAI (AD-4).
+
+    Raises:
+        InvalidCai: the normalized value is not 10-50 characters of
+            dash-separated alphanumerics.
+    """
+    cleaned = "".join(raw.split()).upper()
+    if not (MIN_CAI_LENGTH <= len(cleaned) <= MAX_CAI_LENGTH) or not _CAI_PATTERN.fullmatch(
+        cleaned
+    ):
+        raise InvalidCai(raw)
+    return cleaned
+
+
+def validate_range_bounds(*, range_start: int, range_end: int) -> None:
+    """Raises: InvalidCaiRange: bounds fail `1 <= range_start <=
+    range_end <= 99,999,999` (AD-4).
+    """
+    if not (1 <= range_start <= range_end <= MAX_RANGE_END):
+        raise InvalidCaiRange(range_start=range_start, range_end=range_end)
+
+
+def validate_issue_deadline(issue_deadline: date, *, today: date) -> None:
+    """Raises:
+    CaiDeadlinePassed: ``issue_deadline`` is already in the past.
+    CaiDeadlineTooFar: ``issue_deadline`` is more than 366 days out.
+    """
+    if issue_deadline < today:
+        raise CaiDeadlinePassed(issue_deadline)
+    if issue_deadline > today + timedelta(days=MAX_DEADLINE_DAYS_AHEAD):
+        raise CaiDeadlineTooFar(issue_deadline)

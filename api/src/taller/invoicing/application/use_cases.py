@@ -12,14 +12,30 @@ from taller.identity.application.ports import Clock
 from taller.identity.domain.phone_number import PhoneNumber
 from taller.invoicing.application.ports import CaiRangeRepository, FiscalProfileRepository
 from taller.invoicing.domain.document_number import DocumentNumber, DocumentType
-from taller.invoicing.domain.errors import FiscalProfileCodesLocked
+from taller.invoicing.domain.errors import (
+    CaiRangeIdConflict,
+    CaiRangeImmutable,
+    CaiRangeNotFound,
+    CaiRangeOverlap,
+    FiscalProfileCodesLocked,
+    FiscalProfileMissing,
+    UnsupportedDocumentType,
+)
 from taller.invoicing.domain.profile import (
     FiscalProfile,
     normalize_email,
     normalize_emission_point_code,
     normalize_establishment_code,
 )
-from taller.invoicing.domain.ranges import CaiRange, RangeState, range_states
+from taller.invoicing.domain.ranges import (
+    CaiRange,
+    RangeState,
+    normalize_cai,
+    overlaps,
+    range_states,
+    validate_issue_deadline,
+    validate_range_bounds,
+)
 from taller.shared.timezone import local_today
 
 #: Phase A only ever asks about the Factura document type; Phase B
@@ -126,6 +142,8 @@ class DocumentReadiness:
 class InvoicingSettings:
     profile: FiscalProfile | None
     codes_locked: bool
+    ranges: list[CaiRange]
+    range_states: dict[uuid.UUID, RangeState]
     documents: list[DocumentReadiness]
 
 
@@ -204,4 +222,182 @@ def get_settings(
         )
         for document_type in _READY_DOCUMENT_TYPES
     ]
-    return InvoicingSettings(profile=profile, codes_locked=codes_locked, documents=documents)
+    return InvoicingSettings(
+        profile=profile,
+        codes_locked=codes_locked,
+        ranges=all_ranges,
+        range_states=range_states(all_ranges, today),
+        documents=documents,
+    )
+
+
+def _range_fields_match(
+    existing: CaiRange,
+    *,
+    document_type: DocumentType,
+    cai: str,
+    range_start: int,
+    range_end: int,
+    issue_deadline: date,
+) -> bool:
+    return (
+        existing.document_type == document_type
+        and existing.cai == cai
+        and existing.range_start == range_start
+        and existing.range_end == range_end
+        and existing.issue_deadline == issue_deadline
+    )
+
+
+def create_range(
+    *,
+    workshop_id: uuid.UUID,
+    range_id: uuid.UUID,
+    document_type: DocumentType,
+    cai: str,
+    range_start: int,
+    range_end: int,
+    issue_deadline: date,
+    created_by: uuid.UUID,
+    clock: Clock,
+    profile_repo: FiscalProfileRepository,
+    range_repo: CaiRangeRepository,
+) -> tuple[CaiRange, bool]:
+    """Register a CAI range, or replay an idempotent registration
+    (AD-4): the establecimiento and punto de emisión codes are always
+    copied from the workshop's fiscal profile at registration, so a
+    later profile edit never changes an already-registered range's
+    printed codes.
+
+    Returns ``(cai_range, is_new)``: ``is_new`` is False when
+    ``range_id`` already existed with identical fields (the caller
+    should respond 200, not 201).
+
+    Raises:
+        UnsupportedDocumentType: ``document_type`` is `06` before
+            Phase B.
+        InvalidCai / InvalidCaiRange / CaiDeadlinePassed /
+            CaiDeadlineTooFar: a field fails its own validation.
+        CaiRangeIdConflict: ``range_id`` already exists with different
+            fields.
+        FiscalProfileMissing: the workshop has no fiscal profile yet.
+        CaiRangeOverlap: the bounds intersect another range of the
+            same workshop, document type, establecimiento and punto
+            de emisión.
+    """
+    if document_type is not DocumentType.invoice:
+        raise UnsupportedDocumentType(document_type.value)
+
+    normalized_cai = normalize_cai(cai)
+    validate_range_bounds(range_start=range_start, range_end=range_end)
+    today = local_today(clock)
+    validate_issue_deadline(issue_deadline, today=today)
+
+    existing = range_repo.get_by_id(workshop_id=workshop_id, range_id=range_id)
+    if existing is not None:
+        if not _range_fields_match(
+            existing,
+            document_type=document_type,
+            cai=normalized_cai,
+            range_start=range_start,
+            range_end=range_end,
+            issue_deadline=issue_deadline,
+        ):
+            raise CaiRangeIdConflict(range_id)
+        return existing, False
+
+    profile = profile_repo.get_for_update(workshop_id=workshop_id)
+    if profile is None:
+        raise FiscalProfileMissing()
+
+    now = clock.now()
+    candidate = CaiRange(
+        id=range_id,
+        workshop_id=workshop_id,
+        document_type=document_type,
+        cai=normalized_cai,
+        establishment_code=profile.establishment_code,
+        emission_point_code=profile.emission_point_code,
+        range_start=range_start,
+        range_end=range_end,
+        next_number=range_start,
+        issue_deadline=issue_deadline,
+        created_by=created_by,
+        created_at=now,
+        updated_at=now,
+    )
+    siblings = range_repo.list(workshop_id=workshop_id, document_type=document_type)
+    if overlaps(candidate, siblings):
+        raise CaiRangeOverlap(range_id)
+
+    range_repo.add(candidate)
+    return candidate, True
+
+
+def update_range(
+    *,
+    workshop_id: uuid.UUID,
+    range_id: uuid.UUID,
+    fields: dict,
+    clock: Clock,
+    profile_repo: FiscalProfileRepository,
+    range_repo: CaiRangeRepository,
+) -> CaiRange:
+    """Correct an unused CAI range's fields (AD-4): a mistyped CAI or
+    deadline is the likeliest error, and it would otherwise be printed
+    on a legal document. Locks the workshop's fiscal profile first
+    (AD-5) -- the same per-workshop mutex every other invoicing write
+    takes -- so two concurrent range writes still serialize the
+    overlap check below.
+
+    Raises:
+        FiscalProfileMissing: the workshop has no fiscal profile
+            (defensive: a range cannot exist without one).
+        CaiRangeNotFound: no such range in this workshop.
+        CaiRangeImmutable: at least one number has already been
+            allocated from this range.
+        UnsupportedDocumentType / InvalidCai / InvalidCaiRange /
+            CaiDeadlinePassed / CaiDeadlineTooFar: a new field value
+            fails its own validation.
+        CaiRangeOverlap: the new bounds intersect another range of the
+            resulting document type, establecimiento and punto de
+            emisión.
+    """
+    cai_range = range_repo.get_by_id(workshop_id=workshop_id, range_id=range_id)
+    if cai_range is None:
+        raise CaiRangeNotFound(range_id)
+
+    profile = profile_repo.get_for_update(workshop_id=workshop_id)
+    if profile is None:
+        raise FiscalProfileMissing()
+    if cai_range.in_use:
+        raise CaiRangeImmutable(range_id)
+
+    document_type = fields.get("document_type", cai_range.document_type)
+    if document_type is not DocumentType.invoice:
+        raise UnsupportedDocumentType(document_type.value)
+
+    cai = normalize_cai(fields["cai"]) if "cai" in fields else cai_range.cai
+    range_start = fields.get("range_start", cai_range.range_start)
+    range_end = fields.get("range_end", cai_range.range_end)
+    validate_range_bounds(range_start=range_start, range_end=range_end)
+
+    issue_deadline = fields.get("issue_deadline", cai_range.issue_deadline)
+    today = local_today(clock)
+    validate_issue_deadline(issue_deadline, today=today)
+
+    cai_range.document_type = document_type
+    cai_range.cai = cai
+    cai_range.range_start = range_start
+    cai_range.range_end = range_end
+    # Still unused (just confirmed above), so next_number tracks range_start.
+    cai_range.next_number = range_start
+    cai_range.issue_deadline = issue_deadline
+    cai_range.updated_at = clock.now()
+
+    siblings = range_repo.list(workshop_id=workshop_id, document_type=document_type)
+    if overlaps(cai_range, siblings):
+        raise CaiRangeOverlap(range_id)
+
+    range_repo.save(cai_range)
+    return cai_range

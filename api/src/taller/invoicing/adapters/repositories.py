@@ -1,7 +1,9 @@
 """SQLAlchemy repositories for the fiscal profile and CAI ranges."""
 
 import uuid
+from datetime import datetime
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from taller.invoicing.adapters.models import CaiRangeModel, FiscalProfileModel
@@ -95,10 +97,6 @@ class SqlAlchemyFiscalProfileRepository:
 
 
 class SqlAlchemyCaiRangeRepository:
-    """Implements `CaiRangeRepository.list` for now; `PA.S4` extends
-    this class with `get_by_id`, `add`, `save`, and `allocate`.
-    """
-
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -109,3 +107,58 @@ class SqlAlchemyCaiRangeRepository:
         if document_type is not None:
             query = query.filter(CaiRangeModel.document_type == document_type.value)
         return [_range_from_model(model) for model in query.all()]
+
+    def get_by_id(self, *, workshop_id: uuid.UUID, range_id: uuid.UUID) -> CaiRange | None:
+        model = (
+            self._session.query(CaiRangeModel)
+            .filter(CaiRangeModel.id == range_id, CaiRangeModel.workshop_id == workshop_id)
+            .one_or_none()
+        )
+        return _range_from_model(model) if model is not None else None
+
+    def add(self, cai_range: CaiRange) -> None:
+        self._session.add(
+            CaiRangeModel(
+                id=cai_range.id,
+                workshop_id=cai_range.workshop_id,
+                document_type=cai_range.document_type.value,
+                cai=cai_range.cai,
+                establishment_code=cai_range.establishment_code,
+                emission_point_code=cai_range.emission_point_code,
+                range_start=cai_range.range_start,
+                range_end=cai_range.range_end,
+                next_number=cai_range.next_number,
+                issue_deadline=cai_range.issue_deadline,
+                created_by=cai_range.created_by,
+                created_at=cai_range.created_at,
+                updated_at=cai_range.updated_at,
+            )
+        )
+        self._session.flush()
+
+    def save(self, cai_range: CaiRange) -> None:
+        model = self._session.get(CaiRangeModel, cai_range.id)
+        assert model is not None  # noqa: S101 - caller always holds an existing row
+        model.document_type = cai_range.document_type.value
+        model.cai = cai_range.cai
+        model.establishment_code = cai_range.establishment_code
+        model.emission_point_code = cai_range.emission_point_code
+        model.range_start = cai_range.range_start
+        model.range_end = cai_range.range_end
+        model.next_number = cai_range.next_number
+        model.issue_deadline = cai_range.issue_deadline
+        model.updated_at = cai_range.updated_at
+        self._session.flush()
+
+    def allocate(self, *, range_id: uuid.UUID, now: datetime) -> int | None:
+        statement = (
+            update(CaiRangeModel)
+            .where(
+                CaiRangeModel.id == range_id,
+                CaiRangeModel.next_number <= CaiRangeModel.range_end,
+            )
+            .values(next_number=CaiRangeModel.next_number + 1, updated_at=now)
+            .returning(CaiRangeModel.next_number - 1)
+        )
+        row = self._session.execute(statement).first()
+        return row[0] if row is not None else None

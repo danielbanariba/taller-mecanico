@@ -3,6 +3,7 @@ Facturas, and -- in phase B -- Notas de Crédito).
 """
 
 import uuid
+from datetime import date
 
 
 class InvalidCorrelative(ValueError):
@@ -99,3 +100,96 @@ class InvalidEmissionPointCode(ValueError):
     def __init__(self, raw: str) -> None:
         super().__init__(f"Invalid emission point code: {raw!r}")
         self.raw = raw
+
+
+class UnsupportedDocumentType(Exception):
+    """Raised when a document type is not yet accepted: `06` before
+    Phase B (AD-4). The database check already allows both from Phase
+    A on, so this is purely an application-level gate.
+    """
+
+    def __init__(self, document_type: str) -> None:
+        super().__init__(f"Unsupported document type: {document_type!r}")
+        self.document_type = document_type
+
+
+class InvalidCai(ValueError):
+    """Raised when a CAI string, after normalization, fails the loose
+    shape check (AD-4): SAR's exact format is unconfirmed (design's
+    Open Questions), so only character set and length are enforced.
+    """
+
+    def __init__(self, raw: str) -> None:
+        super().__init__(f"Invalid CAI: {raw!r}")
+        self.raw = raw
+
+
+class InvalidCaiRange(ValueError):
+    """Raised when a range's bounds fail `1 <= range_start <=
+    range_end <= 99,999,999` (AD-4).
+    """
+
+    def __init__(self, *, range_start: int, range_end: int) -> None:
+        super().__init__(f"Invalid CAI range bounds: {range_start}-{range_end}")
+        self.range_start = range_start
+        self.range_end = range_end
+
+
+class CaiDeadlinePassed(ValueError):
+    """Raised when a fecha límite is already in the past (AD-4)."""
+
+    def __init__(self, issue_deadline: date) -> None:
+        super().__init__(f"CAI deadline already passed: {issue_deadline}")
+        self.issue_deadline = issue_deadline
+
+
+class CaiDeadlineTooFar(ValueError):
+    """Raised when a fecha límite is more than 366 days out (AD-4): a
+    CAI is valid for at most one year (Art. 62), so a deadline further
+    away can only be a typo.
+    """
+
+    def __init__(self, issue_deadline: date) -> None:
+        super().__init__(f"CAI deadline too far in the future: {issue_deadline}")
+        self.issue_deadline = issue_deadline
+
+
+class CaiRangeIdConflict(Exception):
+    """Raised when a client-supplied range id exists with different fields."""
+
+    def __init__(self, range_id: uuid.UUID) -> None:
+        super().__init__(f"CAI range id already exists with different fields: {range_id}")
+        self.range_id = range_id
+
+
+class CaiRangeOverlap(Exception):
+    """Raised when a range's bounds intersect another range of the
+    same workshop, document type, establecimiento and punto de
+    emisión (AD-4).
+    """
+
+    def __init__(self, range_id: uuid.UUID) -> None:
+        super().__init__(f"CAI range overlaps an existing one: {range_id}")
+        self.range_id = range_id
+
+
+class CaiRangeImmutable(Exception):
+    """Raised when editing a range from which at least one number has
+    already been allocated (AD-4).
+    """
+
+    def __init__(self, range_id: uuid.UUID) -> None:
+        super().__init__(f"CAI range is immutable once in use: {range_id}")
+        self.range_id = range_id
+
+
+class CaiRangeNotFound(Exception):
+    """Raised when a range id does not exist in the caller's workshop.
+
+    Also used when the range exists but belongs to another workshop,
+    so tenant isolation never leaks whether the range exists at all.
+    """
+
+    def __init__(self, range_id: uuid.UUID) -> None:
+        super().__init__(f"CAI range not found: {range_id}")
+        self.range_id = range_id
