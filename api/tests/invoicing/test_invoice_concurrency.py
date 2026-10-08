@@ -45,7 +45,7 @@ from taller.invoicing.adapters.repositories import (
 )
 from taller.invoicing.application.use_cases import issue_invoice, update_range
 from taller.invoicing.domain.document_number import DocumentType
-from taller.invoicing.domain.errors import CaiRangeExhausted, CaiRangeImmutable
+from taller.invoicing.domain.errors import CaiRangeImmutable
 from taller.invoicing.domain.ranges import CaiRange
 from taller.workorders.adapters.models import (
     WorkOrderLineModel,
@@ -367,50 +367,57 @@ def _issue(session: Session, *, workshop_id: uuid.UUID, order_id: uuid.UUID, cre
     )
 
 
-def test_eight_concurrent_issuances_in_one_workshop_get_gapfree_correlatives(
+def test_allocate_eight_concurrent_racers_against_a_fresh_range_never_duplicates_or_skips(
     committed_invoicing_workshop: dict[str, uuid.UUID], test_engine: Engine
 ) -> None:
-    """Defect this catches: a read-then-write correlative allocation
-    losing an update under concurrency, assigning the same number twice
-    or leaving a gap.
+    """Drives `SqlAlchemyCaiRangeRepository.allocate` directly at the
+    repository seam -- no fiscal-profile lock in play -- covering
+    `cai-ranges/spec.md`'s "Correlative Allocation Is Gap-Free And
+    Row-Locked Under Concurrency" scenario ("concurrent issuance never
+    skips or duplicates a number").
+
+    Defect this catches: replacing `allocate`'s atomic `UPDATE ...
+    RETURNING` with a read-then-write (`SELECT next_number`, then
+    `UPDATE ... SET next_number = :read + 1`, no row lock) loses updates
+    under concurrency, handing the same correlative to more than one
+    racer or skipping one entirely.
     """
     ids = committed_invoicing_workshop
+    racer_count = 8
     with Session(test_engine) as setup:
-        order_ids = [_create_completed_order(setup, ids) for _ in range(8)]
-        _add_range(
+        range_id = _add_range(
             setup,
             workshop_id=ids["workshop_id"],
             created_by=ids["user_id"],
             range_start=1,
-            range_end=8,
+            range_end=racer_count,
             issue_deadline=date.today() + timedelta(days=300),
         )
 
-    correlatives: list[int] = []
+    barrier = threading.Barrier(racer_count)
+    results: list[int | None] = []
     errors: list[BaseException] = []
 
-    def _run(order_id: uuid.UUID) -> None:
+    def _allocate_once() -> None:
         try:
             with Session(test_engine) as session:
-                invoice, _ = _issue(
-                    session,
-                    workshop_id=ids["workshop_id"],
-                    order_id=order_id,
-                    created_by=ids["user_id"],
+                barrier.wait()
+                correlative = SqlAlchemyCaiRangeRepository(session).allocate(
+                    range_id=range_id, now=datetime.now(UTC)
                 )
                 session.commit()
-                correlatives.append(invoice.correlative)
+                results.append(correlative)
         except BaseException as exc:  # noqa: BLE001 -- surfaced via `errors` below
             errors.append(exc)
 
-    threads = [threading.Thread(target=_run, args=(order_id,)) for order_id in order_ids]
+    threads = [threading.Thread(target=_allocate_once) for _ in range(racer_count)]
     for thread in threads:
         thread.start()
     for thread in threads:
         thread.join()
 
     assert not errors, errors
-    assert sorted(correlatives) == list(range(1, 9))
+    assert sorted(results) == list(range(1, racer_count + 1))
 
 
 def test_concurrent_issuances_with_the_same_invoice_id_allocate_exactly_once(
@@ -499,19 +506,22 @@ def test_concurrent_issuances_with_the_same_invoice_id_allocate_exactly_once(
         assert range_row.next_number == 2
 
 
-def test_two_concurrent_issuers_against_a_range_with_one_number_left(
+def test_allocate_gives_the_last_number_to_exactly_one_of_two_racers(
     committed_invoicing_workshop: dict[str, uuid.UUID], test_engine: Engine
 ) -> None:
-    """Defect this catches: `SELECT ... LIMIT 1 FOR UPDATE` under READ
-    COMMITTED returning no row after a lock wait even though the range
-    had a number left just before the wait (AD-5's false-exhaustion
-    trap), instead of correctly reporting the range as exhausted for
-    exactly the second issuer.
+    """Drives `SqlAlchemyCaiRangeRepository.allocate` directly at the
+    repository seam -- no fiscal-profile lock in play -- covering
+    `cai-ranges/spec.md`'s "Issuance Is Blocked When The Active Range Is
+    Exhausted" scenario ("the last number in a range is allocated
+    normally" / "issuance is blocked once the range is exhausted").
+
+    Defect this catches: dropping `allocate`'s `next_number <= range_end`
+    `WHERE` condition lets the second racer allocate a number past
+    `range_end` instead of getting `None`.
     """
     ids = committed_invoicing_workshop
     with Session(test_engine) as setup:
-        order_ids = [_create_completed_order(setup, ids) for _ in range(2)]
-        _add_range(
+        range_id = _add_range(
             setup,
             workshop_id=ids["workshop_id"],
             created_by=ids["user_id"],
@@ -520,37 +530,37 @@ def test_two_concurrent_issuers_against_a_range_with_one_number_left(
             issue_deadline=date.today() + timedelta(days=300),
         )
 
-    outcomes: list[str] = []
+    results: list[int | None] = []
     errors: list[BaseException] = []
     barrier = threading.Barrier(2)
 
-    def _run(order_id: uuid.UUID) -> None:
+    def _allocate_once() -> None:
         try:
             with Session(test_engine) as session:
                 barrier.wait()
-                try:
-                    _issue(
-                        session,
-                        workshop_id=ids["workshop_id"],
-                        order_id=order_id,
-                        created_by=ids["user_id"],
-                    )
-                    session.commit()
-                    outcomes.append("issued")
-                except CaiRangeExhausted:
-                    session.rollback()
-                    outcomes.append("exhausted")
+                correlative = SqlAlchemyCaiRangeRepository(session).allocate(
+                    range_id=range_id, now=datetime.now(UTC)
+                )
+                session.commit()
+                results.append(correlative)
         except BaseException as exc:  # noqa: BLE001
             errors.append(exc)
 
-    threads = [threading.Thread(target=_run, args=(order_id,)) for order_id in order_ids]
+    threads = [threading.Thread(target=_allocate_once) for _ in range(2)]
     for thread in threads:
         thread.start()
     for thread in threads:
         thread.join()
 
     assert not errors, errors
-    assert sorted(outcomes) == ["exhausted", "issued"]
+    assert results.count(1) == 1
+    assert results.count(None) == 1
+
+    with Session(test_engine) as verify:
+        range_row = verify.query(CaiRangeModel).filter(CaiRangeModel.id == range_id).one()
+        # The winning racer's allocation (range_start -> range_end + 1)
+        # must never be exceeded by the loser.
+        assert range_row.next_number == 2
 
 
 def test_a_standby_range_takes_over_when_the_active_one_runs_out_mid_burst(
