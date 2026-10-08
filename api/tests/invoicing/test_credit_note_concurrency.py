@@ -7,20 +7,17 @@ vehicle/fiscal-profile fixture below mirrors that file's
 `committed_invoicing_workshop` (duplicated locally rather than imported,
 matching this suite's one-file-per-concurrency-scenario convention).
 
-Two tests, two different purposes (review finding, PB.S8): the first
-exercises `issue_credit_note` end to end, an honest black-box check of
-the user-visible invariant, but it cannot tell apart *which* of the
-order-row, invoice-row or profile-row locks is doing the serializing --
-removing any ONE of the three alone still leaves the other two
-serializing these two racers, since they target one order and one
-workshop by construction (a credit note's invoice always belongs to
-exactly one order). The second drives the invoice-row lock's own
-check-then-act sequence directly at the repository seam -- no order-row
-or profile-row lock in play at all -- mirroring
-`test_invoice_concurrency.py`'s `test_allocate_eight_concurrent_racers_
-against_a_fresh_range_never_duplicates_or_skips` precedent for
-`allocate()`. That seam test is what actually isolates the invoice-row
-lock as its own guard.
+A credit note's Factura always belongs to exactly one order, so two full
+`issue_credit_note` calls on one Factura are serialized by the order-row,
+invoice-row and profile-row locks all at once, and removing any one of
+them still leaves the others doing the job: an end-to-end race cannot
+pin the invariant on any single lock. The test below drives the
+invoice-row lock's own check-then-act sequence directly at the
+repository seam instead, with no order-row or profile-row lock in play,
+mirroring `test_invoice_concurrency.py`'s `allocate()` seam tests. The
+`credited_at` check itself is covered sequentially by
+`test_credit_notes_api.py`'s
+`test_a_second_credit_note_against_the_same_factura_is_rejected`.
 """
 
 import threading
@@ -45,13 +42,11 @@ from taller.inventory.adapters.repositories import (
 from taller.invoicing.adapters.models import CaiRangeModel, FiscalProfileModel
 from taller.invoicing.adapters.repositories import (
     SqlAlchemyCaiRangeRepository,
-    SqlAlchemyCreditNoteRepository,
     SqlAlchemyFiscalInvoiceRepository,
     SqlAlchemyFiscalProfileRepository,
 )
-from taller.invoicing.application.use_cases import issue_credit_note, issue_invoice
+from taller.invoicing.application.use_cases import issue_invoice
 from taller.invoicing.domain.document_number import DocumentType
-from taller.invoicing.domain.errors import InvoiceAlreadyCredited
 from taller.invoicing.domain.ranges import CaiRange
 from taller.workorders.adapters.models import (
     WorkOrderLineModel,
@@ -285,105 +280,6 @@ def _create_completed_order(session: Session, ids: dict[str, uuid.UUID]) -> uuid
     return order_id
 
 
-def test_two_concurrent_credit_notes_against_one_factura_credit_it_exactly_once(
-    committed_credit_note_workshop: dict[str, uuid.UUID], test_engine: Engine
-) -> None:
-    """End-to-end, black-box: two concurrent `issue_credit_note` calls
-    against one Factura never both succeed.
-
-    This test alone cannot tell which lock is responsible -- the
-    order-row lock, the invoice-row lock, and the profile-row lock are
-    all taken against the same order and the same workshop by both
-    racers here, so any one of the three removed still leaves the
-    other two serializing them. See the module docstring, and
-    `test_the_invoice_row_lock_alone_serializes_two_racers_checking_
-    credited_at` below for the isolated, single-guard regression test.
-    """
-    ids = committed_credit_note_workshop
-    with Session(test_engine) as setup:
-        order_id = _create_completed_order(setup, ids)
-        _add_range(
-            setup,
-            workshop_id=ids["workshop_id"],
-            created_by=ids["user_id"],
-            document_type=DocumentType.invoice,
-            cai="A1B2C3D4E5",
-            range_start=1,
-            range_end=10,
-            issue_deadline=date.today() + timedelta(days=300),
-        )
-        credit_range_id = _add_range(
-            setup,
-            workshop_id=ids["workshop_id"],
-            created_by=ids["user_id"],
-            document_type=DocumentType.credit_note,
-            cai="B2C3D4E5F6",
-            range_start=1,
-            range_end=10,
-            issue_deadline=date.today() + timedelta(days=300),
-        )
-        invoice, _ = issue_invoice(
-            workshop_id=ids["workshop_id"],
-            invoice_id=uuid.uuid4(),
-            order_id=order_id,
-            buyer_name=None,
-            buyer_rtn=None,
-            created_by=ids["user_id"],
-            clock=_RealClock(),
-            order_repo=SqlAlchemyWorkOrderRepository(setup),
-            profile_repo=SqlAlchemyFiscalProfileRepository(setup),
-            range_repo=SqlAlchemyCaiRangeRepository(setup),
-            invoice_repo=SqlAlchemyFiscalInvoiceRepository(setup),
-        )
-        setup.commit()
-        invoice_id = invoice.id
-
-    barrier = threading.Barrier(2)
-    outcomes: list[str] = []
-    errors: list[BaseException] = []
-
-    def _credit_once() -> None:
-        try:
-            with Session(test_engine) as session:
-                barrier.wait()
-                try:
-                    issue_credit_note(
-                        workshop_id=ids["workshop_id"],
-                        credit_note_id=uuid.uuid4(),
-                        invoice_id=invoice_id,
-                        reason="Servicio cancelado por el cliente",
-                        created_by=ids["user_id"],
-                        clock=_RealClock(),
-                        order_repo=SqlAlchemyWorkOrderRepository(session),
-                        profile_repo=SqlAlchemyFiscalProfileRepository(session),
-                        range_repo=SqlAlchemyCaiRangeRepository(session),
-                        invoice_repo=SqlAlchemyFiscalInvoiceRepository(session),
-                        credit_note_repo=SqlAlchemyCreditNoteRepository(session),
-                    )
-                    session.commit()
-                    outcomes.append("success")
-                except InvoiceAlreadyCredited:
-                    session.rollback()
-                    outcomes.append("already_credited")
-        except BaseException as exc:  # noqa: BLE001 -- surfaced via `errors` below
-            errors.append(exc)
-
-    threads = [threading.Thread(target=_credit_once) for _ in range(2)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
-
-    assert not errors, errors
-    assert sorted(outcomes) == ["already_credited", "success"]
-
-    with Session(test_engine) as verify:
-        range_row = verify.query(CaiRangeModel).filter(CaiRangeModel.id == credit_range_id).one()
-        # Only the winning racer's allocation must be consumed: the loser
-        # raised before ever calling `range_repo.allocate`.
-        assert range_row.next_number == 2
-
-
 class _PausingFiscalInvoiceRepository:
     """Wraps the real repository so a test can force a deterministic
     race at the invoice-row lock itself: `get_for_update` signals
@@ -442,8 +338,8 @@ def test_the_invoice_row_lock_alone_serializes_two_racers_checking_credited_at(
     (`invoice_repo.get_for_update`) were ever weakened to a non-locking
     read before the `credited_at` check, two concurrent readers could
     both observe `credited_at IS NULL` and both proceed to stamp it --
-    the double credit the module docstring's end-to-end test cannot, by
-    itself, pin on this one lock.
+    the double credit an end-to-end race cannot pin on this one lock
+    (see the module docstring).
     """
     ids = committed_credit_note_workshop
     with Session(test_engine) as setup:

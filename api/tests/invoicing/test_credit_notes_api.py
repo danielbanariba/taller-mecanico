@@ -369,21 +369,59 @@ def test_a_delivered_fully_credited_order_may_be_reinvoiced_with_corrected_buyer
 
 
 def test_a_credit_note_has_no_effect_on_payments_or_stock(authenticated_client: TestClient):
-    """Defect it catches: a credit note accidentally reverses a
-    payment or stock movement.
+    """Defect it catches: a credit note voids or refunds a recorded
+    payment, or restocks a part the order consumed (`credit-notes`
+    spec's "Issuing a credit note leaves payments and stock untouched").
     """
-    _configure_invoicing_and_credit_notes(authenticated_client)
-    order = _order_in_status(authenticated_client, status="completed")
-    invoice = _issue_invoice(authenticated_client, order["id"]).json()
-    before = _get_order(authenticated_client, order["id"])
+    client = authenticated_client
+    _configure_invoicing_and_credit_notes(client)
+    item_response = client.post(
+        "/api/inventory/items",
+        json={
+            "name": "Filtro de aceite",
+            "category": "Filtros",
+            "unit": "unidad",
+            "initial_stock": 10,
+        },
+    )
+    assert item_response.status_code == 201, item_response.text
+    item_id = item_response.json()["id"]
+    vehicle = _active_vehicle(client)
+    order = _create_order(client, vehicle_id=vehicle["id"])
+    _add_line(
+        client,
+        order["id"],
+        {
+            "id": str(uuid.uuid4()),
+            "kind": "inventory_part",
+            "item_id": item_id,
+            "description": "Filtro de aceite",
+            "quantity": 2,
+            "unit_price_cents": 8000,
+        },
+    )
+    for target in ("approved", "in_progress", "completed"):
+        response = _set_status(client, order["id"], target)
+        assert response.status_code == 200, response.text
+    payment = client.post(
+        f"/api/work-orders/{order['id']}/payments",
+        json={"id": str(uuid.uuid4()), "amount_cents": 10000, "method": "cash"},
+    )
+    assert payment.status_code == 201, payment.text
+    invoice = _issue_invoice(client, order["id"]).json()
 
-    credited = _issue_credit_note(authenticated_client, invoice["id"])
+    before = _get_order(client, order["id"])
+    assert before["paid_cents"] == 10000
+    assert client.get(f"/api/inventory/items/{item_id}").json()["stock"] == 8
+
+    credited = _issue_credit_note(client, invoice["id"])
     assert credited.status_code == 201, credited.text
 
-    after = _get_order(authenticated_client, order["id"])
+    after = _get_order(client, order["id"])
+    assert after["payments"] == before["payments"]
     assert after["paid_cents"] == before["paid_cents"]
     assert after["balance_cents"] == before["balance_cents"]
-    assert after["total_cents"] == before["total_cents"]
+    assert client.get(f"/api/inventory/items/{item_id}").json()["stock"] == 8
 
 
 def test_editing_the_customer_after_a_credit_note_leaves_it_unchanged_on_reprint(

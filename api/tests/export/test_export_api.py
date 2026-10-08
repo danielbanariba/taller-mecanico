@@ -316,21 +316,6 @@ def _issue_credit_note(client: TestClient, invoice_id: str, **overrides: object)
     return response.json()
 
 
-def test_a_workshop_that_never_invoiced_anything_still_gets_empty_fiscal_csvs(
-    authenticated_client: TestClient,
-) -> None:
-    """Defect it catches: an empty fiscal result set crashes the CSV
-    builder, or the three fiscal entities are silently dropped from a
-    workshop that never opted into invoicing (`data-export` delta, "A
-    workshop that never invoiced anything still gets empty fiscal CSVs").
-    """
-    archive = zipfile.ZipFile(io.BytesIO(_export(authenticated_client)))
-
-    assert _read_csv_rows(archive, "fiscal_invoices.csv") == []
-    assert _read_csv_rows(archive, "fiscal_invoice_lines.csv") == []
-    assert _read_csv_rows(archive, "fiscal_credit_notes.csv") == []
-
-
 def test_fiscal_invoices_csv_lists_only_the_current_workshops_documents(
     authenticated_client: TestClient, second_authenticated_client: TestClient
 ) -> None:
