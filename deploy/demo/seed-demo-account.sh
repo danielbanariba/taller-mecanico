@@ -40,12 +40,16 @@ items=(
   "cadena-moto-428|Cadena de moto 428|Motos|unidad|2|45000|5"
 )
 
-# key|full_name|phone (empty means no phone)
+# key|full_name|phone|billing_name|rtn (an empty field is left out)
 # Fictional names and patterned numbers only -- README.md warns testers
 # never to message these. One of each: mobile, mobile, landline, no phone,
 # mobile, so WhatsApp eligibility (phone_is_mobile) has a case of each.
+# María's billing name and RTN (sar-invoicing phase A) ride on her create
+# payload rather than a later PATCH: the server's replay check compares
+# them too, so a rerun replays her record instead of reporting it as
+# edited by a tester.
 customers=(
-  "maria-hernandez|María Hernández|9000-0001"
+  "maria-hernandez|María Hernández|9000-0001|María Hernández|99999999990001"
   "jose-nunez|José Núñez|3000-0002"
   "carlos-mejia|Carlos Mejía|2200-0003"
   "ana-castillo|Ana Castillo|"
@@ -195,11 +199,15 @@ customers_created=0
 customers_present=0
 customers_edited=0
 for entry in "${customers[@]}"; do
-  IFS='|' read -r key full_name customer_phone <<<"$entry"
+  IFS='|' read -r key full_name customer_phone billing_name customer_rtn <<<"$entry"
   customer_id="$(uuidgen --sha1 --namespace @url --name "$id_namespace/customer/$key")"
   customer_ids["$key"]="$customer_id"
   customer_json="$(jq -n --arg id "$customer_id" --arg name "$full_name" --arg phone "$customer_phone" \
-    '{id: $id, full_name: $name} + (if $phone == "" then {} else {phone: $phone} end)')"
+    --arg billing_name "$billing_name" --arg rtn "$customer_rtn" \
+    '{id: $id, full_name: $name}
+      + (if $phone == "" then {} else {phone: $phone} end)
+      + (if $billing_name == "" then {} else {billing_name: $billing_name} end)
+      + (if $rtn == "" then {} else {rtn: $rtn} end)')"
   status="$(request POST /api/customers "$customer_json")"
   case "$status" in
     201) customers_created=$((customers_created + 1)) ;;
@@ -347,9 +355,9 @@ for entry in "${payments[@]}"; do
   esac
 done
 
-# --- Phase A (sar-invoicing): fiscal profile, a Factura 01 range, María
-# Hernández's billing data, and one issued Factura on the Corolla alignment
-# order. The profile, RTN and CAI are all obviously fictional
+# --- Phase A (sar-invoicing): fiscal profile, a Factura 01 range, and one
+# issued Factura on the Corolla alignment order (María Hernández's billing
+# data is already on her create payload above). The profile, RTN and CAI are all obviously fictional
 # (design.md's AD-17, question 3): no real workshop's data belongs here.
 #
 # `range_deadline` is a FIXED literal, not `today + 364 days` computed at
@@ -375,10 +383,6 @@ case "$status" in
   200) profile_result="already present" ;;
   *) fail "saving the fiscal profile returned HTTP $status" ;;
 esac
-
-maria_id="${customer_ids[maria-hernandez]}"
-status="$(request PATCH "/api/customers/$maria_id" '{"billing_name": "María Hernández", "rtn": "99999999990001"}')"
-[[ "$status" == "200" ]] || fail "setting María Hernández's billing data returned HTTP $status"
 
 range_id="$(uuidgen --sha1 --namespace @url --name "$id_namespace/invoicing/range/factura-01")"
 range_deadline="2027-10-06"
@@ -425,6 +429,5 @@ echo "Sample status changes: $status_changes applied, $status_tester_moved left 
 echo "Workshop now lists $orders_total work orders (any status)"
 echo "Sample payments: $payments_created created, $payments_present already present, $payments_edited edited by testers (kept), $payments_balance_conflict balance conflicts (kept)"
 echo "Fiscal profile (Taller Demostración S. de R.L.): $profile_result"
-echo "María Hernández's billing name and RTN: set"
 echo "Sample CAI range (Factura 01, 1-500, deadline $range_deadline): $range_result"
 echo "Sample Factura on the Corolla alignment order (001-001-01-00000001): $invoice_result"
