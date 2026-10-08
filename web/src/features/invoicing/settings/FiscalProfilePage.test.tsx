@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
 
+import { sessionQueryKey } from "../../auth/hooks";
 import { renderWithQueryClient } from "../../../test/render";
 import { server } from "../../../test/server";
+import { invoicingSettingsQueryKey } from "../hooks";
 import { FiscalProfilePage } from "./FiscalProfilePage";
 import type { InvoicingSettingsOut } from "../api";
 
@@ -63,6 +66,43 @@ describe("FiscalProfilePage", () => {
     expect(await screen.findByLabelText(/razón social/i)).toHaveValue("Taller Ana S. de R.L.");
     expect(screen.getByLabelText(/^RTN$/i)).toHaveValue("08011990123456");
     expect(screen.getByLabelText(/código de establecimiento/i)).toHaveValue("001");
+  });
+
+  it("keeps showing the cached profile when the device is offline", async () => {
+    // Defect this catches: a previously fetched fiscal profile
+    // disappearing the moment the device goes offline, instead of
+    // rendering from the persisted cache (`fiscal-profile` spec's "A
+    // previously fetched profile renders offline"), the same way the
+    // Factura detail screen already does for its own document.
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.error()),
+      http.get("/api/invoicing/settings", () => HttpResponse.error()),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const settingsKey = invoicingSettingsQueryKey("w1");
+    queryClient.setQueryData(sessionQueryKey, SESSION);
+    queryClient.setQueryData(settingsKey, settingsWithProfile());
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/ordenes/facturacion/datos"]}>
+          <Routes>
+            <Route path="/ordenes/facturacion/datos" element={<FiscalProfilePage />} />
+            <Route path="/ordenes/facturacion" element={<div>Pantalla de facturación</div>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    // Wait until the background refetch triggered on mount has actually
+    // failed (not just been issued), so the assertions below exercise the
+    // state the cached render must survive, instead of racing ahead of it.
+    await waitFor(() => {
+      expect(queryClient.getQueryState(settingsKey)?.status).toBe("error");
+    });
+
+    expect(screen.getByLabelText(/razón social/i)).toHaveValue("Taller Ana S. de R.L.");
+    expect(screen.getByLabelText(/^RTN$/i)).toHaveValue("08011990123456");
   });
 
   it("shows the Spanish message for invalid_establishment_code on a 422, not the generic fallback", async () => {

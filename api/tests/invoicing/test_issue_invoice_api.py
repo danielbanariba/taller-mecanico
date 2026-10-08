@@ -451,6 +451,30 @@ def test_issuing_against_another_workshops_order_is_not_found(
     assert response.json()["detail"] == "work_order_not_found"
 
 
+def test_another_workshops_factura_is_invisible(
+    authenticated_client: TestClient, second_authenticated_client: TestClient
+):
+    """Defect it catches: a direct-by-id read leaking another
+    workshop's issued Factura instead of reporting it as not found
+    (`fiscal-invoices`, "Another workshop's Factura is invisible").
+    """
+    _configure_invoicing(authenticated_client)
+    order = _order_in_status(authenticated_client, status="completed")
+    issued = _issue_invoice(authenticated_client, order["id"])
+    assert issued.status_code == 201, issued.text
+    invoice_id = issued.json()["id"]
+
+    foreign_response = second_authenticated_client.get(f"/api/invoicing/invoices/{invoice_id}")
+    nonexistent_response = second_authenticated_client.get(
+        f"/api/invoicing/invoices/{uuid.uuid4()}"
+    )
+
+    assert foreign_response.status_code == 404
+    assert foreign_response.json()["detail"] == "fiscal_invoice_not_found"
+    assert foreign_response.status_code == nonexistent_response.status_code
+    assert foreign_response.json()["detail"] == nonexistent_response.json()["detail"]
+
+
 def test_no_invoiceable_status_can_reach_cancelled():
     """Defect it catches: a future back-edge (`completed -> cancelled`)
     would let an invoiced order be cancelled with no guard, since the
