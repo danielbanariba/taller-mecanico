@@ -56,9 +56,11 @@ from taller.invoicing.domain.profile import (
 from taller.invoicing.domain.ranges import (
     CaiRange,
     RangeState,
+    RangeWarning,
     normalize_cai,
     overlaps,
     range_states,
+    range_warnings,
     select_range,
     validate_issue_deadline,
     validate_range_bounds,
@@ -186,6 +188,7 @@ class DocumentReadiness:
     blocked_reason: str | None
     active_range_id: uuid.UUID | None
     next_number: str | None
+    warnings: list[RangeWarning]
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,7 +214,13 @@ def _document_readiness(
             blocked_reason="fiscal_profile_missing",
             active_range_id=None,
             next_number=None,
+            warnings=[],
         )
+
+    # AD-18: warnings are evaluated over this document type's own
+    # ranges regardless of readiness, so a workshop still sees "act
+    # now" even while a range is merely standby, not yet active.
+    warnings = range_warnings(ranges, today)
 
     states = range_states(ranges, today)
     active = next((r for r in ranges if states.get(r.id) == RangeState.active), None)
@@ -228,6 +237,7 @@ def _document_readiness(
             blocked_reason=None,
             active_range_id=active.id,
             next_number=str(number),
+            warnings=warnings,
         )
 
     if not ranges:
@@ -243,6 +253,7 @@ def _document_readiness(
         blocked_reason=blocked_reason,
         active_range_id=None,
         next_number=None,
+        warnings=warnings,
     )
 
 

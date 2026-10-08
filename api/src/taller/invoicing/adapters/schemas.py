@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, field_validator
 
@@ -13,7 +14,13 @@ from taller.invoicing.domain.documents import (
     FiscalInvoiceLine,
 )
 from taller.invoicing.domain.profile import FiscalProfile
-from taller.invoicing.domain.ranges import CaiRange, RangeState
+from taller.invoicing.domain.ranges import (
+    CaiRange,
+    RangeExpiresSoonWarning,
+    RangeLowNumbersWarning,
+    RangeState,
+    RangeWarning,
+)
 
 
 class FiscalProfileSaveRequest(BaseModel):
@@ -59,12 +66,33 @@ class FiscalProfileOut(BaseModel):
         )
 
 
+class RangeExpiresSoonWarningOut(BaseModel):
+    code: Literal["range_expires_soon"] = "range_expires_soon"
+    days_left: int
+
+
+class RangeLowNumbersWarningOut(BaseModel):
+    code: Literal["range_low_numbers"] = "range_low_numbers"
+    remaining: int
+
+
+RangeWarningOut = RangeExpiresSoonWarningOut | RangeLowNumbersWarningOut
+
+
+def _warning_out(warning: RangeWarning) -> RangeWarningOut:
+    if isinstance(warning, RangeExpiresSoonWarning):
+        return RangeExpiresSoonWarningOut(days_left=warning.days_left)
+    assert isinstance(warning, RangeLowNumbersWarning)
+    return RangeLowNumbersWarningOut(remaining=warning.remaining)
+
+
 class DocumentReadinessOut(BaseModel):
     document_type: str
     ready: bool
     blocked_reason: str | None
     active_range_id: uuid.UUID | None
     next_number: str | None
+    warnings: list[RangeWarningOut]
 
     @classmethod
     def from_domain(cls, readiness: DocumentReadiness) -> "DocumentReadinessOut":
@@ -74,6 +102,7 @@ class DocumentReadinessOut(BaseModel):
             blocked_reason=readiness.blocked_reason,
             active_range_id=readiness.active_range_id,
             next_number=readiness.next_number,
+            warnings=[_warning_out(w) for w in readiness.warnings],
         )
 
 

@@ -200,3 +200,60 @@ def validate_issue_deadline(issue_deadline: date, *, today: date) -> None:
         raise CaiDeadlinePassed(issue_deadline)
     if issue_deadline > today + timedelta(days=MAX_DEADLINE_DAYS_AHEAD):
         raise CaiDeadlineTooFar(issue_deadline)
+
+
+@dataclass(frozen=True, slots=True)
+class RangeExpiresSoonWarning:
+    """AD-18 (phase B): the latest usable range's fecha límite is
+    within ``EXPIRY_WARNING_DAYS`` of today -- matching Art. 59's
+    2-month window to request the next range.
+    """
+
+    days_left: int
+
+
+@dataclass(frozen=True, slots=True)
+class RangeLowNumbersWarning:
+    """AD-18 (phase B): the usable ranges' remaining numbers, summed,
+    are at or below ``LOW_NUMBERS_THRESHOLD``.
+    """
+
+    remaining: int
+
+
+RangeWarning = RangeExpiresSoonWarning | RangeLowNumbersWarning
+
+#: AD-18: an absolute count, not a percentage -- sensible at every
+#: range size, where a percentage would warn too late on a small range
+#: and months early on a large one (design.md's threshold rationale).
+#: A named domain constant, not a setting, in v1.
+LOW_NUMBERS_THRESHOLD: Final = 50
+
+#: AD-18: matches Art. 59's 2-month window to request the next range.
+EXPIRY_WARNING_DAYS: Final = 60
+
+
+def range_warnings(ranges: Sequence[CaiRange], today: date) -> list[RangeWarning]:
+    """Warnings for one document type's ranges (AD-18), evaluated over
+    its *usable* ranges (``_usable``, the same set `select_range` and
+    `range_states` consider active/standby): a warning means "act
+    now", not "something will roll over" eventually, so a
+    pre-registered standby range counts toward both checks and
+    registering the next range silences both warnings before the
+    current one lapses.
+    """
+    usable = _usable(ranges, today)
+    if not usable:
+        return []
+
+    warnings: list[RangeWarning] = []
+
+    days_left = (max(r.issue_deadline for r in usable) - today).days
+    if days_left <= EXPIRY_WARNING_DAYS:
+        warnings.append(RangeExpiresSoonWarning(days_left=days_left))
+
+    remaining = sum(r.remaining for r in usable)
+    if remaining <= LOW_NUMBERS_THRESHOLD:
+        warnings.append(RangeLowNumbersWarning(remaining=remaining))
+
+    return warnings
