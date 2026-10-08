@@ -347,6 +347,64 @@ for entry in "${payments[@]}"; do
   esac
 done
 
+# --- Phase A (sar-invoicing): fiscal profile, a Factura 01 range, María
+# Hernández's billing data, and one issued Factura on the Corolla alignment
+# order. The profile, RTN and CAI are all obviously fictional
+# (design.md's AD-17, question 3): no real workshop's data belongs here.
+#
+# `range_deadline` is a FIXED literal, not `today + 364 days` computed at
+# run time. Registering a range sends the same `{id, ..., issue_deadline}`
+# payload every run so the server's replay check (AD-6) can return 200 on
+# a rerun instead of a conflict; a deadline computed from "today" would
+# change every day the script runs and break that replay. Once this fixed
+# date passes, registering a *new* range needs a later deadline -- see
+# README.md's "yearly re-registration" note.
+profile_json="$(jq -n '{
+  rtn: "99999999999999",
+  legal_name: "Taller Demostración S. de R.L.",
+  trade_name: "Taller Demo",
+  address: "Colonia Demostración, Tegucigalpa, Honduras",
+  phone: "2200-0000",
+  email: "demo@example.invalid",
+  establishment_code: "001",
+  emission_point_code: "001"
+}')"
+status="$(request PUT /api/invoicing/profile "$profile_json")"
+case "$status" in
+  201) profile_result="created" ;;
+  200) profile_result="already present" ;;
+  *) fail "saving the fiscal profile returned HTTP $status" ;;
+esac
+
+maria_id="${customer_ids[maria-hernandez]}"
+status="$(request PATCH "/api/customers/$maria_id" '{"billing_name": "María Hernández", "rtn": "99999999990001"}')"
+[[ "$status" == "200" ]] || fail "setting María Hernández's billing data returned HTTP $status"
+
+range_id="$(uuidgen --sha1 --namespace @url --name "$id_namespace/invoicing/range/factura-01")"
+range_deadline="2027-10-06"
+range_json="$(jq -n --arg id "$range_id" --arg dl "$range_deadline" '{
+  id: $id, document_type: "01", cai: "010101-010101-010101-010101-DEMO01-01",
+  range_start: 1, range_end: 500, issue_deadline: $dl
+}')"
+status="$(request POST /api/invoicing/cai-ranges "$range_json")"
+case "$status" in
+  201) range_result="created" ;;
+  200) range_result="already present" ;;
+  422)
+    fail "registering the seeded CAI range returned HTTP 422 -- the fixed issue_deadline ($range_deadline) has probably passed; see README.md's yearly re-registration note"
+    ;;
+  *) fail "registering the seeded CAI range returned HTTP $status" ;;
+esac
+
+invoice_id="$(uuidgen --sha1 --namespace @url --name "$id_namespace/invoicing/invoice/corolla-alignment")"
+invoice_json="$(jq -n --arg id "$invoice_id" --arg oid "${order_ids[corolla-alignment]}" '{id: $id, order_id: $oid}')"
+status="$(request POST /api/invoicing/invoices "$invoice_json")"
+case "$status" in
+  201) invoice_result="issued" ;;
+  200) invoice_result="already present" ;;
+  *) fail "issuing the seeded Factura returned HTTP $status" ;;
+esac
+
 status="$(request GET /api/customers)"
 [[ "$status" == "200" ]] || fail "listing customers returned HTTP $status"
 customers_total="$(jq 'length' "$body_file")"
@@ -366,3 +424,7 @@ echo "Sample order lines: $lines_created created, $lines_present already present
 echo "Sample status changes: $status_changes applied, $status_tester_moved left as testers moved them (already there or unreachable)"
 echo "Workshop now lists $orders_total work orders (any status)"
 echo "Sample payments: $payments_created created, $payments_present already present, $payments_edited edited by testers (kept), $payments_balance_conflict balance conflicts (kept)"
+echo "Fiscal profile (Taller Demostración S. de R.L.): $profile_result"
+echo "María Hernández's billing name and RTN: set"
+echo "Sample CAI range (Factura 01, 1-500, deadline $range_deadline): $range_result"
+echo "Sample Factura on the Corolla alignment order (001-001-01-00000001): $invoice_result"
