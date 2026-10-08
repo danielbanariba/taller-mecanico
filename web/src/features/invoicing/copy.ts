@@ -94,6 +94,7 @@ export const invoicingCopy = {
     rtnLabel: "RTN",
     rtnRequired: "El RTN es obligatorio.",
     identificationRequiredNotice: "Las facturas desde L 10,000.00 requieren el nombre y el RTN del comprador.",
+    cancel: "Cancelar",
     submit: "Emitir factura",
     submitPending: "Emitiendo...",
   },

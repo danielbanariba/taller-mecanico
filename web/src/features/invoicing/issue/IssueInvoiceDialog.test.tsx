@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { useState } from "react";
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
@@ -216,6 +217,38 @@ describe("IssueInvoiceDialog", () => {
 
     expect(await screen.findByText("El rango de CAI se agotó. Registre uno nuevo.")).toBeInTheDocument();
     expect(screen.queryByText("Ocurrió un error. Intente de nuevo.")).not.toBeInTheDocument();
+  });
+
+  it("closes the dialog without issuing when 'Cancelar' is clicked", async () => {
+    // Defect this catches: issuing a Factura is irreversible (AD-10's
+    // immutable snapshot), yet the dialog's only button was "Emitir
+    // factura" -- a mechanic who opened it by mistake had no way out
+    // except actually issuing it.
+    mockCustomerAndSession();
+    let issueRequestWasSent = false;
+    server.use(
+      http.post("/api/invoicing/invoices", () => {
+        issueRequestWasSent = true;
+        return HttpResponse.json({ id: "invoice-1", number: "001-001-01-00000001" }, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+
+    function ClosableDialog() {
+      const [open, setOpen] = useState(true);
+      return <IssueInvoiceDialog open={open} order={ORDER} onClose={() => setOpen(false)} />;
+    }
+    renderWithQueryClient(
+      <MemoryRouter>
+        <ClosableDialog />
+      </MemoryRouter>,
+    );
+
+    await screen.findByLabelText("Nombre o razón social");
+    await user.click(screen.getByRole("button", { name: "Cancelar" }));
+
+    expect(screen.queryByLabelText("Nombre o razón social")).not.toBeInTheDocument();
+    expect(issueRequestWasSent).toBe(false);
   });
 
   it("disables the issue action with its offline message once the connection drops", async () => {

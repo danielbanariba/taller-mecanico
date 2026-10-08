@@ -109,9 +109,14 @@ export function IssueInvoiceDialog({ open, order, onClose }: IssueInvoiceDialogP
           onChange={(event) => setBuyerRtn(event.target.value)}
           error={showValidationError && trimmedRtn.length === 0 ? invoicingCopy.issue.rtnRequired : undefined}
         />
-        <Button onClick={handleSubmit} loading={issueInvoice.isPending} disabled={isOffline || issueInvoice.isPending}>
-          {issueInvoice.isPending ? invoicingCopy.issue.submitPending : invoicingCopy.issue.submit}
-        </Button>
+        <div className="flex gap-3">
+          <Button variant="secondary" onClick={onClose}>
+            {invoicingCopy.issue.cancel}
+          </Button>
+          <Button onClick={handleSubmit} loading={issueInvoice.isPending} disabled={isOffline || issueInvoice.isPending}>
+            {issueInvoice.isPending ? invoicingCopy.issue.submitPending : invoicingCopy.issue.submit}
+          </Button>
+        </div>
       </div>
     </Dialog>
   );
