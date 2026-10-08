@@ -197,6 +197,27 @@ describe("IssueInvoiceDialog", () => {
     expect(await screen.findByText("Invoice detail probe: order-1/invoice-1")).toBeInTheDocument();
   });
 
+  it("shows the range-exhausted message, not the generic fallback, for a 409 cai_range_exhausted response", async () => {
+    // Defect this catches: `getInvoicingErrorMessage`'s map had no entry
+    // for `cai_range_exhausted` (nor `cai_range_missing`/`cai_range_expired`),
+    // so the dialog fell through to the generic "Ocurrió un error. Intente
+    // de nuevo." instead of telling the mechanic to go register a new CAI
+    // range -- a defect that specifically a real submit through the dialog
+    // exposes, since `copy.ts`'s map is otherwise untested from the seam
+    // that actually calls it.
+    mockCustomerAndSession();
+    server.use(
+      http.post("/api/invoicing/invoices", () => HttpResponse.json({ detail: "cai_range_exhausted" }, { status: 409 })),
+    );
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByRole("button", { name: "Emitir factura" }));
+
+    expect(await screen.findByText("El rango de CAI se agotó. Registre uno nuevo.")).toBeInTheDocument();
+    expect(screen.queryByText("Ocurrió un error. Intente de nuevo.")).not.toBeInTheDocument();
+  });
+
   it("disables the issue action with its offline message once the connection drops", async () => {
     // Defect this catches: the submit button staying enabled after the
     // connection drops, which would leave the mutation hanging on a

@@ -25,7 +25,7 @@ export function InvoiceDocument({ invoice, copy }: InvoiceDocumentProps) {
     copy === "original" ? invoicingCopy.print.originalLabel : invoicingCopy.print.issuerCopyLabel;
 
   return (
-    <article className="flex flex-col gap-2 break-words text-sm">
+    <article className="flex flex-col gap-2 break-words">
       <DemoBand />
       <p className="text-center text-xs font-semibold">{destinationLabel}</p>
       <h1 className="text-center text-base font-bold">{invoicingCopy.print.documentName}</h1>
