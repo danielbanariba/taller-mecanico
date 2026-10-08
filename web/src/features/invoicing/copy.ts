@@ -124,6 +124,7 @@ export const invoicingCopy = {
   },
   print: {
     documentName: "FACTURA",
+    creditNoteDocumentName: "NOTA DE CRÉDITO",
     originalLabel: "ORIGINAL: CLIENTE",
     issuerCopyLabel: "COPIA: EMISOR",
     finalConsumer: "CONSUMIDOR FINAL",
@@ -147,6 +148,12 @@ export const invoicingCopy = {
     cutHereLabel: "- - - - - cortar aquí - - - - -",
     onlyOriginalToggle: "Solo original",
     printAction: "Imprimir",
+    originalReferenceLabel: "Referencia a la factura original",
+    originalNumberLabel: "Número de la factura original",
+    originalDateLabel: "Fecha de la factura original",
+    reasonLabel: "Motivo",
+    signatureLabel: "Firma",
+    identificationLabel: "Identidad",
   },
 };
 

@@ -57,11 +57,13 @@ function renderDetailPage() {
 }
 
 describe("CreditNoteDetailPage", () => {
-  it("renders the credit note's number, reason and original Factura reference", async () => {
+  it("renders the credit note's number, reason, original Factura reference and both print links", async () => {
     // Defect this catches: the detail screen failing to render the
     // fetched credit note, or omitting the reference to the Factura it
     // corrects, leaving the owner with a document nobody can trace back
-    // to the original (AD-13's printed field map).
+    // to the original (AD-13's printed field map); or omitting a link to
+    // either print layout, leaving nobody able to print the correction
+    // they just issued (AD-16).
     server.use(
       http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
       http.get("/api/invoicing/credit-notes/credit-note-1", () => HttpResponse.json(CREDIT_NOTE)),
@@ -73,6 +75,14 @@ describe("CreditNoteDetailPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Datos del comprador incorrectos")).toBeInTheDocument();
     expect(screen.getByText("001-001-01-00000001")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Imprimir 58 mm" })).toHaveAttribute(
+      "href",
+      "/ordenes/order-1/nota-credito/credit-note-1/58mm",
+    );
+    expect(screen.getByRole("link", { name: "Imprimir carta" })).toHaveAttribute(
+      "href",
+      "/ordenes/order-1/nota-credito/credit-note-1/carta",
+    );
   });
 
   it("keeps showing a previously fetched credit note when the device is offline", async () => {

@@ -13,8 +13,8 @@ import { useCreditNote } from "../hooks";
  * credited Factura's detail (`InvoiceDetailPage`), or directly offline
  * from the persisted cache (`fiscal-document-print` spec's "A previously
  * fetched document prints offline", which this screen's own query key
- * already supports -- the print routes themselves arrive in a later
- * slice, AD-16).
+ * already supports). Links to both print layouts (AD-16), never the
+ * non-fiscal receipt's own route.
  */
 export function CreditNoteDetailPage() {
   const { orderId: paramOrderId, creditNoteId: paramCreditNoteId } = useParams<{
@@ -82,6 +82,14 @@ export function CreditNoteDetailPage() {
           <span>{formatCents(data.total_cents)}</span>
         </p>
       </section>
+      <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+        <LinkButton to={`/ordenes/${orderId}/nota-credito/${creditNoteId}/58mm`} variant="secondary">
+          {invoicingCopy.documents.print58mm}
+        </LinkButton>
+        <LinkButton to={`/ordenes/${orderId}/nota-credito/${creditNoteId}/carta`} variant="secondary">
+          {invoicingCopy.documents.printLetter}
+        </LinkButton>
+      </div>
       <LinkButton to={`/ordenes/${orderId}`} variant="secondary">
         {invoicingCopy.documents.backToOrder}
       </LinkButton>
