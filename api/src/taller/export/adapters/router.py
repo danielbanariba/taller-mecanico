@@ -48,6 +48,17 @@ def export_data_route(
             "payments.csv": build_csv(
                 sources.PAYMENTS_HEADERS, sources.payments_rows(db, workshop_id)
             ),
+            "fiscal_invoices.csv": build_csv(
+                sources.FISCAL_INVOICES_HEADERS, sources.fiscal_invoices_rows(db, workshop_id)
+            ),
+            "fiscal_invoice_lines.csv": build_csv(
+                sources.FISCAL_INVOICE_LINES_HEADERS,
+                sources.fiscal_invoice_lines_rows(db, workshop_id),
+            ),
+            "fiscal_credit_notes.csv": build_csv(
+                sources.FISCAL_CREDIT_NOTES_HEADERS,
+                sources.fiscal_credit_notes_rows(db, workshop_id),
+            ),
         }
     )
     filename = f"taller-export-{date.today().isoformat()}.zip"
