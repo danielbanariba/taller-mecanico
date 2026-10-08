@@ -145,7 +145,8 @@ Each row is one work-unit commit inside its phase's single PR (no separate PR pe
   - `InvoicingSettingsOut` carries `profile`, `codes_locked`, `documents` for this slice (no `ranges: CaiRangeOut[]` yet, since `CaiRangeOut` and range registration are `PA.S4` work); no test in `PA.S3.T3` asserts `ranges`.
 - [x] **PA.S3.T5** [inline] Run this slice's verification: `uv run ruff check . && uv run ruff format --check . && uv run pytest tests/invoicing/`.
   - **Result:** `ruff check` clean, `ruff format --check` clean (133 files); `pytest tests/invoicing/` passes (64 tests, 52 from `PA.S2` + 12 new); full `uv run pytest` 309 passed.
-- [ ] **PA.S3.T6** [inline] Work-unit commit: `:sparkles: feat(invoicing): add the fiscal profile and invoicing settings readiness`.
+- [x] **PA.S3.T6** [inline] Work-unit commit: `:sparkles: feat(invoicing): add the fiscal profile and invoicing settings readiness`.
+  - **Result:** committed as `22ebff6` on `feat/sar-invoicing`.
 
 ### Slice PA.S4 — API: CAI range create and `PATCH` (overlap, immutability, deadline bounds, profile mutex) + tests
 
