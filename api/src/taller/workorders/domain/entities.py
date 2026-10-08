@@ -125,3 +125,14 @@ class CashSummaryEntry:
 
     payment: Payment
     order_number: int
+
+
+@dataclass(frozen=True, slots=True)
+class InvoiceRef:
+    """The minimal data `work-orders` needs about an active (non-credited)
+    Factura, with no dependency on the `invoicing` feature's own types
+    (`design.md`'s AD-1/AD-12 cross-feature read pattern).
+    """
+
+    id: uuid.UUID
+    number: str

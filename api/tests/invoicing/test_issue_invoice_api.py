@@ -10,7 +10,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from taller.identity.adapters.dependencies import get_clock
+from taller.invoicing.application.use_cases import INVOICEABLE
 from taller.main import app
+from taller.workorders.domain.status import TRANSITIONS, WorkOrderStatus
 
 _PROFILE_PAYLOAD = {
     "rtn": "0801-1990-123456",
@@ -447,3 +449,12 @@ def test_issuing_against_another_workshops_order_is_not_found(
     response = _issue_invoice(authenticated_client, foreign_order["id"])
     assert response.status_code == 404
     assert response.json()["detail"] == "work_order_not_found"
+
+
+def test_no_invoiceable_status_can_reach_cancelled():
+    """Defect it catches: a future back-edge (`completed -> cancelled`)
+    would let an invoiced order be cancelled with no guard, since the
+    `work_order_invoiced` lock only covers line edits, not cancellation.
+    """
+    for status in INVOICEABLE:
+        assert WorkOrderStatus.cancelled not in TRANSITIONS[status]

@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import BigInteger, func
+from sqlalchemy import BigInteger, column, func, table
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from taller.workorders.adapters.models import (
     WorkshopCounterModel,
 )
 from taller.workorders.domain.entities import (
+    InvoiceRef,
     LineKind,
     Payment,
     PaymentMethod,
@@ -22,6 +23,20 @@ from taller.workorders.domain.entities import (
     WorkOrderLine,
 )
 from taller.workorders.domain.status import WorkOrderStatus
+
+#: Lightweight, column-only reference to `fiscal_invoices` -- no ORM
+#: import of `FiscalInvoiceModel`, so work-orders never depends on the
+#: invoicing feature module, only on its table by name (mirrors
+#: `taller.inventory.adapters.repositories._work_orders`,
+#: `design.md`'s AD-1/AD-12).
+_fiscal_invoices = table(
+    "fiscal_invoices",
+    column("id"),
+    column("workshop_id"),
+    column("order_id"),
+    column("number"),
+    column("credited_at"),
+)
 
 
 class SqlAlchemyWorkshopCounterRepository:
@@ -274,6 +289,18 @@ class SqlAlchemyWorkOrderRepository:
             .all()
         )
         return {order_id: number for order_id, number in rows}
+
+    def active_invoice(self, *, workshop_id: uuid.UUID, order_id: uuid.UUID) -> InvoiceRef | None:
+        row = (
+            self._session.query(_fiscal_invoices.c.id, _fiscal_invoices.c.number)
+            .filter(
+                _fiscal_invoices.c.workshop_id == workshop_id,
+                _fiscal_invoices.c.order_id == order_id,
+                _fiscal_invoices.c.credited_at.is_(None),
+            )
+            .first()
+        )
+        return InvoiceRef(id=row[0], number=row[1]) if row is not None else None
 
 
 def _payment_from_model(model: PaymentModel) -> Payment:
