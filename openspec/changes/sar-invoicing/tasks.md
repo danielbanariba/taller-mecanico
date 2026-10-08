@@ -300,6 +300,7 @@ Each row is one work-unit commit inside its phase's single PR (no separate PR pe
 - [ ] **PA.S12.T10** [inline] Re-run this slice's verification after any T8 fixes.
   - **Deviation:** T8 was not performed in this batch (see above), so there are no T8 fixes to re-verify against. Left unchecked rather than marked done with nothing to show.
 - [x] **PA.S12.T11** [inline] Work-unit commit(s): `:memo: docs(invoicing): seed the demo fiscal profile and document the phase A rollback` (plus one atomic commit per T8 fix, if any). No T8 fixes were made in this batch (T8 itself is deferred), so this is the single commit for this slice.
+  - **Result:** committed as `0395ffa` on `feat/sar-invoicing` (4 files changed: `CLAUDE.md`, `deploy/demo/README.md`, `deploy/demo/seed-demo-account.sh`, `openspec/changes/sar-invoicing/tasks.md`).
 
 ---
 
