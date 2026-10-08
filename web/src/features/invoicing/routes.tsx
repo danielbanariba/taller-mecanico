@@ -15,4 +15,22 @@ export const invoicingShellRoutes: RouteObject[] = [
       Component: (await import("./settings/InvoicingSettingsPage")).InvoicingSettingsPage,
     }),
   },
+  {
+    path: "facturacion/datos",
+    lazy: async () => ({
+      Component: (await import("./settings/FiscalProfilePage")).FiscalProfilePage,
+    }),
+  },
+  {
+    path: "facturacion/rangos/nuevo",
+    lazy: async () => ({
+      Component: (await import("./settings/CaiRangePage")).CaiRangePage,
+    }),
+  },
+  {
+    path: "facturacion/rangos/:rangeId",
+    lazy: async () => ({
+      Component: (await import("./settings/CaiRangePage")).CaiRangePage,
+    }),
+  },
 ];

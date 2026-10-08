@@ -30,7 +30,7 @@ export function useInvoicingSettings() {
  * ranges) and the issuance gate, so it invalidates the one settings query
  * every other invoicing screen reads from (AD-3/AD-15).
  */
-export function useSaveFiscalProfile() {
+export function useSaveProfile() {
   const queryClient = useQueryClient();
   const workshopId = useWorkshopId();
   return useMutation({
