@@ -191,23 +191,23 @@ Phase effects: phase A's `downgrade()` drops the invoices, ranges and profile ta
 |---|----------|--------|-------|
 | D1 | Line prices include 15% ISV; the invoice splits base and ISV out of the final amount. Order totals, payments and balances are unchanged, and the order response still carries no tax amount. | Decided by the user | Art. 10–11 breakdown; `work-orders/spec.md:91-100` |
 | D2 | v1 documents are Factura (`01`) and Nota de Crédito (`06`); Nota de Débito is out. | Decided by the user | Art. 4.32, 25–28 |
-| A1 | Opt-in by data: a complete fiscal profile plus an active range per document type; the app never contacts SAR; the workshop obtains its own CAI. | Assumption, confirm | Art. 47, 53, 59, 61 |
-| A2 | One establecimiento and one punto de emisión per workshop. | Assumption, confirm | Art. 59 |
-| A3 | One Factura per order, full amount, from a `completed` or `delivered` order; online-only; idempotent client id; gap-free correlative under a row lock. | Assumption, confirm | Art. 10–11 |
-| A4 | All lines gravado 15%; exento, exonerado and 18% out of v1; rounding rule left to design. | Assumption, confirm | Research note, "Tax rates" |
-| A5 | Buyer "CONSUMIDOR FINAL" by default; optional RTN and billing name stored on the customer and editable at issuance; a consumidor final from L 10,000 must be identified. | Assumption, confirm | Art. 10–11 |
-| A6 | Every correction is a full-amount Nota de Crédito referencing the original; no "ANULADA" in v1; a fully credited order unlocks; partial credit notes are a follow-up. | Assumption, confirm | Art. 4.32, 25–26, 41, 42 |
-| A7 | Issued documents are immutable snapshots; while an order has a non-credited Factura, line edits and cancellation are blocked. | Assumption, confirm | Art. 53.2–53.3; Art. 5, 43 |
-| A8 | Block issuance when the range is exhausted or past its fecha límite; warn from 60 days before and when few numbers remain. | Assumption, confirm | Art. 59, 62 |
-| A9 | 58 mm and letter layouts with every mandatory field, the total in words and the original/copy destinations. | Assumption, confirm | Art. 10–11, 38 |
-| A10 | Invoices and credit notes CSVs in the existing export. | Assumption, confirm | Art. 53.3 |
-| A11 | In-app notice: register the system and file the Declaración Jurada, confirm with a contador, certified thermal paper. | Assumption, confirm | Art. 38, 47, 53 |
-| A12 | The out-of-scope list above (Art. 53.5 files, Art. 42 notification, multiple points, Nota de Débito, exento/exonerado, partial documents, CAEE). | Assumption, confirm | Art. 27–28, 42, 53.5, 57 |
-| A13 | Two phases, one PR each: A as listed, B as listed. | Assumption, confirm | Dependencies above |
+| A1 | Opt-in by data: a complete fiscal profile plus an active range per document type; the app never contacts SAR; the workshop obtains its own CAI. | Approved by the user (2026-10-08) | Art. 47, 53, 59, 61 |
+| A2 | One establecimiento and one punto de emisión per workshop. | Approved by the user (2026-10-08) | Art. 59 |
+| A3 | One Factura per order, full amount, from a `completed` or `delivered` order; online-only; idempotent client id; gap-free correlative under a row lock. | Approved by the user (2026-10-08) | Art. 10–11 |
+| A4 | All lines gravado 15%; exento, exonerado and 18% out of v1; rounding rule left to design. | Approved by the user (2026-10-08) | Research note, "Tax rates" |
+| A5 | Buyer "CONSUMIDOR FINAL" by default; optional RTN and billing name stored on the customer and editable at issuance; a consumidor final from L 10,000 must be identified. | Approved by the user (2026-10-08) | Art. 10–11 |
+| A6 | Every correction is a full-amount Nota de Crédito referencing the original; no "ANULADA" in v1; a fully credited order unlocks; partial credit notes are a follow-up. | Approved by the user (2026-10-08) | Art. 4.32, 25–26, 41, 42 |
+| A7 | Issued documents are immutable snapshots; while an order has a non-credited Factura, line edits and cancellation are blocked. | Approved by the user (2026-10-08) | Art. 53.2–53.3; Art. 5, 43 |
+| A8 | Block issuance when the range is exhausted or past its fecha límite; warn from 60 days before and when few numbers remain. | Approved by the user (2026-10-08) | Art. 59, 62 |
+| A9 | 58 mm and letter layouts with every mandatory field, the total in words and the original/copy destinations. | Approved by the user (2026-10-08) | Art. 10–11, 38 |
+| A10 | Invoices and credit notes CSVs in the existing export. | Approved by the user (2026-10-08) | Art. 53.3 |
+| A11 | In-app notice: register the system and file the Declaración Jurada, confirm with a contador, certified thermal paper. | Approved by the user (2026-10-08) | Art. 38, 47, 53 |
+| A12 | The out-of-scope list above (Art. 53.5 files, Art. 42 notification, multiple points, Nota de Débito, exento/exonerado, partial documents, CAEE). | Approved by the user (2026-10-08) | Art. 27–28, 42, 53.5, 57 |
+| A13 | Two phases, one PR each: A as listed, B as listed. | Approved by the user (2026-10-08) | Dependencies above |
 
 ## Open Questions
 
-**Product decisions (for the user; each has a recommended answer).**
+**Product decisions (for the user; each has a recommended answer).** The user approved the proposal on 2026-10-08 with every recommended answer below, so each one is now a decision, not an open question.
 
 1. **Art. 53.5 and real use.** Can a workshop truthfully file the Declaración Jurada (Art. 53) while v1 cannot generate SAR text files (Art. 53.5)? *Recommended:* keep Art. 53.5 out of v1, but no real workshop issues invoices with the app until a contador confirms; research the text-file format as its own follow-up change.
 2. **Phase A without corrections.** Phase A can issue a Factura but cannot correct one, since the Nota de Crédito is the only legal correction after issuance (Art. 4.32, 25–26). *Recommended:* phase A ships to the demo only, and real issuance waits for phase B. The alternative is moving credit notes into phase A, which makes that PR larger.
