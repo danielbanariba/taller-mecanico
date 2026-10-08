@@ -2,6 +2,8 @@
 Facturas, and -- in phase B -- Notas de Crédito).
 """
 
+import uuid
+
 
 class InvalidCorrelative(ValueError):
     """Raised when a document number's correlative is outside
@@ -53,3 +55,47 @@ class CaiRangeExhausted(Exception):
     """Raised when no CAI range is usable today and none has numbers
     left either (AD-4, AD-6).
     """
+
+
+class FiscalProfileMissing(Exception):
+    """Raised when an action needs a fiscal profile and the workshop
+    has none (AD-3).
+    """
+
+
+class FiscalProfileCodesLocked(Exception):
+    """Raised when an edit would change the establecimiento or punto
+    de emisión code while any CAI range is still usable today (AD-3):
+    a CAI is granted per punto de emisión, so changing either code
+    would invalidate every number still available on that range.
+    """
+
+    def __init__(self, workshop_id: uuid.UUID) -> None:
+        super().__init__(f"Fiscal profile codes are locked: {workshop_id}")
+        self.workshop_id = workshop_id
+
+
+class InvalidEmail(ValueError):
+    """Raised when a value cannot be normalized into a valid email
+    address (AD-3).
+    """
+
+    def __init__(self, raw: str) -> None:
+        super().__init__(f"Invalid email: {raw!r}")
+        self.raw = raw
+
+
+class InvalidEstablishmentCode(ValueError):
+    """Raised when a value is not exactly 3 digits (AD-3)."""
+
+    def __init__(self, raw: str) -> None:
+        super().__init__(f"Invalid establishment code: {raw!r}")
+        self.raw = raw
+
+
+class InvalidEmissionPointCode(ValueError):
+    """Raised when a value is not exactly 3 digits (AD-3)."""
+
+    def __init__(self, raw: str) -> None:
+        super().__init__(f"Invalid emission point code: {raw!r}")
+        self.raw = raw
