@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 
 import { useOnlineStatus } from "../../../shared/offline/useOnlineStatus";
+import { Alert } from "../../../shared/ui/Alert";
 import { Button } from "../../../shared/ui/Button";
 import { LinkButton } from "../../../shared/ui/LinkButton";
 import { CreditNoteDialog } from "../documents/CreditNoteDialog";
@@ -51,23 +52,32 @@ export function InvoiceSection({ order }: InvoiceSectionProps) {
   }
 
   let action: ReactNode = null;
+  // Shown next to the disabled button itself: the dialogs carry the same
+  // message, but a disabled button can never open them.
+  let offlineMessage: string | null = null;
   if (order.active_invoice) {
     action = (
       <Button variant="secondary" onClick={() => setCreditNoteDialogOpen(true)} disabled={isOffline}>
         {invoicingCopy.creditNote.issueAction}
       </Button>
     );
+    offlineMessage = invoicingCopy.offline.issueCreditNoteDisabled;
   } else if (INVOICEABLE_STATUSES.has(order.status)) {
     const readiness = settings.data?.documents.find((document) => document.document_type === "01");
-    action = !readiness?.ready ? (
-      <LinkButton to="/ordenes/facturacion" variant="secondary">
-        {getBlockedReasonMessage(readiness?.blocked_reason ?? "fiscal_profile_missing")}
-      </LinkButton>
-    ) : (
-      <Button variant="secondary" onClick={() => setDialogOpen(true)} disabled={isOffline}>
-        {invoicingCopy.issue.issueAction}
-      </Button>
-    );
+    if (!readiness?.ready) {
+      action = (
+        <LinkButton to="/ordenes/facturacion" variant="secondary">
+          {getBlockedReasonMessage(readiness?.blocked_reason ?? "fiscal_profile_missing")}
+        </LinkButton>
+      );
+    } else {
+      action = (
+        <Button variant="secondary" onClick={() => setDialogOpen(true)} disabled={isOffline}>
+          {invoicingCopy.issue.issueAction}
+        </Button>
+      );
+      offlineMessage = invoicingCopy.offline.issueInvoiceDisabled;
+    }
   }
 
   return (
@@ -88,6 +98,7 @@ export function InvoiceSection({ order }: InvoiceSectionProps) {
           ))}
         </ul>
       ) : null}
+      {isOffline && offlineMessage ? <Alert variant="info">{offlineMessage}</Alert> : null}
       {action}
       {/* Mounted only while open, unlike `LineEditorDialog`: `IssueInvoiceDialog`
           fetches the customer's own billing data itself (`useCustomer`),

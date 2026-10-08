@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
@@ -10,6 +10,12 @@ import { server } from "../../../test/server";
 import { invoiceQueryKey } from "../hooks";
 import { InvoiceDetailPage } from "./InvoiceDetailPage";
 import type { FiscalInvoiceOut } from "../api";
+
+afterEach(() => {
+  // Drops a test's own `navigator.onLine` override, so jsdom's own
+  // getter (always true) applies to the next test.
+  Reflect.deleteProperty(window.navigator, "onLine");
+});
 
 const SESSION = {
   user: { id: "u1", full_name: "Ana Pérez", phone: "99998888", role: "owner" },
@@ -144,5 +150,19 @@ describe("InvoiceDetailPage", () => {
       await screen.findByRole("link", { name: "Ver nota de crédito 001-001-06-00000001" }),
     ).toHaveAttribute("href", "/ordenes/order-1/nota-credito/credit-note-1");
     expect(screen.queryByRole("button", { name: "Emitir nota de crédito" })).not.toBeInTheDocument();
+  });
+
+  it("explains why 'Emitir nota de crédito' is disabled while offline", async () => {
+    // Defect this catches: the offline explanation living only inside
+    // the credit note dialog, which the disabled button can never open.
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
+      http.get("/api/invoicing/invoices/invoice-1", () => HttpResponse.json(INVOICE)),
+    );
+    Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+    renderDetailPage();
+
+    expect(await screen.findByRole("button", { name: "Emitir nota de crédito" })).toBeDisabled();
+    expect(screen.getByText("Conéctese a internet para emitir una nota de crédito.")).toBeInTheDocument();
   });
 });

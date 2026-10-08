@@ -62,9 +62,12 @@ export function InvoiceDetailPage() {
           {invoicingCopy.creditNote.viewAction(data.credit_note.number)}
         </LinkButton>
       ) : (
-        <Button variant="secondary" onClick={() => setCreditNoteDialogOpen(true)} disabled={isOffline}>
-          {invoicingCopy.creditNote.issueAction}
-        </Button>
+        <>
+          {isOffline ? <Alert variant="info">{invoicingCopy.offline.issueCreditNoteDisabled}</Alert> : null}
+          <Button variant="secondary" onClick={() => setCreditNoteDialogOpen(true)} disabled={isOffline}>
+            {invoicingCopy.creditNote.issueAction}
+          </Button>
+        </>
       )}
       <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
         <LinkButton to={`/ordenes/${orderId}/factura/${invoiceId}/58mm`} variant="secondary">

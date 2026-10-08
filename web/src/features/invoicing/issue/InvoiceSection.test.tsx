@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter } from "react-router";
@@ -67,6 +67,17 @@ const ORDER: WorkOrderOut = {
   delivered_at: null,
   cancelled_at: null,
 };
+
+/** What a real browser reports with no connection: `navigator.onLine` is false. */
+function goOffline() {
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+}
+
+afterEach(() => {
+  // Drops the own-property override from `goOffline`, so jsdom's own
+  // `navigator.onLine` getter (always true) applies to the next test.
+  Reflect.deleteProperty(window.navigator, "onLine");
+});
 
 function mockSessionAndSettings(invoices: unknown[]) {
   server.use(
@@ -150,5 +161,40 @@ describe("InvoiceSection", () => {
 
     expect(await screen.findByRole("button", { name: "Emitir nota de crédito" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Emitir factura" })).not.toBeInTheDocument();
+  });
+
+  it("explains why 'Emitir factura' is disabled while offline", async () => {
+    // Defect this catches: the offline explanation living only inside
+    // the issue dialog, which a disabled button can never open, so an
+    // offline mechanic sees a greyed-out button and no reason.
+    mockSessionAndSettings([]);
+    goOffline();
+    renderSection();
+
+    expect(await screen.findByRole("button", { name: "Emitir factura" })).toBeDisabled();
+    expect(screen.getByText("Conéctese a internet para emitir una factura.")).toBeInTheDocument();
+  });
+
+  it("explains why 'Emitir nota de crédito' is disabled while offline", async () => {
+    // Defect this catches: the same missing explanation on the credit
+    // note action, or the Factura message shown for it instead.
+    mockSessionAndSettings([
+      {
+        id: "invoice-1",
+        number: "001-001-01-00000001",
+        issued_at: "2026-01-02T10:00:00Z",
+        total_cents: 50000,
+        credited_at: null,
+        credit_note: null,
+      },
+    ]);
+    goOffline();
+    renderSection({
+      ...ORDER,
+      active_invoice: { id: "invoice-1", number: "001-001-01-00000001" },
+    });
+
+    expect(await screen.findByRole("button", { name: "Emitir nota de crédito" })).toBeDisabled();
+    expect(screen.getByText("Conéctese a internet para emitir una nota de crédito.")).toBeInTheDocument();
   });
 });
