@@ -131,6 +131,7 @@ Its build prefills a shared demo account on the login form from `VITE_DEMO_PHONE
 - This agent sandbox denies writes to any path matching `.env*` by its own permission settings, regardless of content — `api/env.example` is the checked-in, writable template; `cp api/env.example api/.env` (shell copy, not a direct write to the `.env` path) then edit the values the task needs.
 - jsdom implements neither `URL.createObjectURL`/`revokeObjectURL` nor a real anchor-click navigation; a test covering a download (e.g. `exportData.test.ts`) must stub `URL.createObjectURL`/`revokeObjectURL` itself and spy on `HTMLAnchorElement.prototype.click`, or it throws/warns instead of exercising the real download logic.
 - `formatCents` inserts a non-breaking space (` `) between the currency symbol and the amount; `@testing-library/dom`'s text normalizer collapses it when matching rendered text, but only if the *expected* string also has a plain space — build it from `formatCents(...).replace(/ /g, " ")` (see `receipt/ReceiptBody.test.tsx`'s `money()` helper) rather than hardcoding a guessed literal.
+- `taller_unaccent_lower` schema-qualifies `unaccent` because a `pg_dump` restores with an empty `search_path`.
 
 ## Commits and pull requests
 
