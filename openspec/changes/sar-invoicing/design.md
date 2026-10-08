@@ -107,7 +107,7 @@ The check runs **after** the order-row lock, so it reads the state that issuance
 - `fiscal_profiles` has one row per workshop, keyed by `workshop_id`. A workshop that never opts in has no row, and every existing behavior (orders, payments, receipts, export) is untouched.
 - `PUT /api/invoicing/profile` takes the whole profile, and every field is required: RTN, razón social, nombre comercial, address, phone, email, establecimiento code and punto de emisión code (Art. 10–11 require all of them on every printed Factura). A stored profile is therefore always complete.
 - **Readiness** is computed, never stored: a document type is *ready* when a profile exists and a usable range of that type exists today (AD-4). The same pure function feeds `GET /api/invoicing/settings` (what the web shows) and issuance (what the server enforces), so the button and the rule cannot disagree.
-- **Code lock.** Changing `establishment_code` or `emission_point_code` is rejected with 409 `fiscal_codes_locked` while any range of the workshop is still *active* or *standby* (AD-4). A CAI is granted per punto de emisión and document type (Art. 59, 61), so a usable range must never print under different codes than it was granted for. Each range also copies the codes at registration, so finished ranges keep displaying their own codes after a later change.
+- **Code lock.** Changing `establishment_code` or `emission_point_code` is rejected with 409 `fiscal_profile_codes_locked` while any range of the workshop is still *active* or *standby* (AD-4). A CAI is granted per punto de emisión and document type (Art. 59, 61), so a usable range must never print under different codes than it was granted for. Each range also copies the codes at registration, so finished ranges keep displaying their own codes after a later change.
 
 **Alternatives considered.**
 1. An explicit "enable invoicing" toggle. Rejected in the exploration: a state that can disagree with the data.
@@ -133,7 +133,7 @@ The check runs **after** the order-row lock, so it reads the state that issuance
 - **Selection.** Among usable ranges of a type (numbers left and `today <= issue_deadline`), pick the earliest `issue_deadline`, then the lowest `range_start`, then `id`. Using the range that expires first wastes the fewest numbers, since Art. 62 voids whatever is left at the fecha límite.
 - **Pre-registration (Art. 59).** A next range may be registered at any time while the current one is still in use. It waits as `standby` and takes over automatically, in the same issuance that finds the current one exhausted or expired, with no user action. Art. 59 limits when the workshop may *request* a new range from SAR; enforcing that request window is SAR's job, not the app's.
 - **Overlap.** A new or edited range is rejected with 409 `cai_range_overlap` when it intersects `[range_start, range_end]` of another range of the same workshop, document type, establecimiento and punto de emisión. Ranges never overlap within one prefix, so the formatted number `NNN-NNN-TT-NNNNNNNN` is unique per workshop (and `UNIQUE (workshop_id, number)` on the document tables backs it).
-- **Immutability.** A range is `in_use` once `next_number > range_start`. While unused it may be corrected with `PATCH` (a mistyped CAI or deadline is the most likely error, and it would otherwise be printed on a legal document); once used, `PATCH` returns 409 `cai_range_in_use`. Ranges are never deleted.
+- **Immutability.** A range is `in_use` once `next_number > range_start`. While unused it may be corrected with `PATCH` (a mistyped CAI or deadline is the most likely error, and it would otherwise be printed on a legal document); once used, `PATCH` returns 409 `cai_range_immutable`. Ranges are never deleted.
 - **Registration bounds.**
   - `1 <= range_start <= range_end <= 99,999,999`, or 422 `invalid_cai_range`.
   - `issue_deadline >= today`, or 422 `cai_deadline_passed`.
@@ -664,9 +664,9 @@ Every route sits under `/api`, requires the session cookie, and is scoped by `ge
 | Method | Path | Body | Success | Errors |
 |---|---|---|---|---|
 | GET | `/invoicing/settings` | — | 200 `InvoicingSettingsOut` | |
-| PUT | `/invoicing/profile` | `{rtn, legal_name, trade_name, address, phone, email, establishment_code, emission_point_code}` | 201 created, 200 updated: `FiscalProfileOut` | 422 `invalid_rtn`, `invalid_phone`, `invalid_email`, `invalid_establishment_code`, `invalid_emission_point_code`; 409 `fiscal_codes_locked` |
+| PUT | `/invoicing/profile` | `{rtn, legal_name, trade_name, address, phone, email, establishment_code, emission_point_code}` | 201 created, 200 updated: `FiscalProfileOut` | 422 `invalid_rtn`, `invalid_phone`, `invalid_email`, `invalid_establishment_code`, `invalid_emission_point_code`; 409 `fiscal_profile_codes_locked` |
 | POST | `/invoicing/cai-ranges` | `{id, document_type, cai, range_start, range_end, issue_deadline}` | 201 / 200 replay: `CaiRangeOut` | 409 `fiscal_profile_missing`, `cai_range_id_conflict`, `cai_range_overlap`; 422 `unsupported_document_type`, `invalid_cai`, `invalid_cai_range`, `cai_deadline_passed`, `cai_deadline_too_far` |
-| PATCH | `/invoicing/cai-ranges/{id}` | `{document_type?, cai?, range_start?, range_end?, issue_deadline?}` | 200 `CaiRangeOut` | 404 `cai_range_not_found`; 409 `cai_range_in_use`, `cai_range_overlap`; the 422s above |
+| PATCH | `/invoicing/cai-ranges/{id}` | `{document_type?, cai?, range_start?, range_end?, issue_deadline?}` | 200 `CaiRangeOut` | 404 `cai_range_not_found`; 409 `cai_range_immutable`, `cai_range_overlap`; the 422s above |
 | POST | `/invoicing/invoices` | `{id, order_id, buyer_name?, buyer_rtn?}` | 201 / 200 replay: `FiscalInvoiceOut` | 404 `work_order_not_found`; 409 `invoice_id_conflict`, `work_order_not_invoiceable`, `work_order_already_invoiced`, `invoice_amount_zero`, `invoice_amount_too_large`, `fiscal_profile_missing`, `cai_range_missing`, `cai_range_exhausted`, `cai_range_expired`; 422 `invalid_rtn`, `buyer_name_required`, `buyer_identification_required` |
 | GET | `/invoicing/invoices/{id}` | — | 200 `FiscalInvoiceOut` | 404 `invoice_not_found` |
 | GET | `/invoicing/invoices?order_id=` | — (`order_id` required) | 200 `FiscalInvoiceSummaryOut[]`, newest first, credited ones included | 422 without `order_id` |
@@ -1047,8 +1047,8 @@ Approach: pytest on real Postgres through the `db_session` SAVEPOINT fixture and
 | Unit | `overlaps`: adjacent ranges (1–500, 501–1000) do not overlap, intersecting ones do, and other codes or types never collide | Valid consecutive ranges are rejected, or duplicate numbers become possible |
 | Unit | Buyer rules: an RTN alone is rejected; `999999` cents as consumidor final is allowed; `1000000` without RTN is rejected | The L 10,000 boundary is off by one, or an RTN prints without a name |
 | Integration | Customer `rtn` `0801-1990-12345 6` is stored as 14 digits; 13 digits gives 422 `invalid_rtn`; a replay with a different RTN gives 409; `PATCH rtn: null` clears it | Malformed RTNs reach invoices; a retry silently overwrites billing data |
-| Integration | Profile `PUT` twice (201, then 200); an incomplete body gives 422; changing the codes with an active or standby range gives 409 `fiscal_codes_locked`, and with only finished ranges it is allowed | A range prints under codes SAR never granted it |
-| Integration | Range create replay gives 200 and is not flagged as overlapping itself; overlap gives 409; `PATCH` while unused works and after one issuance gives 409 `cai_range_in_use`; past and over-one-year deadlines give 422; `06` gives 422 in phase A | A used CAI is rewritten; a typo deadline (wrong year) is printed; replay detection runs after the overlap check |
+| Integration | Profile `PUT` twice (201, then 200); an incomplete body gives 422; changing the codes with an active or standby range gives 409 `fiscal_profile_codes_locked`, and with only finished ranges it is allowed | A range prints under codes SAR never granted it |
+| Integration | Range create replay gives 200 and is not flagged as overlapping itself; overlap gives 409; `PATCH` while unused works and after one issuance gives 409 `cai_range_immutable`; past and over-one-year deadlines give 422; `06` gives 422 in phase A | A used CAI is rewritten; a typo deadline (wrong year) is printed; replay detection runs after the overlap check |
 | Integration | Issue from `completed`: the first correlative, the formatted number and range bounds, gravado + ISV == total, the stored words; the order response has no tax field and has `active_invoice` | The snapshot misses a field; the order response leaks tax (spec) |
 | Integration | Issue replay gives 200 and `next_number` is unchanged; the same id with another buyer gives 409 `invoice_id_conflict`; a second invoice id for the same order gives 409 `work_order_already_invoiced` | A retry burns a correlative (a gap SAR would see); two Facturas for one sale |
 | Integration | Issue from `quote`/`in_progress`/`cancelled` gives 409 `work_order_not_invoiceable`; no profile gives `fiscal_profile_missing`; no range gives `cai_range_missing`; an exhausted range gives `cai_range_exhausted` | Facturas for unfinished work; an unconfigured workshop issuing |
@@ -1150,7 +1150,7 @@ The application-level threats this change does introduce are designed and tested
 
 1. **`fiscal-profile`.**
    - Every field is required on `PUT`, so readiness is "a profile exists".
-   - Codes are locked (409 `fiscal_codes_locked`) while an active or standby range exists.
+   - Codes are locked (409 `fiscal_profile_codes_locked`) while an active or standby range exists.
    - The entry point is "Más → Facturación" at `/ordenes/facturacion`.
 2. **`cai-ranges`.**
    - The four derived states, and selection by earliest fecha límite.
