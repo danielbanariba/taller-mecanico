@@ -84,7 +84,14 @@ const NO_FISCAL_PROFILE_SETTINGS = {
   codes_locked: false,
   ranges: [],
   documents: [
-    { document_type: "01", ready: false, blocked_reason: "fiscal_profile_missing", active_range_id: null, next_number: null },
+    {
+      document_type: "01",
+      ready: false,
+      blocked_reason: "fiscal_profile_missing",
+      active_range_id: null,
+      next_number: null,
+      warnings: [],
+    },
   ],
 };
 
@@ -110,6 +117,7 @@ const READY_SETTINGS = {
       blocked_reason: null,
       active_range_id: "range-1",
       next_number: "001-001-01-00000001",
+      warnings: [],
     },
   ],
 };

@@ -7,8 +7,9 @@ import { Alert } from "../../../shared/ui/Alert";
 import { Button } from "../../../shared/ui/Button";
 import { Dialog } from "../../../shared/ui/Dialog";
 import { TextArea } from "../../../shared/ui/TextArea";
+import { RangeWarnings } from "../settings/RangeWarnings";
 import { getInvoicingErrorMessage, invoicingCopy } from "../copy";
-import { useIssueCreditNote } from "../hooks";
+import { useInvoicingSettings, useIssueCreditNote } from "../hooks";
 
 export interface CreditNoteDialogProps {
   open: boolean;
@@ -28,6 +29,11 @@ export function CreditNoteDialog({ open, orderId, invoiceId, onClose }: CreditNo
   const navigate = useNavigate();
   const isOffline = useOnlineStatus();
   const issueCreditNote = useIssueCreditNote(orderId, invoiceId);
+  // Same readiness `InvoiceSection`/`InvoiceDetailPage` already fetch
+  // (deduplicated by TanStack Query): surfaces a `06` range warning
+  // (AD-18) right before issuing a correction, without blocking submit.
+  const settings = useInvoicingSettings();
+  const readiness = settings.data?.documents?.find((document) => document.document_type === "06");
   // Stable across a failed submit and its retry, like every other
   // client-generated id in this app (`design.md`'s "Create with
   // double-submit").
@@ -62,6 +68,7 @@ export function CreditNoteDialog({ open, orderId, invoiceId, onClose }: CreditNo
       <div className="flex flex-col gap-4">
         {errorMessage ? <Alert variant="error">{errorMessage}</Alert> : null}
         {isOffline ? <Alert variant="info">{invoicingCopy.offline.issueCreditNoteDisabled}</Alert> : null}
+        {readiness ? <RangeWarnings documents={[readiness]} /> : null}
         <TextArea
           label={invoicingCopy.creditNote.reasonLabel}
           name="reason"

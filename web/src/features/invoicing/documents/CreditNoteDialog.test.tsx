@@ -46,8 +46,21 @@ const CREDIT_NOTE = {
   created_at: "2026-01-03T10:00:00Z",
 };
 
+/** No readiness warning by default: `CreditNoteDialog` always reads this (the same query `InvoiceSection`/`InvoiceDetailPage` already trigger), even in tests that do not exercise AD-18's warning line. */
+const READY_NO_WARNING_SETTINGS = {
+  profile: null,
+  codes_locked: false,
+  ranges: [],
+  documents: [
+    { document_type: "06", ready: true, blocked_reason: null, active_range_id: "range-06", next_number: "001-001-06-00000001", warnings: [] },
+  ],
+};
+
 function mockSession() {
-  server.use(http.get("/api/auth/me", () => HttpResponse.json(SESSION)));
+  server.use(
+    http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
+    http.get("/api/invoicing/settings", () => HttpResponse.json(READY_NO_WARNING_SETTINGS)),
+  );
 }
 
 function renderDialog() {
@@ -113,6 +126,38 @@ describe("CreditNoteDialog", () => {
     expect(requestWasSent).toBe(false);
   });
 
+  it("shows a range-warning line without blocking submission when the active range carries one", async () => {
+    // Defect this catches: a `06` range that is about to expire or run
+    // out of numbers (AD-18) giving the owner no signal until it actually
+    // blocks a correction (AD-6) -- by then there is no time left to
+    // request a new one. The warning must inform, never block, a
+    // still-valid submit.
+    mockSession();
+    server.use(
+      http.get("/api/invoicing/settings", () =>
+        HttpResponse.json({
+          ...READY_NO_WARNING_SETTINGS,
+          documents: [
+            {
+              document_type: "06",
+              ready: true,
+              blocked_reason: null,
+              active_range_id: "range-06",
+              next_number: "001-001-06-00000001",
+              warnings: [{ code: "range_expires_soon", days_left: 45 }],
+            },
+          ],
+        }),
+      ),
+    );
+    renderDialog();
+
+    expect(
+      await screen.findByText("Nota de crédito: El rango de CAI vence en 45 día(s). Registre uno nuevo."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Emitir nota de crédito" })).not.toBeDisabled();
+  });
+
   it("disables the issue action with its offline message once the connection drops", async () => {
     // Defect this catches: the submit button staying enabled after the
     // connection drops, which would leave the mutation hanging on a
@@ -159,6 +204,14 @@ describe("CreditNoteDialog", () => {
     });
     expect(queryClient.getQueryState(orderInvoicesQueryKey("w1", "order-1"))?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(workOrderQueryKey("w1", "order-1"))?.isInvalidated).toBe(true);
-    expect(queryClient.getQueryState(invoicingSettingsQueryKey("w1"))?.isInvalidated).toBe(true);
+    // Unlike the three keys above, settings is actively observed by this
+    // dialog itself (AD-18's range-warning read), so its invalidation
+    // triggers an immediate refetch that can already have resolved by
+    // here, clearing the transient `isInvalidated` flag back to `false`.
+    // The settled data -- replaced from the pre-seeded placeholder by the
+    // refetch the invalidation caused -- is the stable signal instead.
+    await waitFor(() => {
+      expect(queryClient.getQueryData(invoicingSettingsQueryKey("w1"))).toEqual(READY_NO_WARNING_SETTINGS);
+    });
   });
 });

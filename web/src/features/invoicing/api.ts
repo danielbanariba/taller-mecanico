@@ -27,12 +27,27 @@ export interface FiscalProfileSavePayload {
   emission_point_code: string;
 }
 
+/** AD-18 (phase B): the latest usable range's fecha límite is within `EXPIRY_WARNING_DAYS` of today. Mirrors the API's `RangeExpiresSoonWarningOut`. */
+export interface RangeExpiresSoonWarningOut {
+  code: "range_expires_soon";
+  days_left: number;
+}
+
+/** AD-18 (phase B): the usable ranges' remaining numbers, summed, are at or below `LOW_NUMBERS_THRESHOLD`. Mirrors the API's `RangeLowNumbersWarningOut`. */
+export interface RangeLowNumbersWarningOut {
+  code: "range_low_numbers";
+  remaining: number;
+}
+
+export type RangeWarningOut = RangeExpiresSoonWarningOut | RangeLowNumbersWarningOut;
+
 export interface DocumentReadinessOut {
   document_type: string;
   ready: boolean;
   blocked_reason: string | null;
   active_range_id: string | null;
   next_number: string | null;
+  warnings: RangeWarningOut[];
 }
 
 export type CaiRangeState = "active" | "standby" | "exhausted" | "expired";

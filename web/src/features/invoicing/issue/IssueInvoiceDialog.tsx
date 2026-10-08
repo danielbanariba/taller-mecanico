@@ -10,8 +10,9 @@ import { Dialog } from "../../../shared/ui/Dialog";
 import { TextField } from "../../../shared/ui/TextField";
 import { useCustomer } from "../../customers/hooks";
 import type { WorkOrderOut } from "../../workorders/api";
+import { RangeWarnings } from "../settings/RangeWarnings";
 import { getInvoicingErrorMessage, invoicingCopy } from "../copy";
-import { useIssueInvoice } from "../hooks";
+import { useInvoicingSettings, useIssueInvoice } from "../hooks";
 import { isBuyerValid } from "./buyer";
 
 export interface IssueInvoiceDialogProps {
@@ -37,6 +38,12 @@ export function IssueInvoiceDialog({ open, order, onClose }: IssueInvoiceDialogP
   const isOffline = useOnlineStatus();
   const customer = useCustomer(order.customer.id);
   const issueInvoice = useIssueInvoice(order.id);
+  // Readiness is already fetched by `InvoiceSection` (same query key,
+  // deduplicated by TanStack Query); reading it here too surfaces a
+  // range warning (AD-18) right where the mechanic is about to issue,
+  // without blocking the submit the warning merely precedes.
+  const settings = useInvoicingSettings();
+  const readiness = settings.data?.documents?.find((document) => document.document_type === "01");
   // Stable across a failed submit and its retry (`design.md`'s "Create
   // with double-submit"), the same convention as every other
   // client-generated id in this app.
@@ -91,6 +98,7 @@ export function IssueInvoiceDialog({ open, order, onClose }: IssueInvoiceDialogP
       <div className="flex flex-col gap-4">
         {errorMessage ? <Alert variant="error">{errorMessage}</Alert> : null}
         {isOffline ? <Alert variant="info">{invoicingCopy.offline.issueInvoiceDisabled}</Alert> : null}
+        {readiness ? <RangeWarnings documents={[readiness]} /> : null}
         <p className="text-base text-brand-foreground">
           {invoicingCopy.issue.totalLabel}: {formatCents(order.total_cents)}
         </p>

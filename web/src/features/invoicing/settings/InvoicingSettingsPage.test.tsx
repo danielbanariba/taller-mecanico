@@ -26,6 +26,7 @@ function settingsResponse(overrides: Partial<InvoicingSettingsOut> = {}): Invoic
         blocked_reason: "fiscal_profile_missing",
         active_range_id: null,
         next_number: null,
+        warnings: [],
       },
     ],
     ...overrides,
@@ -106,6 +107,7 @@ describe("InvoicingSettingsPage", () => {
                 blocked_reason: "cai_range_missing",
                 active_range_id: null,
                 next_number: null,
+                warnings: [],
               },
             ],
           }),
@@ -135,6 +137,7 @@ describe("InvoicingSettingsPage", () => {
                 blocked_reason: "cai_range_expired",
                 active_range_id: null,
                 next_number: null,
+                warnings: [],
               },
             ],
           }),
@@ -165,6 +168,37 @@ describe("InvoicingSettingsPage", () => {
     expect(screen.getByText("En espera")).toBeInTheDocument();
     expect(screen.getByText("Agotado")).toBeInTheDocument();
     expect(screen.getByText("Vencido")).toBeInTheDocument();
+  });
+
+  it("shows a range warning on the settings page once a document's readiness carries one", async () => {
+    // Defect this catches: `GET /invoicing/settings` computing a range
+    // warning (AD-18) that is never actually rendered anywhere the owner
+    // would see it, leaving a lapsing range to surface only once it
+    // already blocks issuance (AD-6).
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
+      http.get("/api/invoicing/settings", () =>
+        HttpResponse.json(
+          settingsResponse({
+            documents: [
+              {
+                document_type: "01",
+                ready: true,
+                blocked_reason: null,
+                active_range_id: "range-1",
+                next_number: "001-001-01-00000001",
+                warnings: [{ code: "range_low_numbers", remaining: 25 }],
+              },
+            ],
+          }),
+        ),
+      ),
+    );
+    renderSettingsPage();
+
+    expect(
+      await screen.findByText("Factura: Quedan 25 números del rango de CAI. Registre uno nuevo."),
+    ).toBeInTheDocument();
   });
 
   it("disables the profile and range actions while offline, with the Spanish message", async () => {

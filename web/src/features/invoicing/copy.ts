@@ -1,3 +1,5 @@
+import type { RangeWarningOut } from "./api";
+
 /**
  * All Spanish user-facing strings for the invoicing feature (the fiscal
  * settings screen, the profile and CAI range forms, and later the
@@ -236,4 +238,18 @@ const GENERIC_ERROR_MESSAGE = "Ocurrió un error. Intente de nuevo.";
 
 export function getInvoicingErrorMessage(code: string): string {
   return ERROR_MESSAGES[code] ?? GENERIC_ERROR_MESSAGE;
+}
+
+/**
+ * Maps one of `GET /invoicing/settings`'s per-document-type `warnings`
+ * (AD-18) to its Spanish text: 60 days before a range's fecha límite, or
+ * once its remaining numbers fall at or below the design-fixed threshold.
+ * Shown on the settings page (`RangeWarnings`) and as one line in the
+ * issue and credit note dialogs -- a warning never blocks submission.
+ */
+export function getRangeWarningMessage(warning: RangeWarningOut): string {
+  if (warning.code === "range_expires_soon") {
+    return `El rango de CAI vence en ${warning.days_left} día(s). Registre uno nuevo.`;
+  }
+  return `Quedan ${warning.remaining} números del rango de CAI. Registre uno nuevo.`;
 }

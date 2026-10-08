@@ -36,6 +36,7 @@ const READY_SETTINGS = {
       blocked_reason: null,
       active_range_id: "range-1",
       next_number: "001-001-01-00000002",
+      warnings: [],
     },
   ],
 };
