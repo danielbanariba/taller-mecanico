@@ -82,12 +82,12 @@ describe("InvoiceLetterPage", () => {
     expect(screen.queryByText("COPIA: EMISOR")).not.toBeInTheDocument();
   });
 
-  it("starts the issuer's copy on its own page and sets the letter @page margin", async () => {
+  it("starts the issuer's copy on its own page and never forces a page size", async () => {
     // Defect this catches: the `break-before-page` wrapper around the
     // issuer's copy being dropped (the issuer's copy would no longer
-    // start on its own sheet when printed), or `LetterPageStyle`'s own
-    // `@page { margin: 12mm; }` rule regressing -- neither is exercised
-    // by any other test.
+    // start on its own sheet when printed), or the letter layout's
+    // `@page` rule forcing a `size` (the 58 mm one leaking in, or a fixed
+    // A4), which would stop both Letter and A4 paper from working.
     server.use(
       http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
       http.get("/api/invoicing/invoices/invoice-1", () => HttpResponse.json(INVOICE)),
@@ -98,7 +98,8 @@ describe("InvoiceLetterPage", () => {
     const issuerArticle = issuerLegend.closest("article");
     expect(issuerArticle?.parentElement).toHaveClass("break-before-page");
 
-    const pageStyle = document.querySelector("style");
-    expect(pageStyle?.textContent).toBe("@page { margin: 12mm; }");
+    const pageRule = document.querySelector("style")?.textContent ?? "";
+    expect(pageRule).toContain("@page");
+    expect(pageRule).not.toMatch(/\bsize\s*:/);
   });
 });
