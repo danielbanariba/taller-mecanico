@@ -273,20 +273,29 @@ def get_settings(
     all_ranges = range_repo.list(workshop_id=workshop_id)
     codes_locked = profile is not None and any(r.usable_on(today) for r in all_ranges)
 
+    ranges_by_type = {
+        document_type: [r for r in all_ranges if r.document_type == document_type]
+        for document_type in DocumentType
+    }
     documents = [
         _document_readiness(
             document_type=document_type,
             profile=profile,
-            ranges=[r for r in all_ranges if r.document_type == document_type],
+            ranges=ranges_by_type[document_type],
             today=today,
         )
         for document_type in _READY_DOCUMENT_TYPES
     ]
+    # Each document type has its own active range (AD-4), so states are
+    # derived per type, the same way a range's own write response does.
+    states: dict[uuid.UUID, RangeState] = {}
+    for ranges in ranges_by_type.values():
+        states.update(range_states(ranges, today))
     return InvoicingSettings(
         profile=profile,
         codes_locked=codes_locked,
         ranges=all_ranges,
-        range_states=range_states(all_ranges, today),
+        range_states=states,
         documents=documents,
     )
 

@@ -463,6 +463,14 @@ Addresses the phase B review findings against the actual code: one major PATCH g
   - **Deviation (recorded honestly):** the existing end-to-end test is not rewritten to isolate the order-row lock from the invoice-row lock, because that isolation is not achievable for this exact invariant (two credit notes on one invoice) without testing a different invariant entirely — any fix here is a genuine improvement in regression-catching precision (the new seam test), not a complete three-way isolation.
 - [x] **PB.S8.T4** [inline] Ran the API verification: `docker compose up -d db`; `uv run ruff check . && uv run ruff format --check . && uv run pytest`. **Result:** container already running; `ruff check .` → "All checks passed!"; `ruff format --check .` → "145 files already formatted"; `pytest` → 400 passed (398 + the 2 new tests).
 - [x] **PB.S8.T5** [inline] API work-unit commit: `:bug: fix(invoicing): accept a 06 range edit and isolate the credit-note lock test`.
-  - **Result:** committed as `<pending>` on `feat/sar-invoicing-phase-b`.
+  - **Result:** committed as `1feefce` on `feat/sar-invoicing-phase-b`.
 
 **Findings not fixed, with reason:** none — both findings (one major, one minor) were fixed. No web-side change was needed for either finding, so there is no separate web work-unit commit for this slice.
+
+### Slice PB.S9 — Per-type range states in settings
+
+Found while closing phase B (PB.S3 had flagged it as a follow-up): `get_settings()` derived every range's state from `range_states(all_ranges, today)`, across both document types at once, so a usable `01` range and a usable `06` range competed for a single `active` slot and one of them was reported as `standby` — while the range's own `POST`/`PATCH` response (`_range_out`, per type) said `active`. Readiness itself was already per type, so issuance was never affected; only the state shown on the settings screen was wrong.
+
+- [x] **PB.S9.T1 (RED)** [inline] Added `test_a_factura_range_and_a_credit_note_range_are_both_active_in_settings` to `api/tests/invoicing/test_cai_ranges_api.py`. **Confirmed RED:** against the unfixed code it failed with one of the two ranges reported as `standby`.
+- [x] **PB.S9.T2 (GREEN)** [inline] `get_settings()` now groups ranges by document type once and derives states per type, reusing the same groups for readiness. **Confirmed GREEN:** `uv run pytest tests/invoicing/` → 142 passed; `ruff check .` and `ruff format --check .` clean.
+- [ ] **PB.S9.T3** [inline] Work-unit commit.

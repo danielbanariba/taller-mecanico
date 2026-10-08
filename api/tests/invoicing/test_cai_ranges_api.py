@@ -1,9 +1,7 @@
 """Tests for CAI range registration and correction (`cai-ranges` spec, AD-4).
 
-Identical bounds on a different document type being allowed is already
-covered at the domain level by `test_range_selection.py`'s `overlaps()`
-tests: in Phase A the API itself rejects `06` before a range of that type
-could ever be registered to exercise that scenario end to end.
+Identical bounds on a different document type being allowed is covered
+at the domain level by `test_range_selection.py`'s `overlaps()` tests.
 """
 
 import uuid
@@ -268,3 +266,24 @@ def test_a_registered_range_appears_in_settings_with_its_state(authenticated_cli
     assert len(ranges) == 1
     assert ranges[0]["id"] == created["id"]
     assert ranges[0]["state"] == "active"
+
+
+def test_a_factura_range_and_a_credit_note_range_are_both_active_in_settings(
+    authenticated_client: TestClient,
+):
+    """Defect it catches: settings deriving range states across every
+    document type at once, so a usable `01` range and a usable `06`
+    range compete for one `active` slot and one of them is reported as
+    standby, disagreeing with the range's own registration response.
+    """
+    _save_profile(authenticated_client)
+    invoice_range = _create_range(authenticated_client).json()
+    credit_note_range = _create_range(
+        authenticated_client,
+        document_type="06",
+        issue_deadline=(date.today() + timedelta(days=200)).isoformat(),
+    ).json()
+
+    response = authenticated_client.get("/api/invoicing/settings")
+    states = {r["id"]: r["state"] for r in response.json()["ranges"]}
+    assert states == {invoice_range["id"]: "active", credit_note_range["id"]: "active"}
