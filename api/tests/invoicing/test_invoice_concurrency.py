@@ -236,7 +236,12 @@ def committed_invoicing_workshop(test_engine: Engine) -> Generator[dict[str, uui
         yield ids
     finally:
         with Session(test_engine) as cleanup:
-            cleanup.execute(text("TRUNCATE TABLE fiscal_invoice_lines, fiscal_invoices"))
+            # `fiscal_credit_notes` (phase B) FK-references `fiscal_invoices`,
+            # so Postgres requires it in the same TRUNCATE statement even
+            # when this fixture never creates a credit note itself.
+            cleanup.execute(
+                text("TRUNCATE TABLE fiscal_credit_notes, fiscal_invoice_lines, fiscal_invoices")
+            )
             cleanup.execute(
                 delete(CaiRangeModel).where(CaiRangeModel.workshop_id == ids["workshop_id"])
             )

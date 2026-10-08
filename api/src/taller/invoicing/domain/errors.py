@@ -251,3 +251,43 @@ class FiscalInvoiceNotFound(Exception):
     def __init__(self, invoice_id: uuid.UUID) -> None:
         super().__init__(f"Invoice not found: {invoice_id}")
         self.invoice_id = invoice_id
+
+
+class InvoiceAlreadyCredited(Exception):
+    """Raised when a Factura already has an issued credit note
+    (`credit-notes` spec: a Factura can be credited only once, AD-13).
+    """
+
+    def __init__(self, invoice_id: uuid.UUID) -> None:
+        super().__init__(f"Invoice already credited: {invoice_id}")
+        self.invoice_id = invoice_id
+
+
+class InvalidCreditNoteReason(ValueError):
+    """Raised when a credit note's reason is empty after trimming, or
+    exceeds 300 characters (AD-13).
+    """
+
+    def __init__(self, raw: str) -> None:
+        super().__init__(f"Invalid credit note reason: {raw!r}")
+        self.raw = raw
+
+
+class CreditNoteIdConflict(Exception):
+    """Raised when a client-supplied credit note id exists with different fields."""
+
+    def __init__(self, credit_note_id: uuid.UUID) -> None:
+        super().__init__(f"Credit note id already exists with different fields: {credit_note_id}")
+        self.credit_note_id = credit_note_id
+
+
+class CreditNoteNotFound(Exception):
+    """Raised when a credit note id does not exist in the caller's workshop.
+
+    Also used when the credit note exists but belongs to another
+    workshop, so tenant isolation never leaks whether it exists at all.
+    """
+
+    def __init__(self, credit_note_id: uuid.UUID) -> None:
+        super().__init__(f"Credit note not found: {credit_note_id}")
+        self.credit_note_id = credit_note_id

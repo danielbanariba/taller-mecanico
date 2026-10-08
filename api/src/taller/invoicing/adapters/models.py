@@ -227,3 +227,51 @@ class FiscalInvoiceLineModel(Base):
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     unit_price_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     line_total_cents: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
+class FiscalCreditNoteModel(Base, IssuerSnapshot, CaiSnapshot, Amounts):
+    """A Nota de Credito (phase B, AD-13): a full-amount, immutable
+    snapshot crediting a Factura, guarded at the database level by the
+    `taller_fiscal_append_only` trigger (declared in the migration,
+    reusing the function `db3dfe52854a` created for
+    `fiscal_invoice_lines`).
+    """
+
+    __tablename__ = "fiscal_credit_notes"
+    __table_args__ = (
+        CheckConstraint(
+            "issue_date <= issue_deadline", name="ck_fiscal_credit_notes_within_deadline"
+        ),
+        CheckConstraint("length(btrim(reason)) > 0", name="ck_fiscal_credit_notes_reason_nonempty"),
+        CheckConstraint(
+            "taxable_15_cents + isv_15_cents = total_cents",
+            name="ck_fiscal_credit_notes_breakdown_sum",
+        ),
+        UniqueConstraint("invoice_id", name="uq_fiscal_credit_notes_invoice_id"),
+        UniqueConstraint(
+            "cai_range_id", "correlative", name="uq_fiscal_credit_notes_range_correlative"
+        ),
+        UniqueConstraint("workshop_id", "number", name="uq_fiscal_credit_notes_workshop_number"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    workshop_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workshops.id"), nullable=False)
+    invoice_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fiscal_invoices.id"), nullable=False)
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("work_orders.id"), nullable=False, index=True
+    )
+    cai_range_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("cai_ranges.id"), nullable=False)
+    correlative: Mapped[int] = mapped_column(Integer, nullable=False)
+    number: Mapped[str] = mapped_column(String(19), nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    issue_date: Mapped[date] = mapped_column(Date, nullable=False)
+    buyer_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    buyer_rtn: Mapped[str | None] = mapped_column(String(14), nullable=True)
+    original_cai: Mapped[str] = mapped_column(String(50), nullable=False)
+    original_number: Mapped[str] = mapped_column(String(19), nullable=False)
+    original_issue_date: Mapped[date] = mapped_column(Date, nullable=False)
+    reason: Mapped[str] = mapped_column(String(300), nullable=False)
+    total_cents: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    total_in_words: Mapped[str] = mapped_column(String(300), nullable=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

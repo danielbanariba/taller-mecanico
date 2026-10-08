@@ -13,6 +13,7 @@ from taller.identity.application.ports import Clock
 from taller.identity.domain.phone_number import PhoneNumber
 from taller.invoicing.application.ports import (
     CaiRangeRepository,
+    CreditNoteRepository,
     FiscalInvoiceRepository,
     FiscalProfileRepository,
 )
@@ -20,6 +21,7 @@ from taller.invoicing.domain.amount_in_words import MAX_LEMPIRAS, amount_in_word
 from taller.invoicing.domain.buyer import resolve_buyer
 from taller.invoicing.domain.document_number import DocumentNumber, DocumentType
 from taller.invoicing.domain.documents import (
+    FiscalCreditNote,
     FiscalInvoice,
     FiscalInvoiceLine,
     fiscal_invoice_line_id,
@@ -31,10 +33,14 @@ from taller.invoicing.domain.errors import (
     CaiRangeImmutable,
     CaiRangeNotFound,
     CaiRangeOverlap,
+    CreditNoteIdConflict,
+    CreditNoteNotFound,
     FiscalInvoiceIdConflict,
     FiscalInvoiceNotFound,
     FiscalProfileCodesLocked,
     FiscalProfileMissing,
+    InvalidCreditNoteReason,
+    InvoiceAlreadyCredited,
     InvoiceAmountTooLarge,
     InvoiceAmountZero,
     UnsupportedDocumentType,
@@ -78,9 +84,13 @@ INVOICEABLE: Final[frozenset[WorkOrderStatus]] = frozenset(
 #: snapshot construction.
 MAX_INVOICE_CENTS: Final = MAX_LEMPIRAS * 100
 
-#: Phase A only ever asks about the Factura document type; Phase B
-#: adds `06` to this list once credit notes exist.
-_READY_DOCUMENT_TYPES: tuple[DocumentType, ...] = (DocumentType.invoice,)
+#: Phase A only ever asked about the Factura document type; phase B adds
+#: `06` now that credit notes exist, so `GET /invoicing/settings` reports
+#: both documents' readiness.
+_READY_DOCUMENT_TYPES: tuple[DocumentType, ...] = (DocumentType.invoice, DocumentType.credit_note)
+
+#: A credit note's reason (AD-13): trimmed, 1-300 characters.
+MAX_CREDIT_NOTE_REASON_LENGTH: Final = 300
 
 
 def save_profile(
@@ -314,8 +324,6 @@ def create_range(
     should respond 200, not 201).
 
     Raises:
-        UnsupportedDocumentType: ``document_type`` is `06` before
-            Phase B.
         InvalidCai / InvalidCaiRange / CaiDeadlinePassed /
             CaiDeadlineTooFar: a field fails its own validation.
         CaiRangeIdConflict: ``range_id`` already exists with different
@@ -325,9 +333,6 @@ def create_range(
             same workshop, document type, establecimiento and punto
             de emisión.
     """
-    if document_type is not DocumentType.invoice:
-        raise UnsupportedDocumentType(document_type.value)
-
     normalized_cai = normalize_cai(cai)
     validate_range_bounds(range_start=range_start, range_end=range_end)
     today = local_today(clock)
@@ -647,3 +652,170 @@ def list_order_invoices(
 ) -> list[FiscalInvoice]:
     """Every Factura issued for this order, newest first, credited ones included."""
     return invoice_repo.list_for_order(workshop_id=workshop_id, order_id=order_id)
+
+
+def _normalize_credit_note_reason(raw: str) -> str:
+    """Raises: InvalidCreditNoteReason: ``raw`` is empty after trimming,
+    or exceeds `MAX_CREDIT_NOTE_REASON_LENGTH` characters (AD-13).
+    """
+    trimmed = raw.strip()
+    if not trimmed or len(trimmed) > MAX_CREDIT_NOTE_REASON_LENGTH:
+        raise InvalidCreditNoteReason(raw)
+    return trimmed
+
+
+def _credit_note_fields_match(
+    existing: FiscalCreditNote, *, invoice_id: uuid.UUID, reason: str
+) -> bool:
+    return existing.invoice_id == invoice_id and existing.reason == reason
+
+
+def issue_credit_note(
+    *,
+    workshop_id: uuid.UUID,
+    credit_note_id: uuid.UUID,
+    invoice_id: uuid.UUID,
+    reason: str,
+    created_by: uuid.UUID,
+    clock: Clock,
+    order_repo: WorkOrderRepository,
+    profile_repo: FiscalProfileRepository,
+    range_repo: CaiRangeRepository,
+    invoice_repo: FiscalInvoiceRepository,
+    credit_note_repo: CreditNoteRepository,
+) -> tuple[FiscalCreditNote, bool]:
+    """Issue a full-amount Nota de Credito against an issued Factura, or
+    replay an idempotent issuance (AD-13): normalize the reason, lock
+    the order, replay, lock the Factura, lock the profile, select and
+    allocate from the usable `06` range, build and insert the
+    snapshot, then stamp the Factura's `credited_at` -- the only
+    update its own AD-10 trigger allows.
+
+    The lock order extends AD-5: the order row, then the Factura, then
+    the fiscal profile, then the range. A replayed credit note returns
+    before any of the later checks and never consumes a number.
+
+    Returns ``(credit_note, is_new)``: ``is_new`` is False when
+    ``credit_note_id`` already existed with identical fields (the
+    caller should respond 200, not 201).
+
+    Raises:
+        InvalidCreditNoteReason: ``reason`` is empty after trimming,
+            or exceeds 300 characters.
+        FiscalInvoiceNotFound: no such Factura in this workshop.
+        CreditNoteIdConflict: ``credit_note_id`` already exists with
+            fields that do not match this request.
+        InvoiceAlreadyCredited: the Factura already has a credit note.
+        FiscalProfileMissing: the workshop has no fiscal profile.
+        CaiRangeMissing / CaiRangeExpired / CaiRangeExhausted: no `06`
+            range is usable today (AD-4, AD-13).
+    """
+    normalized_reason = _normalize_credit_note_reason(reason)
+
+    invoice = invoice_repo.get_by_id(workshop_id=workshop_id, invoice_id=invoice_id)
+    if invoice is None:
+        raise FiscalInvoiceNotFound(invoice_id)
+
+    # Locks the same row every line edit and the original issuance lock,
+    # so a credit note is always serialized against both (AD-5).
+    order_repo.get_for_update(workshop_id=workshop_id, order_id=invoice.order_id)
+
+    existing = credit_note_repo.get_by_id(workshop_id=workshop_id, credit_note_id=credit_note_id)
+    if existing is not None:
+        if not _credit_note_fields_match(existing, invoice_id=invoice_id, reason=normalized_reason):
+            raise CreditNoteIdConflict(credit_note_id)
+        return existing, False
+
+    # Re-read the Factura under its own lock: the unlocked read above
+    # can already be stale, and this is the row whose `credited_at`
+    # decides eligibility and whose own lock serializes two concurrent
+    # credit notes against it.
+    invoice = invoice_repo.get_for_update(workshop_id=workshop_id, invoice_id=invoice_id)
+    if invoice is None:
+        raise FiscalInvoiceNotFound(invoice_id)
+    if invoice.credited_at is not None:
+        raise InvoiceAlreadyCredited(invoice_id)
+
+    profile = profile_repo.get_for_update(workshop_id=workshop_id)
+    if profile is None:
+        raise FiscalProfileMissing()
+
+    now = clock.now()
+    today = now.astimezone(HONDURAS_TZ).date()
+    ranges = range_repo.list(workshop_id=workshop_id, document_type=DocumentType.credit_note)
+    cai_range = select_range(ranges, today)
+
+    correlative = range_repo.allocate(range_id=cai_range.id, now=now)
+    if correlative is None:
+        # The profile lock serializes every fiscal write for this
+        # workshop, so this should never actually happen -- but fail
+        # safely as exhausted rather than crash if it somehow does.
+        raise CaiRangeExhausted()
+
+    number = DocumentNumber(
+        establishment=profile.establishment_code,
+        emission_point=profile.emission_point_code,
+        document_type=DocumentType.credit_note,
+        correlative=correlative,
+    )
+
+    credit_note = FiscalCreditNote(
+        id=credit_note_id,
+        workshop_id=workshop_id,
+        invoice_id=invoice_id,
+        order_id=invoice.order_id,
+        cai_range_id=cai_range.id,
+        correlative=correlative,
+        number=str(number),
+        issued_at=now,
+        issue_date=today,
+        issuer_rtn=profile.rtn,
+        issuer_legal_name=profile.legal_name,
+        issuer_trade_name=profile.trade_name,
+        issuer_address=profile.address,
+        issuer_phone=profile.phone,
+        issuer_email=profile.email,
+        cai=cai_range.cai,
+        range_first_number=str(
+            DocumentNumber(
+                establishment=cai_range.establishment_code,
+                emission_point=cai_range.emission_point_code,
+                document_type=cai_range.document_type,
+                correlative=cai_range.range_start,
+            )
+        ),
+        range_last_number=str(
+            DocumentNumber(
+                establishment=cai_range.establishment_code,
+                emission_point=cai_range.emission_point_code,
+                document_type=cai_range.document_type,
+                correlative=cai_range.range_end,
+            )
+        ),
+        issue_deadline=cai_range.issue_deadline,
+        buyer_name=invoice.buyer_name,
+        buyer_rtn=invoice.buyer_rtn,
+        original_cai=invoice.cai,
+        original_number=invoice.number,
+        original_issue_date=invoice.issue_date,
+        reason=normalized_reason,
+        taxable_15_cents=invoice.taxable_15_cents,
+        isv_15_cents=invoice.isv_15_cents,
+        total_cents=invoice.total_cents,
+        total_in_words=invoice.total_in_words,
+        created_by=created_by,
+        created_at=now,
+    )
+    credit_note_repo.add(credit_note)
+    invoice_repo.mark_credited(invoice_id=invoice_id, credited_at=now)
+    return credit_note, True
+
+
+def get_credit_note(
+    *, workshop_id: uuid.UUID, credit_note_id: uuid.UUID, credit_note_repo: CreditNoteRepository
+) -> FiscalCreditNote:
+    """Raises: CreditNoteNotFound: no such credit note in this workshop."""
+    credit_note = credit_note_repo.get_by_id(workshop_id=workshop_id, credit_note_id=credit_note_id)
+    if credit_note is None:
+        raise CreditNoteNotFound(credit_note_id)
+    return credit_note

@@ -8,12 +8,13 @@ from sqlalchemy.orm import Session
 
 from taller.invoicing.adapters.models import (
     CaiRangeModel,
+    FiscalCreditNoteModel,
     FiscalInvoiceLineModel,
     FiscalInvoiceModel,
     FiscalProfileModel,
 )
 from taller.invoicing.domain.document_number import DocumentType
-from taller.invoicing.domain.documents import FiscalInvoice, FiscalInvoiceLine
+from taller.invoicing.domain.documents import FiscalCreditNote, FiscalInvoice, FiscalInvoiceLine
 from taller.invoicing.domain.profile import FiscalProfile
 from taller.invoicing.domain.ranges import CaiRange
 
@@ -246,6 +247,30 @@ class SqlAlchemyFiscalInvoiceRepository:
             return None
         return _invoice_from_model(model, self._lines_for(invoice_id))
 
+    def get_for_update(
+        self, *, workshop_id: uuid.UUID, invoice_id: uuid.UUID
+    ) -> FiscalInvoice | None:
+        model = (
+            self._session.query(FiscalInvoiceModel)
+            .filter(
+                FiscalInvoiceModel.id == invoice_id,
+                FiscalInvoiceModel.workshop_id == workshop_id,
+            )
+            .with_for_update()
+            .one_or_none()
+        )
+        if model is None:
+            return None
+        return _invoice_from_model(model, self._lines_for(invoice_id))
+
+    def mark_credited(self, *, invoice_id: uuid.UUID, credited_at: datetime) -> None:
+        self._session.execute(
+            update(FiscalInvoiceModel)
+            .where(FiscalInvoiceModel.id == invoice_id)
+            .values(credited_at=credited_at)
+        )
+        self._session.flush()
+
     def has_active_for_order(self, *, workshop_id: uuid.UUID, order_id: uuid.UUID) -> bool:
         return (
             self._session.query(FiscalInvoiceModel)
@@ -326,4 +351,109 @@ class SqlAlchemyFiscalInvoiceRepository:
                     line_total_cents=line.line_total_cents,
                 )
             )
+        self._session.flush()
+
+
+def _credit_note_from_model(model: FiscalCreditNoteModel) -> FiscalCreditNote:
+    return FiscalCreditNote(
+        id=model.id,
+        workshop_id=model.workshop_id,
+        invoice_id=model.invoice_id,
+        order_id=model.order_id,
+        cai_range_id=model.cai_range_id,
+        correlative=model.correlative,
+        number=model.number,
+        issued_at=model.issued_at,
+        issue_date=model.issue_date,
+        issuer_rtn=model.issuer_rtn,
+        issuer_legal_name=model.issuer_legal_name,
+        issuer_trade_name=model.issuer_trade_name,
+        issuer_address=model.issuer_address,
+        issuer_phone=model.issuer_phone,
+        issuer_email=model.issuer_email,
+        cai=model.cai,
+        range_first_number=model.range_first_number,
+        range_last_number=model.range_last_number,
+        issue_deadline=model.issue_deadline,
+        buyer_name=model.buyer_name,
+        buyer_rtn=model.buyer_rtn,
+        original_cai=model.original_cai,
+        original_number=model.original_number,
+        original_issue_date=model.original_issue_date,
+        reason=model.reason,
+        taxable_15_cents=model.taxable_15_cents,
+        isv_15_cents=model.isv_15_cents,
+        total_cents=model.total_cents,
+        total_in_words=model.total_in_words,
+        created_by=model.created_by,
+        created_at=model.created_at,
+    )
+
+
+class SqlAlchemyCreditNoteRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get_by_id(
+        self, *, workshop_id: uuid.UUID, credit_note_id: uuid.UUID
+    ) -> FiscalCreditNote | None:
+        model = (
+            self._session.query(FiscalCreditNoteModel)
+            .filter(
+                FiscalCreditNoteModel.id == credit_note_id,
+                FiscalCreditNoteModel.workshop_id == workshop_id,
+            )
+            .one_or_none()
+        )
+        return _credit_note_from_model(model) if model is not None else None
+
+    def get_for_invoice(
+        self, *, workshop_id: uuid.UUID, invoice_id: uuid.UUID
+    ) -> FiscalCreditNote | None:
+        model = (
+            self._session.query(FiscalCreditNoteModel)
+            .filter(
+                FiscalCreditNoteModel.workshop_id == workshop_id,
+                FiscalCreditNoteModel.invoice_id == invoice_id,
+            )
+            .one_or_none()
+        )
+        return _credit_note_from_model(model) if model is not None else None
+
+    def add(self, credit_note: FiscalCreditNote) -> None:
+        self._session.add(
+            FiscalCreditNoteModel(
+                id=credit_note.id,
+                workshop_id=credit_note.workshop_id,
+                invoice_id=credit_note.invoice_id,
+                order_id=credit_note.order_id,
+                cai_range_id=credit_note.cai_range_id,
+                correlative=credit_note.correlative,
+                number=credit_note.number,
+                issued_at=credit_note.issued_at,
+                issue_date=credit_note.issue_date,
+                issuer_rtn=credit_note.issuer_rtn,
+                issuer_legal_name=credit_note.issuer_legal_name,
+                issuer_trade_name=credit_note.issuer_trade_name,
+                issuer_address=credit_note.issuer_address,
+                issuer_phone=credit_note.issuer_phone,
+                issuer_email=credit_note.issuer_email,
+                cai=credit_note.cai,
+                range_first_number=credit_note.range_first_number,
+                range_last_number=credit_note.range_last_number,
+                issue_deadline=credit_note.issue_deadline,
+                buyer_name=credit_note.buyer_name,
+                buyer_rtn=credit_note.buyer_rtn,
+                original_cai=credit_note.original_cai,
+                original_number=credit_note.original_number,
+                original_issue_date=credit_note.original_issue_date,
+                reason=credit_note.reason,
+                taxable_15_cents=credit_note.taxable_15_cents,
+                isv_15_cents=credit_note.isv_15_cents,
+                total_cents=credit_note.total_cents,
+                total_in_words=credit_note.total_in_words,
+                created_by=credit_note.created_by,
+                created_at=credit_note.created_at,
+            )
+        )
         self._session.flush()

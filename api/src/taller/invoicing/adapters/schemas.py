@@ -7,7 +7,11 @@ from pydantic import BaseModel, field_validator
 
 from taller.invoicing.application.use_cases import DocumentReadiness, InvoicingSettings
 from taller.invoicing.domain.document_number import DocumentNumber, DocumentType
-from taller.invoicing.domain.documents import FiscalInvoice, FiscalInvoiceLine
+from taller.invoicing.domain.documents import (
+    FiscalCreditNote,
+    FiscalInvoice,
+    FiscalInvoiceLine,
+)
 from taller.invoicing.domain.profile import FiscalProfile
 from taller.invoicing.domain.ranges import CaiRange, RangeState
 
@@ -208,6 +212,20 @@ class FiscalInvoiceCreateRequest(BaseModel):
     buyer_rtn: str | None = None
 
 
+class CreditNoteRefOut(BaseModel):
+    """The credit note reference a Factura's response gains once it has
+    been fully credited (phase B, AD-13).
+    """
+
+    id: uuid.UUID
+    number: str
+    issue_date: date
+
+    @classmethod
+    def from_domain(cls, credit_note: FiscalCreditNote) -> "CreditNoteRefOut":
+        return cls(id=credit_note.id, number=credit_note.number, issue_date=credit_note.issue_date)
+
+
 class FiscalInvoiceLineOut(BaseModel):
     id: uuid.UUID
     position: int
@@ -264,11 +282,14 @@ class FiscalInvoiceOut(BaseModel):
     total_cents: int
     total_in_words: str
     credited_at: datetime | None
+    credit_note: CreditNoteRefOut | None
     lines: list[FiscalInvoiceLineOut]
     created_at: datetime
 
     @classmethod
-    def from_domain(cls, invoice: FiscalInvoice) -> "FiscalInvoiceOut":
+    def from_domain(
+        cls, invoice: FiscalInvoice, *, credit_note: FiscalCreditNote | None = None
+    ) -> "FiscalInvoiceOut":
         return cls(
             id=invoice.id,
             order_id=invoice.order_id,
@@ -296,6 +317,7 @@ class FiscalInvoiceOut(BaseModel):
             total_cents=invoice.total_cents,
             total_in_words=invoice.total_in_words,
             credited_at=invoice.credited_at,
+            credit_note=CreditNoteRefOut.from_domain(credit_note) if credit_note else None,
             lines=[FiscalInvoiceLineOut.from_domain(line) for line in invoice.lines],
             created_at=invoice.created_at,
         )
@@ -311,13 +333,90 @@ class FiscalInvoiceSummaryOut(BaseModel):
     issued_at: datetime
     total_cents: int
     credited_at: datetime | None
+    credit_note: CreditNoteRefOut | None
 
     @classmethod
-    def from_domain(cls, invoice: FiscalInvoice) -> "FiscalInvoiceSummaryOut":
+    def from_domain(
+        cls, invoice: FiscalInvoice, *, credit_note: FiscalCreditNote | None = None
+    ) -> "FiscalInvoiceSummaryOut":
         return cls(
             id=invoice.id,
             number=invoice.number,
             issued_at=invoice.issued_at,
             total_cents=invoice.total_cents,
             credited_at=invoice.credited_at,
+            credit_note=CreditNoteRefOut.from_domain(credit_note) if credit_note else None,
+        )
+
+
+class FiscalCreditNoteCreateRequest(BaseModel):
+    id: uuid.UUID
+    invoice_id: uuid.UUID
+    reason: str
+
+
+class FiscalCreditNoteOut(BaseModel):
+    """The full Nota de Credito snapshot (AD-13): every field is copied
+    at issuance and never recomputed on read, so a later profile or
+    customer edit never changes what an already-issued document shows.
+    """
+
+    id: uuid.UUID
+    invoice_id: uuid.UUID
+    order_id: uuid.UUID
+    number: str
+    issued_at: datetime
+    issue_date: date
+    issuer_rtn: str
+    issuer_legal_name: str
+    issuer_trade_name: str
+    issuer_address: str
+    issuer_phone: str
+    issuer_email: str
+    cai: str
+    range_first_number: str
+    range_last_number: str
+    issue_deadline: date
+    buyer_name: str | None
+    buyer_rtn: str | None
+    original_cai: str
+    original_number: str
+    original_issue_date: date
+    reason: str
+    taxable_15_cents: int
+    isv_15_cents: int
+    total_cents: int
+    total_in_words: str
+    created_at: datetime
+
+    @classmethod
+    def from_domain(cls, credit_note: FiscalCreditNote) -> "FiscalCreditNoteOut":
+        return cls(
+            id=credit_note.id,
+            invoice_id=credit_note.invoice_id,
+            order_id=credit_note.order_id,
+            number=credit_note.number,
+            issued_at=credit_note.issued_at,
+            issue_date=credit_note.issue_date,
+            issuer_rtn=credit_note.issuer_rtn,
+            issuer_legal_name=credit_note.issuer_legal_name,
+            issuer_trade_name=credit_note.issuer_trade_name,
+            issuer_address=credit_note.issuer_address,
+            issuer_phone=credit_note.issuer_phone,
+            issuer_email=credit_note.issuer_email,
+            cai=credit_note.cai,
+            range_first_number=credit_note.range_first_number,
+            range_last_number=credit_note.range_last_number,
+            issue_deadline=credit_note.issue_deadline,
+            buyer_name=credit_note.buyer_name,
+            buyer_rtn=credit_note.buyer_rtn,
+            original_cai=credit_note.original_cai,
+            original_number=credit_note.original_number,
+            original_issue_date=credit_note.original_issue_date,
+            reason=credit_note.reason,
+            taxable_15_cents=credit_note.taxable_15_cents,
+            isv_15_cents=credit_note.isv_15_cents,
+            total_cents=credit_note.total_cents,
+            total_in_words=credit_note.total_in_words,
+            created_at=credit_note.created_at,
         )

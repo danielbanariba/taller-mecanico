@@ -80,3 +80,46 @@ class FiscalInvoice:
     created_by: uuid.UUID
     created_at: datetime
     lines: list[FiscalInvoiceLine] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class FiscalCreditNote:
+    """An issued Nota de Credito (phase B, AD-13): a full-amount,
+    immutable snapshot crediting a Factura. Mirrors
+    `taller.invoicing.adapters.models.FiscalCreditNoteModel`'s columns;
+    the ORM row is mapped into this plain dataclass at the repository
+    boundary, the same pattern every other feature in this codebase
+    uses.
+    """
+
+    id: uuid.UUID
+    workshop_id: uuid.UUID
+    invoice_id: uuid.UUID
+    order_id: uuid.UUID
+    cai_range_id: uuid.UUID
+    correlative: int
+    number: str
+    issued_at: datetime
+    issue_date: date
+    issuer_rtn: str
+    issuer_legal_name: str
+    issuer_trade_name: str
+    issuer_address: str
+    issuer_phone: str
+    issuer_email: str
+    cai: str
+    range_first_number: str
+    range_last_number: str
+    issue_deadline: date
+    buyer_name: str | None
+    buyer_rtn: str | None
+    original_cai: str
+    original_number: str
+    original_issue_date: date
+    reason: str
+    taxable_15_cents: int
+    isv_15_cents: int
+    total_cents: int
+    total_in_words: str
+    created_by: uuid.UUID
+    created_at: datetime

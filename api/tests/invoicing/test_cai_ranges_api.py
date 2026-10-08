@@ -74,14 +74,16 @@ def test_registering_a_range_with_no_profile_is_rejected(authenticated_client: T
     assert response.json()["detail"] == "fiscal_profile_missing"
 
 
-def test_a_credit_note_range_is_rejected_before_phase_b(authenticated_client: TestClient):
-    """Defect it catches: the database check also rejects `01`, or `06`
-    is silently accepted ahead of Phase B.
+def test_a_credit_note_range_is_accepted_in_phase_b(authenticated_client: TestClient):
+    """Defect it catches: `create_range` still carries phase A's
+    `unsupported_document_type` gate, blocking the `06` ranges phase B's
+    credit notes need.
     """
     _save_profile(authenticated_client)
     response = _create_range(authenticated_client, document_type="06")
-    assert response.status_code == 422
-    assert response.json()["detail"] == "unsupported_document_type"
+    assert response.status_code == 201
+    body = response.json()
+    assert body["document_type"] == "06"
 
 
 def test_replaying_an_identical_registration_is_a_noop(authenticated_client: TestClient):
