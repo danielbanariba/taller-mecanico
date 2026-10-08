@@ -16,3 +16,13 @@ export function getDemoAccount(): LoginPayload | null {
   }
   return { phone, password };
 }
+
+/**
+ * Whether this build is the public demo deployment (AD-17): every fiscal
+ * document's print layout and detail page watermarks itself
+ * "DEMOSTRACIÓN — SIN VALOR FISCAL" while this is true, driven by the
+ * same build-time configuration as the login prefill above.
+ */
+export function isDemoBuild(): boolean {
+  return getDemoAccount() !== null;
+}

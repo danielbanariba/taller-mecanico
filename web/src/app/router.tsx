@@ -75,6 +75,22 @@ export const router = createBrowserRouter([
           Component: (await import("../features/workorders/receipt/ReceiptLetterPage")).ReceiptLetterPage,
         }),
       },
+      // The Factura's own print routes (`fiscal-document-print` spec),
+      // siblings of the receipt routes above for the same reason (AD-16):
+      // no navigation chrome ever prints, and a workshop that never
+      // prints a Factura never downloads this chunk.
+      {
+        path: "/ordenes/:orderId/factura/:invoiceId/58mm",
+        lazy: async () => ({
+          Component: (await import("../features/invoicing/print/Invoice58Page")).Invoice58Page,
+        }),
+      },
+      {
+        path: "/ordenes/:orderId/factura/:invoiceId/carta",
+        lazy: async () => ({
+          Component: (await import("../features/invoicing/print/InvoiceLetterPage")).InvoiceLetterPage,
+        }),
+      },
     ],
   },
 ]);

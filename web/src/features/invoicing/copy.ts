@@ -116,6 +116,7 @@ export const invoicingCopy = {
     rangeLabel: "Rango autorizado",
     deadlineLabel: "Fecha límite de emisión",
     dateLabel: "Fecha de emisión",
+    issuedAtLabel: "Fecha y hora de emisión",
     buyerLabel: "Cliente",
     descriptionLabel: "Descripción",
     quantityLabel: "Cantidad",
