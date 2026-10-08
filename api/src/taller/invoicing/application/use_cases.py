@@ -43,7 +43,6 @@ from taller.invoicing.domain.errors import (
     InvoiceAlreadyCredited,
     InvoiceAmountTooLarge,
     InvoiceAmountZero,
-    UnsupportedDocumentType,
     WorkOrderAlreadyInvoiced,
     WorkOrderNotInvoiceable,
 )
@@ -412,9 +411,9 @@ def update_range(
         CaiRangeNotFound: no such range in this workshop.
         CaiRangeImmutable: at least one number has already been
             allocated from this range.
-        UnsupportedDocumentType / InvalidCai / InvalidCaiRange /
-            CaiDeadlinePassed / CaiDeadlineTooFar: a new field value
-            fails its own validation.
+        InvalidCai / InvalidCaiRange / CaiDeadlinePassed /
+            CaiDeadlineTooFar: a new field value fails its own
+            validation.
         CaiRangeOverlap: the new bounds intersect another range of the
             resulting document type, establecimiento and punto de
             emisión.
@@ -440,9 +439,9 @@ def update_range(
     if cai_range.in_use:
         raise CaiRangeImmutable(range_id)
 
+    # Phase B accepts both `01` and `06` (D2); no document-type gate
+    # applies here, mirroring `create_range`'s own phase B change.
     document_type = fields.get("document_type", cai_range.document_type)
-    if document_type is not DocumentType.invoice:
-        raise UnsupportedDocumentType(document_type.value)
 
     cai = normalize_cai(fields["cai"]) if "cai" in fields else cai_range.cai
     range_start = fields.get("range_start", cai_range.range_start)

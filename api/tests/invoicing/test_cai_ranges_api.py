@@ -151,6 +151,26 @@ def test_editing_an_untouched_range_succeeds(authenticated_client: TestClient):
     assert response.json()["issue_deadline"] == new_deadline
 
 
+def test_editing_an_untouched_credit_note_range_succeeds(authenticated_client: TestClient):
+    """Defect it catches: `update_range` still carries phase A's
+    `unsupported_document_type` gate (`fields.get("document_type",
+    cai_range.document_type)` falls back to the stored `06` and the
+    unconditional check fires anyway), so a PATCH that never even
+    touches `document_type` is rejected for every `06` range -- the
+    only correction path there is for one, since there is no DELETE.
+    """
+    _save_profile(authenticated_client)
+    created = _create_range(authenticated_client, document_type="06").json()
+
+    new_deadline = (date.today() + timedelta(days=200)).isoformat()
+    response = authenticated_client.patch(
+        f"/api/invoicing/cai-ranges/{created['id']}", json={"issue_deadline": new_deadline}
+    )
+    assert response.status_code == 200
+    assert response.json()["issue_deadline"] == new_deadline
+    assert response.json()["document_type"] == "06"
+
+
 def test_editing_a_range_that_has_issued_a_document_is_rejected(
     authenticated_client: TestClient, db_session: Session
 ):
