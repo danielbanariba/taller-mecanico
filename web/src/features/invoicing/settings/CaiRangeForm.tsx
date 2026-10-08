@@ -7,6 +7,8 @@ import { invoicingCopy } from "../copy";
 import type { DocumentType } from "../api";
 
 export interface CaiRangeFormValues {
+  /** Fixed once a range exists (AD-4); defaults to `"01"` for a new range. */
+  documentType: DocumentType;
   cai: string;
   rangeStart: string;
   rangeEnd: string;
@@ -33,14 +35,14 @@ export interface CaiRangeFormProps {
   offline?: boolean;
 }
 
-/** Phase A only ever accepts `01` (Factura); `06` arrives in Phase B. */
-const DOCUMENT_TYPE: DocumentType = "01";
+/** Every document type a CAI range can be registered for (A1, Phase B adds `06`). */
+const DOCUMENT_TYPES: DocumentType[] = ["01", "06"];
 
 /**
- * Presentational: a CAI range's bounds, CAI, and fecha límite (AD-4).
- * The document-type control only ever offers Factura in Phase A (the
- * `cai-ranges` spec rejects `06` before Phase B), so it is rendered
- * fixed and disabled rather than a real choice. `rangeStart`/`rangeEnd`
+ * Presentational: a CAI range's document type, bounds, CAI, and fecha
+ * límite (AD-4). The document type is chosen once, at creation, and
+ * fixed forever after (`inUse` disables it exactly like every other
+ * field once the range has allocated a number). `rangeStart`/`rangeEnd`
  * are kept as text locally (so the field never fights the user's
  * typing) and parsed to numbers only on submit.
  */
@@ -52,6 +54,7 @@ export function CaiRangeForm({
   errorMessage,
   offline = false,
 }: CaiRangeFormProps) {
+  const [documentType, setDocumentType] = useState<DocumentType>(initialValues?.documentType ?? "01");
   const [cai, setCai] = useState(initialValues?.cai ?? "");
   const [rangeStart, setRangeStart] = useState(initialValues?.rangeStart ?? "");
   const [rangeEnd, setRangeEnd] = useState(initialValues?.rangeEnd ?? "");
@@ -77,7 +80,7 @@ export function CaiRangeForm({
       return;
     }
     onSubmit({
-      documentType: DOCUMENT_TYPE,
+      documentType,
       cai: trimmedCai,
       rangeStart: Number(trimmedRangeStart),
       rangeEnd: Number(trimmedRangeEnd),
@@ -99,11 +102,16 @@ export function CaiRangeForm({
         </label>
         <select
           id="document_type"
-          value={DOCUMENT_TYPE}
-          disabled
+          value={documentType}
+          onChange={(event) => setDocumentType(event.target.value as DocumentType)}
+          disabled={inUse}
           className="min-h-12 rounded-xl border border-brand-border px-4 text-base text-brand-foreground outline-none focus:ring-2 focus:ring-brand-accent"
         >
-          <option value="01">{invoicingCopy.settings.documentTypeLabels["01"]}</option>
+          {DOCUMENT_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {invoicingCopy.settings.documentTypeLabels[type]}
+            </option>
+          ))}
         </select>
       </div>
 

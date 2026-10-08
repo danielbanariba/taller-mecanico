@@ -43,6 +43,7 @@ const INVOICE: FiscalInvoiceOut = {
   total_cents: 50000,
   total_in_words: "QUINIENTOS LEMPIRAS CON 00/100",
   credited_at: null,
+  credit_note: null,
   lines: [],
   created_at: "2026-01-02T10:00:00Z",
 };
@@ -107,5 +108,41 @@ describe("InvoiceDetailPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Factura 001-001-01-00000001" })).toBeInTheDocument();
     expect(screen.queryByText("No se encontró la factura.")).not.toBeInTheDocument();
+  });
+
+  it("offers 'Emitir nota de crédito' for a Factura that has not been credited yet", async () => {
+    // Defect this catches: no way to correct a wrong Factura from its own
+    // detail screen, the natural place to fix a mistake found while
+    // reviewing that exact document (AD-13).
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
+      http.get("/api/invoicing/invoices/invoice-1", () => HttpResponse.json(INVOICE)),
+    );
+    renderDetailPage();
+
+    expect(await screen.findByRole("button", { name: "Emitir nota de crédito" })).toBeInTheDocument();
+  });
+
+  it("links to the credit note instead, once the Factura has been credited", async () => {
+    // Defect this catches: the detail screen still offering to issue a
+    // second credit note against an already-credited Factura (A6: a
+    // Factura is credited once), or never surfacing the existing
+    // correction's own document at all.
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
+      http.get("/api/invoicing/invoices/invoice-1", () =>
+        HttpResponse.json({
+          ...INVOICE,
+          credited_at: "2026-01-03T10:00:00Z",
+          credit_note: { id: "credit-note-1", number: "001-001-06-00000001", issue_date: "2026-01-03" },
+        }),
+      ),
+    );
+    renderDetailPage();
+
+    expect(
+      await screen.findByRole("link", { name: "Ver nota de crédito 001-001-06-00000001" }),
+    ).toHaveAttribute("href", "/ordenes/order-1/nota-credito/credit-note-1");
+    expect(screen.queryByRole("button", { name: "Emitir nota de crédito" })).not.toBeInTheDocument();
   });
 });

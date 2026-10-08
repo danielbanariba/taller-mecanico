@@ -6,6 +6,7 @@ import {
   invoicingApi,
   type CreateCaiRangePayload,
   type FiscalProfileSavePayload,
+  type IssueCreditNotePayload,
   type IssueInvoicePayload,
   type UpdateCaiRangePayload,
 } from "./api";
@@ -82,12 +83,18 @@ export function useInvoice(id: string) {
   });
 }
 
-export function useOrderInvoices(orderId: string) {
+/**
+ * `enabled` lets a caller gate the fetch on something besides the id
+ * itself -- `InvoiceSection` only knows an order's documents once a
+ * fiscal profile exists, and must not fire this request for every
+ * workshop that never opted in.
+ */
+export function useOrderInvoices(orderId: string, enabled = true) {
   const workshopId = useWorkshopId();
   return useQuery({
     queryKey: orderInvoicesQueryKey(workshopId, orderId),
     queryFn: () => invoicingApi.listOrderInvoices(orderId),
-    enabled: workshopId !== undefined && orderId !== "",
+    enabled: enabled && workshopId !== undefined && orderId !== "",
   });
 }
 
@@ -106,6 +113,42 @@ export function useIssueInvoice(orderId: string) {
       queryClient.setQueryData(invoiceQueryKey(workshopId, invoice.id), invoice);
       queryClient.invalidateQueries({ queryKey: workOrderQueryKey(workshopId, orderId) });
       queryClient.invalidateQueries({ queryKey: orderInvoicesQueryKey(workshopId, orderId) });
+      queryClient.invalidateQueries({ queryKey: invoicingSettingsQueryKey(workshopId) });
+    },
+  });
+}
+
+/** A credit note's own query key (AD-15's "Query keys" table): persisted, so a previously fetched credit note still renders offline for its detail route. */
+export const creditNoteQueryKey = (workshopId: string | undefined, id: string) =>
+  [...workshopQueryKey(workshopId), "invoicing", "creditNotes", "detail", id] as const;
+
+export function useCreditNote(id: string) {
+  const workshopId = useWorkshopId();
+  return useQuery({
+    queryKey: creditNoteQueryKey(workshopId, id),
+    queryFn: () => invoicingApi.getCreditNote(id),
+    enabled: workshopId !== undefined && id !== "",
+  });
+}
+
+/**
+ * Crediting a Factura releases the invoiced-order lock (AD-13): the
+ * order's own `active_invoice`/`lines_editable` change, the invoice
+ * gains its `credit_note` reference, this order's document list gains
+ * the new document, and readiness can change (the `06` range may move
+ * to exhausted) -- so it invalidates all four alongside caching the
+ * credit note itself (AD-15's "Query keys" table).
+ */
+export function useIssueCreditNote(orderId: string, invoiceId: string) {
+  const queryClient = useQueryClient();
+  const workshopId = useWorkshopId();
+  return useMutation({
+    mutationFn: (payload: IssueCreditNotePayload) => invoicingApi.issueCreditNote(payload),
+    onSuccess: (creditNote) => {
+      queryClient.setQueryData(creditNoteQueryKey(workshopId, creditNote.id), creditNote);
+      queryClient.invalidateQueries({ queryKey: invoiceQueryKey(workshopId, invoiceId) });
+      queryClient.invalidateQueries({ queryKey: orderInvoicesQueryKey(workshopId, orderId) });
+      queryClient.invalidateQueries({ queryKey: workOrderQueryKey(workshopId, orderId) });
       queryClient.invalidateQueries({ queryKey: invoicingSettingsQueryKey(workshopId) });
     },
   });

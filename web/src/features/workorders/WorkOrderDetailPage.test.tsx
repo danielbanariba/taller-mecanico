@@ -404,7 +404,10 @@ describe("WorkOrderDetailPage", () => {
     // of before them (`fiscal-invoices` spec's "An eligible, uninvoiced
     // order shows the Factura action first").
     mockSessionAndOrder({ ...ORDER, status: "completed", allowed_transitions: ["delivered"] });
-    server.use(http.get("/api/invoicing/settings", () => HttpResponse.json(READY_SETTINGS)));
+    server.use(
+      http.get("/api/invoicing/settings", () => HttpResponse.json(READY_SETTINGS)),
+      http.get("/api/invoicing/invoices", () => HttpResponse.json([])),
+    );
     renderDetailPage();
 
     expect(await screen.findByRole("heading", { name: "Orden #42" })).toBeInTheDocument();
@@ -426,7 +429,21 @@ describe("WorkOrderDetailPage", () => {
       allowed_transitions: ["delivered"],
       active_invoice: { id: "invoice-1", number: "001-001-01-00000001" },
     });
-    server.use(http.get("/api/invoicing/settings", () => HttpResponse.json(READY_SETTINGS)));
+    server.use(
+      http.get("/api/invoicing/settings", () => HttpResponse.json(READY_SETTINGS)),
+      http.get("/api/invoicing/invoices", () =>
+        HttpResponse.json([
+          {
+            id: "invoice-1",
+            number: "001-001-01-00000001",
+            issued_at: "2026-01-02T10:00:00Z",
+            total_cents: 50000,
+            credited_at: null,
+            credit_note: null,
+          },
+        ]),
+      ),
+    );
     renderDetailPage();
 
     expect(await screen.findByRole("heading", { name: "Orden #42" })).toBeInTheDocument();

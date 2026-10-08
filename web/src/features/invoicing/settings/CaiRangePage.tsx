@@ -6,6 +6,7 @@ import { useOnlineStatus } from "../../../shared/offline/useOnlineStatus";
 import { Alert } from "../../../shared/ui/Alert";
 import { LinkButton } from "../../../shared/ui/LinkButton";
 import { Spinner } from "../../../shared/ui/Spinner";
+import type { DocumentType } from "../api";
 import { getInvoicingErrorMessage, invoicingCopy } from "../copy";
 import { useCreateCaiRange, useInvoicingSettings, useUpdateCaiRange } from "../hooks";
 import { CaiRangeForm, type CaiRangeFormSubmitValues } from "./CaiRangeForm";
@@ -76,6 +77,7 @@ export function CaiRangePage() {
         initialValues={
           existing
             ? {
+                documentType: existing.document_type as DocumentType,
                 cai: existing.cai,
                 rangeStart: String(existing.range_start),
                 rangeEnd: String(existing.range_end),

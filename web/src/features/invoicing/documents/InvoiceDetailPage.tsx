@@ -1,11 +1,15 @@
+import { useState } from "react";
 import { useParams } from "react-router";
 
 import { ApiError } from "../../../shared/api/http";
+import { useOnlineStatus } from "../../../shared/offline/useOnlineStatus";
 import { Alert } from "../../../shared/ui/Alert";
+import { Button } from "../../../shared/ui/Button";
 import { LinkButton } from "../../../shared/ui/LinkButton";
 import { Spinner } from "../../../shared/ui/Spinner";
 import { getInvoicingErrorMessage, invoicingCopy } from "../copy";
 import { useInvoice } from "../hooks";
+import { CreditNoteDialog } from "./CreditNoteDialog";
 import { InvoiceSummary } from "./InvoiceSummary";
 
 /**
@@ -20,6 +24,8 @@ export function InvoiceDetailPage() {
   const orderId = paramOrderId ?? "";
   const invoiceId = paramInvoiceId ?? "";
   const invoice = useInvoice(invoiceId);
+  const isOffline = useOnlineStatus();
+  const [creditNoteDialogOpen, setCreditNoteDialogOpen] = useState(false);
 
   if (invoice.isPending) {
     return (
@@ -51,6 +57,15 @@ export function InvoiceDetailPage() {
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold text-brand-primary">{invoicingCopy.documents.detailTitle(data.number)}</h1>
       <InvoiceSummary invoice={data} />
+      {data.credit_note ? (
+        <LinkButton to={`/ordenes/${orderId}/nota-credito/${data.credit_note.id}`} variant="secondary">
+          {invoicingCopy.creditNote.viewAction(data.credit_note.number)}
+        </LinkButton>
+      ) : (
+        <Button variant="secondary" onClick={() => setCreditNoteDialogOpen(true)} disabled={isOffline}>
+          {invoicingCopy.creditNote.issueAction}
+        </Button>
+      )}
       <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
         <LinkButton to={`/ordenes/${orderId}/factura/${invoiceId}/58mm`} variant="secondary">
           {invoicingCopy.documents.print58mm}
@@ -62,6 +77,14 @@ export function InvoiceDetailPage() {
       <LinkButton to={`/ordenes/${orderId}`} variant="secondary">
         {invoicingCopy.documents.backToOrder}
       </LinkButton>
+      {creditNoteDialogOpen ? (
+        <CreditNoteDialog
+          open={creditNoteDialogOpen}
+          orderId={orderId}
+          invoiceId={invoiceId}
+          onClose={() => setCreditNoteDialogOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

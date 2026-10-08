@@ -39,4 +39,10 @@ export const invoicingShellRoutes: RouteObject[] = [
       Component: (await import("./documents/InvoiceDetailPage")).InvoiceDetailPage,
     }),
   },
+  {
+    path: ":orderId/nota-credito/:creditNoteId",
+    lazy: async () => ({
+      Component: (await import("./documents/CreditNoteDetailPage")).CreditNoteDetailPage,
+    }),
+  },
 ];
