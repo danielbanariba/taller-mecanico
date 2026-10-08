@@ -11,6 +11,9 @@ import { RangeWarnings } from "../settings/RangeWarnings";
 import { getInvoicingErrorMessage, invoicingCopy } from "../copy";
 import { useInvoicingSettings, useIssueCreditNote } from "../hooks";
 
+/** Mirrors the API's `MAX_CREDIT_NOTE_REASON_LENGTH` (`api/.../invoicing/application/use_cases.py`). */
+const MAX_REASON_LENGTH = 300;
+
 export interface CreditNoteDialogProps {
   open: boolean;
   orderId: string;
@@ -42,11 +45,18 @@ export function CreditNoteDialog({ open, orderId, invoiceId, onClose }: CreditNo
   const [touched, setTouched] = useState(false);
 
   const trimmedReason = reason.trim();
-  const showValidationError = touched && trimmedReason.length === 0;
+  const reasonMissing = trimmedReason.length === 0;
+  const reasonTooLong = trimmedReason.length > MAX_REASON_LENGTH;
+  let reasonError: string | undefined;
+  if (touched && reasonMissing) {
+    reasonError = invoicingCopy.creditNote.reasonRequired;
+  } else if (touched && reasonTooLong) {
+    reasonError = invoicingCopy.creditNote.reasonTooLong;
+  }
 
   function handleSubmit() {
     setTouched(true);
-    if (isOffline || trimmedReason.length === 0) {
+    if (isOffline || reasonMissing || reasonTooLong) {
       return;
     }
     issueCreditNote.mutate(
@@ -74,7 +84,8 @@ export function CreditNoteDialog({ open, orderId, invoiceId, onClose }: CreditNo
           name="reason"
           value={reason}
           onChange={(event) => setReason(event.target.value)}
-          error={showValidationError ? invoicingCopy.creditNote.reasonRequired : undefined}
+          maxLength={MAX_REASON_LENGTH + 1}
+          error={reasonError}
         />
         <div className="flex gap-3">
           <Button variant="secondary" onClick={onClose}>

@@ -105,6 +105,29 @@ describe("CreditNoteDialog", () => {
     expect(requestWasSent).toBe(false);
   });
 
+  it("blocks a reason over 300 characters, before any request is sent", async () => {
+    // Defect this catches: a long reason only failing after a round
+    // trip, with the server's generic message, instead of being caught
+    // client-side against the same 300-character limit the API enforces.
+    mockSession();
+    let requestWasSent = false;
+    server.use(
+      http.post("/api/invoicing/credit-notes", () => {
+        requestWasSent = true;
+        return HttpResponse.json(CREDIT_NOTE, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByRole("textbox", { name: "Motivo" }));
+    await user.paste("a".repeat(301));
+    await user.click(screen.getByRole("button", { name: "Emitir nota de crédito" }));
+
+    expect(screen.getByText("El motivo puede tener hasta 300 caracteres.")).toBeInTheDocument();
+    expect(requestWasSent).toBe(false);
+  });
+
   it("closes the dialog without issuing when 'Cancelar' is clicked", async () => {
     // Defect this catches: issuing a credit note is irreversible (a
     // Factura is credited once, A6) -- the dialog's only button must
