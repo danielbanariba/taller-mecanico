@@ -410,6 +410,17 @@ def update_range(
     profile = profile_repo.get_for_update(workshop_id=workshop_id)
     if profile is None:
         raise FiscalProfileMissing()
+
+    # Re-read the range now that the profile mutex (AD-5) is held: the
+    # snapshot fetched above, before the lock, can already be stale --
+    # a concurrent issue_invoice() may have allocated a number from this
+    # range in the window between that read and this lock, and the
+    # immutability check below must see that allocation, not the
+    # pre-lock state, or it would un-consume an already-issued Factura's
+    # correlative.
+    cai_range = range_repo.get_by_id(workshop_id=workshop_id, range_id=range_id)
+    if cai_range is None:
+        raise CaiRangeNotFound(range_id)
     if cai_range.in_use:
         raise CaiRangeImmutable(range_id)
 

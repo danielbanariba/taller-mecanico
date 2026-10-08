@@ -43,9 +43,9 @@ from taller.invoicing.adapters.repositories import (
     SqlAlchemyFiscalInvoiceRepository,
     SqlAlchemyFiscalProfileRepository,
 )
-from taller.invoicing.application.use_cases import issue_invoice
+from taller.invoicing.application.use_cases import issue_invoice, update_range
 from taller.invoicing.domain.document_number import DocumentType
-from taller.invoicing.domain.errors import CaiRangeExhausted
+from taller.invoicing.domain.errors import CaiRangeExhausted, CaiRangeImmutable
 from taller.invoicing.domain.ranges import CaiRange
 from taller.workorders.adapters.models import (
     WorkOrderLineModel,
@@ -108,6 +108,50 @@ class _PausingOrderRepository:
 
     def save(self, order) -> None:
         self._inner.save(order)
+
+
+class _PausingCaiRangeRepository:
+    """Wraps the real repository so a test can force a concurrent
+    allocation to land in the window `update_range()` leaves open between
+    its first, unlocked `get_by_id()` read and the fiscal-profile lock it
+    only then acquires: `get_by_id` signals `acquired` once it has
+    returned that first, soon-to-be-stale snapshot, then blocks on
+    `release` before letting the caller continue towards the lock. Only
+    the first call pauses; a second call (a fixed `update_range()`
+    re-reading the range under the lock) returns immediately. Mirrors
+    `_PausingOrderRepository` above.
+    """
+
+    def __init__(
+        self,
+        inner: SqlAlchemyCaiRangeRepository,
+        acquired: threading.Event,
+        release: threading.Event,
+    ) -> None:
+        self._inner = inner
+        self._acquired = acquired
+        self._release = release
+        self._calls = 0
+
+    def get_by_id(self, *, workshop_id: uuid.UUID, range_id: uuid.UUID):
+        result = self._inner.get_by_id(workshop_id=workshop_id, range_id=range_id)
+        self._calls += 1
+        if self._calls == 1:
+            self._acquired.set()
+            self._release.wait(timeout=5)
+        return result
+
+    def list(self, *, workshop_id: uuid.UUID, document_type: DocumentType | None = None):
+        return self._inner.list(workshop_id=workshop_id, document_type=document_type)
+
+    def add(self, cai_range: CaiRange) -> None:
+        self._inner.add(cai_range)
+
+    def save(self, cai_range: CaiRange) -> None:
+        self._inner.save(cai_range)
+
+    def allocate(self, *, range_id: uuid.UUID, now: datetime) -> int | None:
+        return self._inner.allocate(range_id=range_id, now=now)
 
 
 @pytest.fixture
@@ -728,3 +772,76 @@ def test_issuance_committed_first_locks_out_a_concurrent_line_edit(
     assert not errors, errors
     assert "invoice" in results
     assert isinstance(results.get("edit_error"), WorkOrderInvoiced)
+
+
+def test_update_range_does_not_un_consume_a_number_allocated_during_its_unlocked_read(
+    committed_invoicing_workshop: dict[str, uuid.UUID], test_engine: Engine
+) -> None:
+    """Defect this catches: `update_range()` reads the CAI range before
+    taking the fiscal-profile lock (AD-5), so a concurrent
+    `issue_invoice()` that allocates and commits a correlative in that
+    window is invisible to the immutability check that follows the lock
+    -- letting the PATCH report success and reset `next_number` back to
+    `range_start`, silently un-consuming a correlative an immutable,
+    already-committed Factura still references.
+    """
+    ids = committed_invoicing_workshop
+    with Session(test_engine) as setup:
+        order_id = _create_completed_order(setup, ids)
+        range_id = _add_range(
+            setup,
+            workshop_id=ids["workshop_id"],
+            created_by=ids["user_id"],
+            range_start=1,
+            range_end=100,
+            issue_deadline=date.today() + timedelta(days=300),
+        )
+
+    acquired = threading.Event()
+    release = threading.Event()
+    errors: list[BaseException] = []
+
+    def _patch_range() -> None:
+        try:
+            with Session(test_engine) as session:
+                range_repo = _PausingCaiRangeRepository(
+                    SqlAlchemyCaiRangeRepository(session), acquired, release
+                )
+                update_range(
+                    workshop_id=ids["workshop_id"],
+                    range_id=range_id,
+                    fields={"issue_deadline": date.today() + timedelta(days=301)},
+                    clock=_RealClock(),
+                    profile_repo=SqlAlchemyFiscalProfileRepository(session),
+                    range_repo=range_repo,
+                )
+                session.commit()
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+        finally:
+            acquired.set()
+
+    patcher = threading.Thread(target=_patch_range)
+    patcher.start()
+    assert acquired.wait(timeout=5)
+
+    with Session(test_engine) as session:
+        _issue(
+            session,
+            workshop_id=ids["workshop_id"],
+            order_id=order_id,
+            created_by=ids["user_id"],
+        )
+        session.commit()
+
+    release.set()
+    patcher.join(timeout=5)
+
+    assert len(errors) == 1, errors
+    assert isinstance(errors[0], CaiRangeImmutable)
+
+    with Session(test_engine) as verify:
+        range_row = verify.query(CaiRangeModel).filter(CaiRangeModel.id == range_id).one()
+        # The issuance's allocation (range_start -> range_start + 1) must
+        # survive the PATCH, not be reset back to range_start.
+        assert range_row.next_number == 2
