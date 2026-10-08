@@ -134,7 +134,7 @@ amount and balance. The "Más" menu's "Caja del día" shows both payments
 (bucketed by their `America/Tegucigalpa` local day); "Exportar todo"
 downloads a ZIP with one CSV per entity, including both payments.
 
-### Fiscal invoicing (phase A, `sar-invoicing`)
+### Fiscal invoicing (`sar-invoicing`)
 
 **Real (non-demo) invoicing is out of scope for v1.** Nothing here, in
 the seed script, or anywhere else in this phase's configuration invites
@@ -162,7 +162,25 @@ passes, issuing a new Factura on the demo needs a *new* range with a
 later deadline -- a used range is immutable (AD-4), so the existing one
 cannot simply be edited. Register it the same way the seed script does
 (`POST /api/invoicing/cai-ranges`), or bump `range_deadline` in
-`seed-demo-account.sh` and rerun the script with a fresh `range_id`.
+`seed-demo-account.sh` and rerun the script with a fresh `range_id`. The
+same fixed `range_deadline` backs the seeded `06` range below, so it
+expires on the same schedule.
+
+**Credit notes and the correction flow (phase B).** The seed also
+registers one fictional Nota de Crédito (`06`) CAI range (bounds 1-100,
+same fixed-deadline rule as the `01` range above), issues a credit note
+against the seeded Factura (reason "Datos del comprador incorrectos"),
+and re-issues a new Factura on the same `delivered` order naming María
+Hernández and her RTN (`99999999990001`) as the buyer -- the full
+correction flow a tester can walk end to end: the order detail screen
+lists both Facturas and the credit note, the "Emitir factura" action
+reappears once the credit note lifts the `work_order_invoiced` lock, and
+both print layouts of the credit note (`/ordenes/<id>/nota-credito/<id>/58mm`
+and `/carta`, by URL) show the original Factura's CAI, number and date
+plus the "DEMOSTRACIÓN — SIN VALOR FISCAL" watermark. "Exportar todo" now
+downloads a ZIP with ten CSVs: the seven from before, plus
+`fiscal_invoices.csv`, `fiscal_invoice_lines.csv` and
+`fiscal_credit_notes.csv`.
 
 ```sh
 bash -c 'set -a; . ~/.config/taller-mecanico/demo.env; set +a; \

@@ -15,6 +15,11 @@ from sqlalchemy.orm import Session
 from taller.customers.adapters.models import CustomerModel, VehicleModel
 from taller.export.application.csv_zip import CellValue, format_local_timestamp, format_money
 from taller.inventory.adapters.models import ItemModel, StockMovementModel
+from taller.invoicing.adapters.models import (
+    FiscalCreditNoteModel,
+    FiscalInvoiceLineModel,
+    FiscalInvoiceModel,
+)
 from taller.workorders.adapters.models import PaymentModel, WorkOrderLineModel, WorkOrderModel
 
 CUSTOMERS_HEADERS = [
@@ -23,6 +28,8 @@ CUSTOMERS_HEADERS = [
     "phone",
     "phone_is_mobile",
     "notes",
+    "billing_name",
+    "rtn",
     "archived_at",
     "created_at",
     "updated_at",
@@ -134,6 +141,8 @@ def customers_rows(session: Session, workshop_id: uuid.UUID) -> list[Sequence[Ce
                 model.phone,
                 phone_is_mobile,
                 model.notes,
+                model.billing_name,
+                model.rtn,
                 format_local_timestamp(model.archived_at),
                 format_local_timestamp(model.created_at),
                 format_local_timestamp(model.updated_at),
@@ -304,6 +313,181 @@ def work_order_lines_rows(session: Session, workshop_id: uuid.UUID) -> list[Sequ
             format_money(model.quantity * model.unit_price_cents),
             format_local_timestamp(model.removed_at),
             format_local_timestamp(model.created_at),
+        ]
+        for model in models
+    ]
+
+
+#: Phase B (`sar-invoicing`, design.md's AD-19).
+FISCAL_INVOICES_HEADERS = [
+    "id",
+    "number",
+    "order_id",
+    "order_number",
+    "issue_date",
+    "issued_at",
+    "cai",
+    "range_first_number",
+    "range_last_number",
+    "issue_deadline",
+    "issuer_rtn",
+    "issuer_legal_name",
+    "issuer_trade_name",
+    "issuer_address",
+    "issuer_phone",
+    "issuer_email",
+    "buyer_name",
+    "buyer_rtn",
+    "exempt_hnl",
+    "exonerated_hnl",
+    "taxable_15_hnl",
+    "isv_15_hnl",
+    "discount_hnl",
+    "total_hnl",
+    "total_in_words",
+    "credited_at",
+]
+FISCAL_INVOICE_LINES_HEADERS = [
+    "id",
+    "invoice_id",
+    "position",
+    "kind",
+    "description",
+    "quantity",
+    "unit_price_hnl",
+    "line_total_hnl",
+]
+FISCAL_CREDIT_NOTES_HEADERS = [
+    "id",
+    "number",
+    "invoice_id",
+    "original_number",
+    "original_cai",
+    "original_issue_date",
+    "order_id",
+    "issue_date",
+    "issued_at",
+    "cai",
+    "range_first_number",
+    "range_last_number",
+    "issue_deadline",
+    "buyer_name",
+    "buyer_rtn",
+    "reason",
+    "taxable_15_hnl",
+    "isv_15_hnl",
+    "total_hnl",
+    "total_in_words",
+]
+
+
+def fiscal_invoices_rows(session: Session, workshop_id: uuid.UUID) -> list[Sequence[CellValue]]:
+    """Every issued Factura's own snapshot fields (AD-19): never
+    recomputed from the live order, profile, or customer.
+    """
+    models = (
+        session.query(FiscalInvoiceModel)
+        .filter(FiscalInvoiceModel.workshop_id == workshop_id)
+        .order_by(FiscalInvoiceModel.issued_at, FiscalInvoiceModel.number)
+        .all()
+    )
+    return [
+        [
+            str(model.id),
+            model.number,
+            str(model.order_id),
+            model.order_number,
+            model.issue_date.isoformat(),
+            format_local_timestamp(model.issued_at),
+            model.cai,
+            model.range_first_number,
+            model.range_last_number,
+            model.issue_deadline.isoformat(),
+            model.issuer_rtn,
+            model.issuer_legal_name,
+            model.issuer_trade_name,
+            model.issuer_address,
+            model.issuer_phone,
+            model.issuer_email,
+            model.buyer_name,
+            model.buyer_rtn,
+            format_money(model.exempt_cents),
+            format_money(model.exonerated_cents),
+            format_money(model.taxable_15_cents),
+            format_money(model.isv_15_cents),
+            format_money(model.discount_cents),
+            format_money(model.total_cents),
+            model.total_in_words,
+            format_local_timestamp(model.credited_at),
+        ]
+        for model in models
+    ]
+
+
+def fiscal_invoice_lines_rows(
+    session: Session, workshop_id: uuid.UUID
+) -> list[Sequence[CellValue]]:
+    """The snapshot's line-level detail (AD-19), separate from
+    `work_order_lines_rows`: an order's current lines may no longer
+    match what was actually invoiced, for example after a full credit
+    note reopened the order for editing (`data-export` delta).
+    """
+    rows = (
+        session.query(FiscalInvoiceLineModel)
+        .join(FiscalInvoiceModel, FiscalInvoiceLineModel.invoice_id == FiscalInvoiceModel.id)
+        .filter(FiscalInvoiceLineModel.workshop_id == workshop_id)
+        .order_by(
+            FiscalInvoiceModel.issued_at, FiscalInvoiceModel.number, FiscalInvoiceLineModel.position
+        )
+        .all()
+    )
+    return [
+        [
+            str(line.id),
+            str(line.invoice_id),
+            line.position,
+            line.kind,
+            line.description,
+            line.quantity,
+            format_money(line.unit_price_cents),
+            format_money(line.line_total_cents),
+        ]
+        for line in rows
+    ]
+
+
+def fiscal_credit_notes_rows(session: Session, workshop_id: uuid.UUID) -> list[Sequence[CellValue]]:
+    """Every issued Nota de Crédito (AD-19), including its reference to
+    the original Factura.
+    """
+    models = (
+        session.query(FiscalCreditNoteModel)
+        .filter(FiscalCreditNoteModel.workshop_id == workshop_id)
+        .order_by(FiscalCreditNoteModel.issued_at, FiscalCreditNoteModel.number)
+        .all()
+    )
+    return [
+        [
+            str(model.id),
+            model.number,
+            str(model.invoice_id),
+            model.original_number,
+            model.original_cai,
+            model.original_issue_date.isoformat(),
+            str(model.order_id),
+            model.issue_date.isoformat(),
+            format_local_timestamp(model.issued_at),
+            model.cai,
+            model.range_first_number,
+            model.range_last_number,
+            model.issue_deadline.isoformat(),
+            model.buyer_name,
+            model.buyer_rtn,
+            model.reason,
+            format_money(model.taxable_15_cents),
+            format_money(model.isv_15_cents),
+            format_money(model.total_cents),
+            model.total_in_words,
         ]
         for model in models
     ]

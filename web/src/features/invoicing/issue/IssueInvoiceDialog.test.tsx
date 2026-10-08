@@ -51,6 +51,16 @@ const ORDER: WorkOrderOut = {
   cancelled_at: null,
 };
 
+/** No readiness warning by default: `IssueInvoiceDialog` always reads this (the same query `InvoiceSection` already triggers), even in tests that do not exercise AD-18's warning line. */
+const READY_NO_WARNING_SETTINGS = {
+  profile: null,
+  codes_locked: false,
+  ranges: [],
+  documents: [
+    { document_type: "01", ready: true, blocked_reason: null, active_range_id: "range-1", next_number: "001-001-01-00000001", warnings: [] },
+  ],
+};
+
 function mockCustomerAndSession(customerOverrides: Partial<CustomerOut> = {}) {
   server.use(
     http.get("/api/auth/me", () =>
@@ -60,6 +70,7 @@ function mockCustomerAndSession(customerOverrides: Partial<CustomerOut> = {}) {
       }),
     ),
     http.get("/api/customers/c1", () => HttpResponse.json({ ...CUSTOMER, ...customerOverrides })),
+    http.get("/api/invoicing/settings", () => HttpResponse.json(READY_NO_WARNING_SETTINGS)),
   );
 }
 
@@ -249,6 +260,40 @@ describe("IssueInvoiceDialog", () => {
 
     expect(screen.queryByLabelText("Nombre o razón social")).not.toBeInTheDocument();
     expect(issueRequestWasSent).toBe(false);
+  });
+
+  it("shows a range-warning line without blocking submission when the active range carries one", async () => {
+    // Defect this catches: a range that is about to expire or run out of
+    // numbers (AD-18) giving the owner no signal until it actually blocks
+    // issuance (AD-6) -- by then it is too late to request a new one in
+    // time. The warning must inform, never block, a still-valid submit.
+    mockCustomerAndSession();
+    server.use(
+      http.get("/api/invoicing/settings", () =>
+        HttpResponse.json({
+          ...READY_NO_WARNING_SETTINGS,
+          documents: [
+            {
+              document_type: "01",
+              ready: true,
+              blocked_reason: null,
+              active_range_id: "range-1",
+              next_number: "001-001-01-00000001",
+              warnings: [{ code: "range_low_numbers", remaining: 10 }],
+            },
+          ],
+        }),
+      ),
+      http.post("/api/invoicing/invoices", () =>
+        HttpResponse.json({ id: "invoice-1", number: "001-001-01-00000001" }, { status: 201 }),
+      ),
+    );
+    renderDialog();
+
+    expect(
+      await screen.findByText("Factura: Quedan 10 números del rango de CAI. Registre uno nuevo."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Emitir factura" })).not.toBeDisabled();
   });
 
   it("disables the issue action with its offline message once the connection drops", async () => {

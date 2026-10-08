@@ -17,6 +17,7 @@ from taller.identity.domain.entities import User
 from taller.identity.domain.errors import InvalidPhoneNumber
 from taller.invoicing.adapters.repositories import (
     SqlAlchemyCaiRangeRepository,
+    SqlAlchemyCreditNoteRepository,
     SqlAlchemyFiscalInvoiceRepository,
     SqlAlchemyFiscalProfileRepository,
 )
@@ -24,6 +25,8 @@ from taller.invoicing.adapters.schemas import (
     CaiRangeCreateRequest,
     CaiRangeOut,
     CaiRangePatchRequest,
+    FiscalCreditNoteCreateRequest,
+    FiscalCreditNoteOut,
     FiscalInvoiceCreateRequest,
     FiscalInvoiceOut,
     FiscalInvoiceSummaryOut,
@@ -33,8 +36,10 @@ from taller.invoicing.adapters.schemas import (
 )
 from taller.invoicing.application.use_cases import (
     create_range,
+    get_credit_note,
     get_invoice,
     get_settings,
+    issue_credit_note,
     issue_invoice,
     list_order_invoices,
     save_profile,
@@ -52,15 +57,19 @@ from taller.invoicing.domain.errors import (
     CaiRangeMissing,
     CaiRangeNotFound,
     CaiRangeOverlap,
+    CreditNoteIdConflict,
+    CreditNoteNotFound,
     FiscalInvoiceIdConflict,
     FiscalInvoiceNotFound,
     FiscalProfileCodesLocked,
     FiscalProfileMissing,
     InvalidCai,
     InvalidCaiRange,
+    InvalidCreditNoteReason,
     InvalidEmail,
     InvalidEmissionPointCode,
     InvalidEstablishmentCode,
+    InvoiceAlreadyCredited,
     InvoiceAmountTooLarge,
     InvoiceAmountZero,
     UnsupportedDocumentType,
@@ -78,6 +87,10 @@ invoicing_router = APIRouter(prefix="/invoicing", tags=["invoicing"])
 #: `fiscal_invoices`'s primary key constraint name, as Postgres reports it on
 #: an `IntegrityError` (AD-6's retry-once rule).
 _INVOICE_PK_CONSTRAINT = "fiscal_invoices_pkey"
+
+#: `fiscal_credit_notes`'s primary key constraint name (AD-13's retry-once
+#: rule, mirroring `_INVOICE_PK_CONSTRAINT`).
+_CREDIT_NOTE_PK_CONSTRAINT = "fiscal_credit_notes_pkey"
 
 
 def _violated_constraint(exc: IntegrityError) -> str | None:
@@ -306,6 +319,7 @@ def issue_invoice_route(
     profile_repo = SqlAlchemyFiscalProfileRepository(db)
     range_repo = SqlAlchemyCaiRangeRepository(db)
     invoice_repo = SqlAlchemyFiscalInvoiceRepository(db)
+    credit_note_repo = SqlAlchemyCreditNoteRepository(db)
 
     def _attempt() -> tuple:
         result = issue_invoice(
@@ -444,7 +458,8 @@ def issue_invoice_route(
 
     if not is_new:
         response.status_code = status.HTTP_200_OK
-    return FiscalInvoiceOut.from_domain(invoice)
+    credit_note = credit_note_repo.get_for_invoice(workshop_id=workshop_id, invoice_id=invoice.id)
+    return FiscalInvoiceOut.from_domain(invoice, credit_note=credit_note)
 
 
 @invoicing_router.get("/invoices/{invoice_id}", response_model=FiscalInvoiceOut)
@@ -454,13 +469,15 @@ def get_invoice_route(
     db: Session = Depends(get_db),
 ) -> FiscalInvoiceOut:
     invoice_repo = SqlAlchemyFiscalInvoiceRepository(db)
+    credit_note_repo = SqlAlchemyCreditNoteRepository(db)
     try:
         invoice = get_invoice(
             workshop_id=workshop_id, invoice_id=invoice_id, invoice_repo=invoice_repo
         )
     except FiscalInvoiceNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="fiscal_invoice_not_found") from exc
-    return FiscalInvoiceOut.from_domain(invoice)
+    credit_note = credit_note_repo.get_for_invoice(workshop_id=workshop_id, invoice_id=invoice.id)
+    return FiscalInvoiceOut.from_domain(invoice, credit_note=credit_note)
 
 
 @invoicing_router.get("/invoices", response_model=list[FiscalInvoiceSummaryOut])
@@ -470,7 +487,150 @@ def list_invoices_route(
     db: Session = Depends(get_db),
 ) -> list[FiscalInvoiceSummaryOut]:
     invoice_repo = SqlAlchemyFiscalInvoiceRepository(db)
+    credit_note_repo = SqlAlchemyCreditNoteRepository(db)
     invoices = list_order_invoices(
         workshop_id=workshop_id, order_id=order_id, invoice_repo=invoice_repo
     )
-    return [FiscalInvoiceSummaryOut.from_domain(invoice) for invoice in invoices]
+    return [
+        FiscalInvoiceSummaryOut.from_domain(
+            invoice,
+            credit_note=credit_note_repo.get_for_invoice(
+                workshop_id=workshop_id, invoice_id=invoice.id
+            ),
+        )
+        for invoice in invoices
+    ]
+
+
+@invoicing_router.post(
+    "/credit-notes", response_model=FiscalCreditNoteOut, status_code=status.HTTP_201_CREATED
+)
+def issue_credit_note_route(
+    payload: FiscalCreditNoteCreateRequest,
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    workshop_id: uuid.UUID = Depends(get_current_workshop_id),
+    clock: Clock = Depends(get_clock),
+    db: Session = Depends(get_db),
+) -> FiscalCreditNoteOut:
+    order_repo = SqlAlchemyWorkOrderRepository(db)
+    profile_repo = SqlAlchemyFiscalProfileRepository(db)
+    range_repo = SqlAlchemyCaiRangeRepository(db)
+    invoice_repo = SqlAlchemyFiscalInvoiceRepository(db)
+    credit_note_repo = SqlAlchemyCreditNoteRepository(db)
+
+    def _attempt() -> tuple:
+        result = issue_credit_note(
+            workshop_id=workshop_id,
+            credit_note_id=payload.id,
+            invoice_id=payload.invoice_id,
+            reason=payload.reason,
+            created_by=current_user.id,
+            clock=clock,
+            order_repo=order_repo,
+            profile_repo=profile_repo,
+            range_repo=range_repo,
+            invoice_repo=invoice_repo,
+            credit_note_repo=credit_note_repo,
+        )
+        db.commit()
+        return result
+
+    try:
+        credit_note, is_new = _attempt()
+    except InvalidCreditNoteReason as exc:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid_credit_note_reason"
+        ) from exc
+    except FiscalInvoiceNotFound as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="invoice_not_found") from exc
+    except CreditNoteIdConflict as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="credit_note_id_conflict") from exc
+    except InvoiceAlreadyCredited as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="credit_note_already_issued") from exc
+    except (FiscalProfileMissing, CaiRangeMissing) as exc:
+        # Both configuration gaps share one code (mirrors
+        # `issue_invoice_route`'s `invoicing_not_configured`): the web
+        # never needs to tell a missing profile apart from a missing
+        # `06` range. An existing-but-exhausted-or-expired range keeps
+        # its own direct code instead, per the `cai-ranges` spec.
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="invoicing_not_configured") from exc
+    except CaiRangeExpired as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="cai_range_expired") from exc
+    except CaiRangeExhausted as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="cai_range_exhausted") from exc
+    except IntegrityError as first_exc:
+        db.rollback()
+        # Mirrors `issue_invoice_route`'s retry-once dance: a credit note
+        # id reused against a *different* invoice races on the primary
+        # key with no shared lock serializing the two attempts (they
+        # lock different orders). The rollback above also undoes this
+        # attempt's allocated correlative, so the retry's replay check
+        # resolves it cleanly instead of burning a number.
+        if _violated_constraint(first_exc) != _CREDIT_NOTE_PK_CONSTRAINT:
+            raise
+        try:
+            credit_note, is_new = _attempt()
+        except InvalidCreditNoteReason as exc:
+            db.rollback()
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid_credit_note_reason"
+            ) from exc
+        except FiscalInvoiceNotFound as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="invoice_not_found") from exc
+        except CreditNoteIdConflict as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_409_CONFLICT, detail="credit_note_id_conflict") from exc
+        except InvoiceAlreadyCredited as exc:
+            db.rollback()
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, detail="credit_note_already_issued"
+            ) from exc
+        except (FiscalProfileMissing, CaiRangeMissing) as exc:
+            db.rollback()
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, detail="invoicing_not_configured"
+            ) from exc
+        except CaiRangeExpired as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_409_CONFLICT, detail="cai_range_expired") from exc
+        except CaiRangeExhausted as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_409_CONFLICT, detail="cai_range_exhausted") from exc
+        except IntegrityError as exc:
+            db.rollback()
+            if _violated_constraint(exc) == _CREDIT_NOTE_PK_CONSTRAINT:
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT, detail="credit_note_id_conflict"
+                ) from exc
+            raise
+
+    if not is_new:
+        response.status_code = status.HTTP_200_OK
+    return FiscalCreditNoteOut.from_domain(credit_note)
+
+
+@invoicing_router.get("/credit-notes/{credit_note_id}", response_model=FiscalCreditNoteOut)
+def get_credit_note_route(
+    credit_note_id: uuid.UUID,
+    workshop_id: uuid.UUID = Depends(get_current_workshop_id),
+    db: Session = Depends(get_db),
+) -> FiscalCreditNoteOut:
+    credit_note_repo = SqlAlchemyCreditNoteRepository(db)
+    try:
+        credit_note = get_credit_note(
+            workshop_id=workshop_id,
+            credit_note_id=credit_note_id,
+            credit_note_repo=credit_note_repo,
+        )
+    except CreditNoteNotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="credit_note_not_found") from exc
+    return FiscalCreditNoteOut.from_domain(credit_note)

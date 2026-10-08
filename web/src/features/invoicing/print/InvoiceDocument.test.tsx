@@ -31,6 +31,7 @@ const INVOICE: FiscalInvoiceOut = {
   total_cents: 50000,
   total_in_words: "QUINIENTOS LEMPIRAS CON 00/100",
   credited_at: null,
+  credit_note: null,
   lines: [
     {
       id: "line-1",

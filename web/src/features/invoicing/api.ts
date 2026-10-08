@@ -27,12 +27,27 @@ export interface FiscalProfileSavePayload {
   emission_point_code: string;
 }
 
+/** AD-18 (phase B): the latest usable range's fecha límite is within `EXPIRY_WARNING_DAYS` of today. Mirrors the API's `RangeExpiresSoonWarningOut`. */
+export interface RangeExpiresSoonWarningOut {
+  code: "range_expires_soon";
+  days_left: number;
+}
+
+/** AD-18 (phase B): the usable ranges' remaining numbers, summed, are at or below `LOW_NUMBERS_THRESHOLD`. Mirrors the API's `RangeLowNumbersWarningOut`. */
+export interface RangeLowNumbersWarningOut {
+  code: "range_low_numbers";
+  remaining: number;
+}
+
+export type RangeWarningOut = RangeExpiresSoonWarningOut | RangeLowNumbersWarningOut;
+
 export interface DocumentReadinessOut {
   document_type: string;
   ready: boolean;
   blocked_reason: string | null;
   active_range_id: string | null;
   next_number: string | null;
+  warnings: RangeWarningOut[];
 }
 
 export type CaiRangeState = "active" | "standby" | "exhausted" | "expired";
@@ -92,6 +107,13 @@ export interface FiscalInvoiceLineOut {
   line_total_cents: number;
 }
 
+/** A Factura's credit note reference, gained once it has been fully credited (phase B, AD-13). Mirrors the API's `CreditNoteRefOut`. */
+export interface CreditNoteRefOut {
+  id: string;
+  number: string;
+  issue_date: string;
+}
+
 /** The full Factura snapshot (AD-10): every field was copied at issuance and never recomputed on read. Mirrors the API's `FiscalInvoiceOut`. */
 export interface FiscalInvoiceOut {
   id: string;
@@ -120,6 +142,7 @@ export interface FiscalInvoiceOut {
   total_cents: number;
   total_in_words: string;
   credited_at: string | null;
+  credit_note: CreditNoteRefOut | null;
   lines: FiscalInvoiceLineOut[];
   created_at: string;
 }
@@ -131,6 +154,7 @@ export interface FiscalInvoiceSummaryOut {
   issued_at: string;
   total_cents: number;
   credited_at: string | null;
+  credit_note: CreditNoteRefOut | null;
 }
 
 export interface IssueInvoicePayload {
@@ -138,6 +162,43 @@ export interface IssueInvoicePayload {
   order_id: string;
   buyer_name?: string;
   buyer_rtn?: string;
+}
+
+/** The full Nota de Crédito snapshot (AD-13): mirrors the API's `FiscalCreditNoteOut`. */
+export interface FiscalCreditNoteOut {
+  id: string;
+  invoice_id: string;
+  order_id: string;
+  number: string;
+  issued_at: string;
+  issue_date: string;
+  issuer_rtn: string;
+  issuer_legal_name: string;
+  issuer_trade_name: string;
+  issuer_address: string;
+  issuer_phone: string;
+  issuer_email: string;
+  cai: string;
+  range_first_number: string;
+  range_last_number: string;
+  issue_deadline: string;
+  buyer_name: string | null;
+  buyer_rtn: string | null;
+  original_cai: string;
+  original_number: string;
+  original_issue_date: string;
+  reason: string;
+  taxable_15_cents: number;
+  isv_15_cents: number;
+  total_cents: number;
+  total_in_words: string;
+  created_at: string;
+}
+
+export interface IssueCreditNotePayload {
+  id: string;
+  invoice_id: string;
+  reason: string;
 }
 
 export const invoicingApi = {
@@ -153,4 +214,7 @@ export const invoicingApi = {
   getInvoice: (id: string) => http.get<FiscalInvoiceOut>(`/api/invoicing/invoices/${id}`),
   listOrderInvoices: (orderId: string) =>
     http.get<FiscalInvoiceSummaryOut[]>(`/api/invoicing/invoices?order_id=${orderId}`),
+  issueCreditNote: (payload: IssueCreditNotePayload) =>
+    http.post<FiscalCreditNoteOut>("/api/invoicing/credit-notes", payload),
+  getCreditNote: (id: string) => http.get<FiscalCreditNoteOut>(`/api/invoicing/credit-notes/${id}`),
 };

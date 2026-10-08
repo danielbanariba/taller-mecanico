@@ -230,3 +230,26 @@ def test_settings_with_a_complete_profile_and_an_active_range_is_ready(
     assert documents[0]["ready"] is True
     assert documents[0]["blocked_reason"] is None
     assert documents[0]["next_number"] == "001-001-01-00000001"
+    assert documents[0]["warnings"] == []
+
+
+def test_settings_surfaces_a_range_expires_soon_warning(
+    authenticated_client: TestClient, db_session: Session
+):
+    """Defect it catches: `range_warnings` (AD-18) is a correct pure
+    function but never reaches `GET /invoicing/settings`'s response,
+    so the fiscal settings screen has nothing to render a warning
+    from.
+    """
+    _save_profile(authenticated_client)
+    me = authenticated_client.get("/api/auth/me").json()
+    _insert_cai_range(
+        db_session,
+        workshop_id=me["workshop"]["id"],
+        created_by=me["user"]["id"],
+        issue_deadline=date.today() + timedelta(days=60),
+    )
+
+    response = authenticated_client.get("/api/invoicing/settings")
+    documents = response.json()["documents"]
+    assert documents[0]["warnings"] == [{"code": "range_expires_soon", "days_left": 60}]

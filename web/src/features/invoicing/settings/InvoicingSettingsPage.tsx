@@ -8,6 +8,7 @@ import { Spinner } from "../../../shared/ui/Spinner";
 import { getInvoicingErrorMessage, invoicingCopy } from "../copy";
 import { useInvoicingSettings } from "../hooks";
 import { CaiRangeList } from "./CaiRangeList";
+import { RangeWarnings } from "./RangeWarnings";
 import { ReadinessSummary } from "./ReadinessSummary";
 import { SarNotice } from "./SarNotice";
 
@@ -42,6 +43,7 @@ export function InvoicingSettingsPage() {
       ) : (
         <>
           <ReadinessSummary documents={settings.data.documents} />
+          <RangeWarnings documents={settings.data.documents} />
 
           <section className="flex flex-col gap-3">
             <h2 className="text-lg font-bold text-brand-primary">{invoicingCopy.settings.profileTitle}</h2>

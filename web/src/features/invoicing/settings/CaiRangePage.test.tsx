@@ -20,7 +20,14 @@ function emptySettings(): InvoicingSettingsOut {
     codes_locked: false,
     ranges: [],
     documents: [
-      { document_type: "01", ready: false, blocked_reason: "fiscal_profile_missing", active_range_id: null, next_number: null },
+      {
+        document_type: "01",
+        ready: false,
+        blocked_reason: "fiscal_profile_missing",
+        active_range_id: null,
+        next_number: null,
+        warnings: [],
+      },
     ],
   };
 }

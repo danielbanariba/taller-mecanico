@@ -409,6 +409,50 @@ case "$status" in
   *) fail "issuing the seeded Factura returned HTTP $status" ;;
 esac
 
+# --- Phase B (sar-invoicing): a Nota de Credito (06) range, a credit note
+# against the Factura above (wrong buyer data), and a re-issued Factura on
+# the same order naming Maria Hernandez and her RTN -- the full correction
+# flow a tester can walk end to end. Every id and payload below is
+# deterministic and byte-identical on every rerun, like every other seeded
+# row (AD-6/AD-13's replay check), so a second run creates nothing new.
+credit_note_range_id="$(uuidgen --sha1 --namespace @url --name "$id_namespace/invoicing/range/credit-note-06")"
+credit_note_range_json="$(jq -n --arg id "$credit_note_range_id" --arg dl "$range_deadline" '{
+  id: $id, document_type: "06", cai: "060606-060606-060606-060606-DEMO06-06",
+  range_start: 1, range_end: 100, issue_deadline: $dl
+}')"
+status="$(request POST /api/invoicing/cai-ranges "$credit_note_range_json")"
+case "$status" in
+  201) credit_note_range_result="created" ;;
+  200) credit_note_range_result="already present" ;;
+  422)
+    fail "registering the seeded Nota de Credito range returned HTTP 422 -- the fixed issue_deadline ($range_deadline) has probably passed; see README.md's yearly re-registration note"
+    ;;
+  *) fail "registering the seeded Nota de Credito range returned HTTP $status" ;;
+esac
+
+credit_note_id="$(uuidgen --sha1 --namespace @url --name "$id_namespace/invoicing/credit-note/corolla-alignment")"
+credit_note_json="$(jq -n --arg id "$credit_note_id" --arg invoice_id "$invoice_id" '{
+  id: $id, invoice_id: $invoice_id, reason: "Datos del comprador incorrectos"
+}')"
+status="$(request POST /api/invoicing/credit-notes "$credit_note_json")"
+case "$status" in
+  201) credit_note_result="issued" ;;
+  200) credit_note_result="already present" ;;
+  *) fail "issuing the seeded credit note returned HTTP $status" ;;
+esac
+
+reissued_invoice_id="$(uuidgen --sha1 --namespace @url --name "$id_namespace/invoicing/invoice/corolla-alignment-reissue")"
+reissued_invoice_json="$(jq -n --arg id "$reissued_invoice_id" --arg oid "${order_ids[corolla-alignment]}" \
+  --arg buyer_name "María Hernández" --arg buyer_rtn "99999999990001" '{
+  id: $id, order_id: $oid, buyer_name: $buyer_name, buyer_rtn: $buyer_rtn
+}')"
+status="$(request POST /api/invoicing/invoices "$reissued_invoice_json")"
+case "$status" in
+  201) reissued_invoice_result="issued" ;;
+  200) reissued_invoice_result="already present" ;;
+  *) fail "issuing the re-issued Factura returned HTTP $status" ;;
+esac
+
 status="$(request GET /api/customers)"
 [[ "$status" == "200" ]] || fail "listing customers returned HTTP $status"
 customers_total="$(jq 'length' "$body_file")"
@@ -431,3 +475,6 @@ echo "Sample payments: $payments_created created, $payments_present already pres
 echo "Fiscal profile (Taller Demostración S. de R.L.): $profile_result"
 echo "Sample CAI range (Factura 01, 1-500, deadline $range_deadline): $range_result"
 echo "Sample Factura on the Corolla alignment order (001-001-01-00000001): $invoice_result"
+echo "Sample CAI range (Nota de Crédito 06, 1-100, deadline $range_deadline): $credit_note_range_result"
+echo "Sample credit note against the Corolla alignment Factura: $credit_note_result"
+echo "Re-issued Factura on the Corolla alignment order (María Hernández, RTN 99999999990001): $reissued_invoice_result"

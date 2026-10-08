@@ -1,9 +1,7 @@
 """Tests for CAI range registration and correction (`cai-ranges` spec, AD-4).
 
-Identical bounds on a different document type being allowed is already
-covered at the domain level by `test_range_selection.py`'s `overlaps()`
-tests: in Phase A the API itself rejects `06` before a range of that type
-could ever be registered to exercise that scenario end to end.
+Identical bounds on a different document type being allowed is covered
+at the domain level by `test_range_selection.py`'s `overlaps()` tests.
 """
 
 import uuid
@@ -74,14 +72,16 @@ def test_registering_a_range_with_no_profile_is_rejected(authenticated_client: T
     assert response.json()["detail"] == "fiscal_profile_missing"
 
 
-def test_a_credit_note_range_is_rejected_before_phase_b(authenticated_client: TestClient):
-    """Defect it catches: the database check also rejects `01`, or `06`
-    is silently accepted ahead of Phase B.
+def test_a_credit_note_range_is_accepted_in_phase_b(authenticated_client: TestClient):
+    """Defect it catches: `create_range` still carries phase A's
+    `unsupported_document_type` gate, blocking the `06` ranges phase B's
+    credit notes need.
     """
     _save_profile(authenticated_client)
     response = _create_range(authenticated_client, document_type="06")
-    assert response.status_code == 422
-    assert response.json()["detail"] == "unsupported_document_type"
+    assert response.status_code == 201
+    body = response.json()
+    assert body["document_type"] == "06"
 
 
 def test_replaying_an_identical_registration_is_a_noop(authenticated_client: TestClient):
@@ -147,6 +147,26 @@ def test_editing_an_untouched_range_succeeds(authenticated_client: TestClient):
     )
     assert response.status_code == 200
     assert response.json()["issue_deadline"] == new_deadline
+
+
+def test_editing_an_untouched_credit_note_range_succeeds(authenticated_client: TestClient):
+    """Defect it catches: `update_range` still carries phase A's
+    `unsupported_document_type` gate (`fields.get("document_type",
+    cai_range.document_type)` falls back to the stored `06` and the
+    unconditional check fires anyway), so a PATCH that never even
+    touches `document_type` is rejected for every `06` range -- the
+    only correction path there is for one, since there is no DELETE.
+    """
+    _save_profile(authenticated_client)
+    created = _create_range(authenticated_client, document_type="06").json()
+
+    new_deadline = (date.today() + timedelta(days=200)).isoformat()
+    response = authenticated_client.patch(
+        f"/api/invoicing/cai-ranges/{created['id']}", json={"issue_deadline": new_deadline}
+    )
+    assert response.status_code == 200
+    assert response.json()["issue_deadline"] == new_deadline
+    assert response.json()["document_type"] == "06"
 
 
 def test_editing_a_range_that_has_issued_a_document_is_rejected(
@@ -246,3 +266,24 @@ def test_a_registered_range_appears_in_settings_with_its_state(authenticated_cli
     assert len(ranges) == 1
     assert ranges[0]["id"] == created["id"]
     assert ranges[0]["state"] == "active"
+
+
+def test_a_factura_range_and_a_credit_note_range_are_both_active_in_settings(
+    authenticated_client: TestClient,
+):
+    """Defect it catches: settings deriving range states across every
+    document type at once, so a usable `01` range and a usable `06`
+    range compete for one `active` slot and one of them is reported as
+    standby, disagreeing with the range's own registration response.
+    """
+    _save_profile(authenticated_client)
+    invoice_range = _create_range(authenticated_client).json()
+    credit_note_range = _create_range(
+        authenticated_client,
+        document_type="06",
+        issue_deadline=(date.today() + timedelta(days=200)).isoformat(),
+    ).json()
+
+    response = authenticated_client.get("/api/invoicing/settings")
+    states = {r["id"]: r["state"] for r in response.json()["ranges"]}
+    assert states == {invoice_range["id"]: "active", credit_note_range["id"]: "active"}

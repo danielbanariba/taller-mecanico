@@ -1,3 +1,5 @@
+import type { RangeWarningOut } from "./api";
+
 /**
  * All Spanish user-facing strings for the invoicing feature (the fiscal
  * settings screen, the profile and CAI range forms, and later the
@@ -83,6 +85,7 @@ export const invoicingCopy = {
     profileWriteDisabled: "Conéctese a internet para guardar los datos fiscales.",
     rangeWriteDisabled: "Conéctese a internet para registrar o editar un rango de CAI.",
     issueInvoiceDisabled: "Conéctese a internet para emitir una factura.",
+    issueCreditNoteDisabled: "Conéctese a internet para emitir una nota de crédito.",
   },
   issue: {
     issueAction: "Emitir factura",
@@ -98,18 +101,33 @@ export const invoicingCopy = {
     submit: "Emitir factura",
     submitPending: "Emitiendo...",
   },
+  creditNote: {
+    issueAction: "Emitir nota de crédito",
+    viewAction: (number: string) => `Ver nota de crédito ${number}`,
+    dialogTitle: "Emitir nota de crédito",
+    reasonLabel: "Motivo",
+    reasonRequired: "El motivo es obligatorio.",
+    reasonTooLong: "El motivo puede tener hasta 300 caracteres.",
+    cancel: "Cancelar",
+    submit: "Emitir nota de crédito",
+    submitPending: "Emitiendo...",
+  },
   documents: {
     detailTitle: (number: string) => `Factura ${number}`,
+    creditNoteDetailTitle: (number: string) => `Nota de crédito ${number}`,
     numberLabel: "Número",
     issuedAtLabel: "Fecha de emisión",
     buyerLabel: "Cliente",
     totalLabel: "Total",
+    reasonLabel: "Motivo",
+    originalInvoiceLabel: "Factura original",
     print58mm: "Imprimir 58 mm",
     printLetter: "Imprimir carta",
     backToOrder: "Volver a la orden",
   },
   print: {
     documentName: "FACTURA",
+    creditNoteDocumentName: "NOTA DE CRÉDITO",
     originalLabel: "ORIGINAL: CLIENTE",
     issuerCopyLabel: "COPIA: EMISOR",
     finalConsumer: "CONSUMIDOR FINAL",
@@ -133,6 +151,12 @@ export const invoicingCopy = {
     cutHereLabel: "- - - - - cortar aquí - - - - -",
     onlyOriginalToggle: "Solo original",
     printAction: "Imprimir",
+    originalReferenceLabel: "Referencia a la factura original",
+    originalNumberLabel: "Número de la factura original",
+    originalDateLabel: "Fecha de la factura original",
+    reasonLabel: "Motivo",
+    signatureLabel: "Firma",
+    identificationLabel: "Identidad",
   },
 };
 
@@ -201,6 +225,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   invoice_amount_zero: "No se puede facturar una orden con un total de cero.",
   invoice_amount_too_large: "El monto de la orden es demasiado alto para facturar.",
   fiscal_invoice_not_found: "No se encontró la factura.",
+  invalid_credit_note_reason: "El motivo es obligatorio y puede tener hasta 300 caracteres.",
+  invoice_not_found: "No se encontró la factura.",
+  credit_note_id_conflict: "No se pudo emitir la nota de crédito. Intente de nuevo.",
+  credit_note_already_issued: "Esta factura ya tiene una nota de crédito.",
+  credit_note_not_found: "No se encontró la nota de crédito.",
   work_order_not_found: "No se encontró la orden.",
   not_authenticated: "Debe iniciar sesión para continuar.",
   network_error: "No se pudo conectar. Verifique su conexión e intente de nuevo.",
@@ -210,4 +239,18 @@ const GENERIC_ERROR_MESSAGE = "Ocurrió un error. Intente de nuevo.";
 
 export function getInvoicingErrorMessage(code: string): string {
   return ERROR_MESSAGES[code] ?? GENERIC_ERROR_MESSAGE;
+}
+
+/**
+ * Maps one of `GET /invoicing/settings`'s per-document-type `warnings`
+ * (AD-18) to its Spanish text: 60 days before a range's fecha límite, or
+ * once its remaining numbers fall at or below the design-fixed threshold.
+ * Shown on the settings page (`RangeWarnings`) and as one line in the
+ * issue and credit note dialogs -- a warning never blocks submission.
+ */
+export function getRangeWarningMessage(warning: RangeWarningOut): string {
+  if (warning.code === "range_expires_soon") {
+    return `El rango de CAI vence en ${warning.days_left} día(s). Registre uno nuevo.`;
+  }
+  return `Quedan ${warning.remaining} números del rango de CAI. Registre uno nuevo.`;
 }

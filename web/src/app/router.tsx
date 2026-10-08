@@ -91,6 +91,21 @@ export const router = createBrowserRouter([
           Component: (await import("../features/invoicing/print/InvoiceLetterPage")).InvoiceLetterPage,
         }),
       },
+      // The Nota de Crédito's own print routes (`fiscal-document-print`
+      // spec, Phase B requirement), siblings of the Factura's print
+      // routes above for the same reason (AD-16).
+      {
+        path: "/ordenes/:orderId/nota-credito/:creditNoteId/58mm",
+        lazy: async () => ({
+          Component: (await import("../features/invoicing/print/CreditNote58Page")).CreditNote58Page,
+        }),
+      },
+      {
+        path: "/ordenes/:orderId/nota-credito/:creditNoteId/carta",
+        lazy: async () => ({
+          Component: (await import("../features/invoicing/print/CreditNoteLetterPage")).CreditNoteLetterPage,
+        }),
+      },
     ],
   },
 ]);
