@@ -89,6 +89,8 @@ No CRITICAL findings. The PA.S13 review-fixes slice's own critical finding (the 
 **Change**: `sar-invoicing` — Phase B (PB.S1–PB.S7 + PB.S8 review-fixes slice)
 **Store**: openspec · **Branch**: `feat/sar-invoicing-phase-b` (from `main`) · **Scope**: phase B only, per request; phase A requirements re-checked as still passing
 
+Sections 1–5 record the verify run at `1feefce`. Section 6 records what changed after it; two tests named below were removed in PB.S11 and are marked where they appear.
+
 ## 1. Executed checks (all re-run live, not read from prior records)
 
 | Command | Result |
@@ -96,7 +98,7 @@ No CRITICAL findings. The PA.S13 review-fixes slice's own critical finding (the 
 | `docker compose up -d db` | container running |
 | `cd api && uv run ruff check .` | All checks passed! |
 | `cd api && uv run ruff format --check .` | 145 files already formatted |
-| `cd api && uv run pytest -q` | 400 passed |
+| `cd api && uv run pytest -q` | 400 passed (399 after PB.S11) |
 | `cd web && npm run lint` | clean, exit 0 |
 | `cd web && npm run typecheck` | clean, exit 0 |
 | `cd web && npm test -- --run` | 62 test files, 261 passed |
@@ -118,7 +120,7 @@ No other unchecked box exists in phase B. `git log --oneline main..feat/sar-invo
 
 Confirmed that `fiscal-invoices`, `fiscal-profile`, `work-orders`, `customers` carry **no Phase B deltas** — phase A fully, unaffected by this scope. Phase B touches exactly `credit-notes` (new) plus deltas on `cai-ranges`, `data-export`, `fiscal-document-print`.
 
-**`credit-notes` (new capability, 10 requirements):** every scenario has a near-literal test in `api/tests/invoicing/test_credit_notes_api.py` (13 tests) plus `test_credit_note_concurrency.py` (2 tests):
+**`credit-notes` (new capability, 10 requirements):** every scenario has a near-literal test in `api/tests/invoicing/test_credit_notes_api.py` (13 tests) plus `test_credit_note_concurrency.py` (2 tests at verify time, 1 after PB.S11):
 
 | Scenario | Test |
 |---|---|
@@ -134,7 +136,7 @@ Confirmed that `fiscal-invoices`, `fiscal-profile`, `work-orders`, `customers` c
 | Editing customer leaves reprint unchanged | `test_editing_the_customer_after_a_credit_note_leaves_it_unchanged_on_reprint` |
 | Another workshop's credit note is invisible | `test_another_workshops_credit_note_is_invisible` |
 | (implicit) bogus invoice id | `test_a_bogus_invoice_id_is_not_found` |
-| (implicit) concurrency / row locking | `test_two_concurrent_credit_notes_against_one_factura_credit_it_exactly_once` + PB.S8's `test_the_invoice_row_lock_alone_serializes_two_racers_checking_credited_at` |
+| (implicit) concurrency / row locking | ~~`test_two_concurrent_credit_notes_against_one_factura_credit_it_exactly_once`~~ (removed in PB.S11; the sequential `test_a_second_credit_note_against_the_same_factura_is_rejected` covers the `credited_at` check) + PB.S8's `test_the_invoice_row_lock_alone_serializes_two_racers_checking_credited_at` |
 
 Web-side offline requirement, read directly: `CreditNoteDialog.tsx`'s `handleSubmit` gates on `isOffline || trimmedReason.length === 0` before any request, the submit button carries `disabled={isOffline || ...}`, and an `Alert` shows `invoicingCopy.offline.issueCreditNoteDisabled` — covered by `CreditNoteDialog.test.tsx` (4 tests). "A previously fetched credit note renders offline" → `CreditNoteDetailPage.test.tsx`'s offline test (read directly: seeds `QueryClient` with `creditNoteQueryKey`, serves network errors, asserts the heading still renders).
 
@@ -146,7 +148,7 @@ Order-detail document list / re-issuance affordance (AD-15, exercising `credit-n
 - UI rendering → `RangeWarnings.test.tsx` (3 tests, read directly: exact Spanish text assertions) plus `IssueInvoiceDialog.test.tsx`/`CreditNoteDialog.test.tsx` each asserting the warning line appears without blocking submit.
 - PB.S8's fix regression test, read directly: `test_editing_an_untouched_credit_note_range_succeeds` — registers a `06` range, PATCHes only `issue_deadline`, asserts 200 (previously 422).
 
-**`data-export` delta (Phase B):** every scenario has a literal test in `api/tests/export/test_export_api.py` (read directly, all present and passing): `test_the_export_contains_exactly_one_csv_per_entity` (extended to 10 files), `test_a_workshop_that_never_invoiced_anything_still_gets_empty_fiscal_csvs`, `test_invoice_lines_reflect_the_snapshot_not_the_orders_current_lines`, `test_customers_csv_carries_billing_name_and_rtn_empty_when_absent`, plus `test_a_credit_notes_csv_row_references_its_invoice`, `test_fiscal_invoices_csv_lists_only_the_current_workshops_documents` (tenant isolation), `test_a_credit_note_reason_starting_with_equals_is_escaped` (formula-injection guard).
+**`data-export` delta (Phase B):** every scenario has a literal test in `api/tests/export/test_export_api.py` (read directly, all present and passing): `test_the_export_contains_exactly_one_csv_per_entity` (extended to 10 files), ~~`test_a_workshop_that_never_invoiced_anything_still_gets_empty_fiscal_csvs`~~ (removed in PB.S11; see section 6), `test_invoice_lines_reflect_the_snapshot_not_the_orders_current_lines`, `test_customers_csv_carries_billing_name_and_rtn_empty_when_absent`, plus `test_a_credit_notes_csv_row_references_its_invoice`, `test_fiscal_invoices_csv_lists_only_the_current_workshops_documents` (tenant isolation), `test_a_credit_note_reason_starting_with_equals_is_escaped` (formula-injection guard).
 
 **`fiscal-document-print` delta ("Credit Note Layouts Carry Every Art. 25–26 Mandatory Field"):** read `CreditNoteDocument.tsx`, `CreditNote58Page.tsx`, `CreditNoteLetterPage.tsx` end to end. Every field the design's "Printed field map" Nota de Crédito column and the research note's Art. 25–26 list name is present on both layouts: issuer fields, "NOTA DE CRÉDITO" name, its own CAI/rango/fecha límite, number, issuance date/time (`America/Tegucigalpa`), buyer name/RTN or "CONSUMIDOR FINAL", the original Factura's CAI/number/date reference, the reason, gravado 15%/ISV 15%/total in numbers and words (correctly omitting exento/exonerado/discount/lines per the field map's own "—" cells), blank "Firma"/"Identidad" lines, both copy-destination legends, and the demo watermark. `CreditNoteDocument.test.tsx` (3 tests) plus `CreditNote58Page.test.tsx`/`CreditNoteLetterPage.test.tsx` (3 tests) cover this directly. **No gap found.**
 
