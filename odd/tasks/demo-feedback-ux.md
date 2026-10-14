@@ -51,7 +51,7 @@ Each task is delegated to a single writer inside the workflow, followed by an in
   - Acceptance: the active tab is distinguishable without relying on color alone.
 - [x] **T3** Sync status banner without layout shift: render it as a fixed overlay (toast-like) that never moves page content, and show "Sincronizando..." only when a flush is still running after a short delay (about 600 ms), so a fast sync shows nothing.
   - Acceptance: a flush that finishes inside the delay never shows the banner, a longer one does, and the offline and pending messages still appear.
-- [ ] **T4** Shared `Dialog` as a bottom sheet on small screens (anchored to the bottom, full width, rounded top) and a centered modal from `sm` up, keeping its accessibility behavior (focus, Escape, labelled title).
+- [x] **T4** Shared `Dialog` as a bottom sheet on small screens (anchored to the bottom, full width, rounded top) and a centered modal from `sm` up, keeping its accessibility behavior (focus, Escape, labelled title).
   - Acceptance: every existing dialog test still passes.
 - [ ] **T5** A shared work-order status badge (a colored chip per status: draft, approved, in_progress, completed, delivered, cancelled), used wherever an order's status is shown.
   - Acceptance: every status renders its Spanish label inside the badge in the list and the detail screens.
@@ -87,6 +87,7 @@ Each task is delegated to a single writer inside the workflow, followed by an in
 | T2 | delegated (workflow writer) | (this commit) | lint, typecheck and 63 files / 267 tests pass (2 new); RED confirmed first (`BottomNav > renders a decorative icon above each tab...` failed on `expected null not to be null` before the icon markup existed) |
 | T3 | delegated (workflow writer) | (this commit) | lint, typecheck and 65 files / 273 tests pass (6 new: `useDelayedFlag.test.ts` x3, `OfflineStatusBanner.test.tsx` x3); RED confirmed first (`OfflineStatusBanner > never shows the pending count or syncing message for a flush that clears before the delay` failed, finding the `Sincronizando...` span, before the delay gate existed) |
 | T3 | bounded correction (workflow writer) | (this commit) | verifier major: `SyncStatusBanner.tsx` was outside T3's allowed edit surface; reverted it byte-for-byte to its pre-T3 state and moved the toast look (`pointer-events-auto`, `shadow-md`, `w-full max-w-sm`, `empty:hidden` for the no-content case) onto a wrapper `div` inside `OfflineStatusBanner.tsx` instead, which owns the full surface; pure styling, no new test per the Test Value Gate exception; lint, typecheck and 65 files / 273 tests pass unchanged |
+| T4 | delegated (workflow writer) | (this commit) | lint, typecheck and 65 files / 273 tests pass unchanged (no new tests: pure layout change, class-echo exception per Test Value Gate); `Dialog.tsx` panel is `items-end`/full-width/`rounded-t-2xl`/safe-area `pb-[max(...)]`/`max-h-[85vh] overflow-y-auto` below `sm`, and unchanged `items-center`/`max-w-sm`/`rounded-2xl` from `sm` up; all 3 `Dialog.test.tsx` cases and every dialog-using test file pass |
 
 ## Next step
 
