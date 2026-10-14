@@ -113,6 +113,28 @@ describe("CustomerDetailPage", () => {
     expect(screen.getByText(/08011990123456/)).toBeInTheDocument();
   });
 
+  it("shows an archived indicator and hides edit/add-vehicle actions for an archived customer", async () => {
+    // Defect this catches: a direct link to an archived customer's detail
+    // page rendering exactly like an active one, letting "Editar cliente"
+    // silently rename the archived record and "Agregar vehículo" fail
+    // with a generic error the mechanic never sees explained (both
+    // rejected by the API as `customer_archived`).
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION_RESPONSE)),
+      http.get("/api/customers/c1", () =>
+        HttpResponse.json({ ...CUSTOMER, archived_at: "2026-02-01T00:00:00Z" }),
+      ),
+      http.get("/api/customers/c1/vehicles", () => HttpResponse.json([])),
+      http.get("/api/work-orders", () => HttpResponse.json([])),
+    );
+    renderCustomerDetailPage();
+
+    expect(await screen.findByText("Archivado")).toBeInTheDocument();
+    expect(screen.getByText(/este cliente está archivado/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Editar cliente" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Agregar vehículo" })).not.toBeInTheDocument();
+  });
+
   it("renders neither billing name nor RTN -- not a literal 'null' -- when the customer has neither", async () => {
     // Defect this catches: an absent optional field rendered as the
     // literal string "null" or "undefined" instead of not rendering at

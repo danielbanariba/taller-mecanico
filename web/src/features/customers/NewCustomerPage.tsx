@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 
 import { ApiError } from "../../shared/api/http";
 import { useOnlineStatus } from "../../shared/offline/useOnlineStatus";
+import { LinkButton } from "../../shared/ui/LinkButton";
 import { CustomerForm, type CustomerFormValues } from "./CustomerForm";
 import { customersCopy, getCustomersErrorMessage } from "./copy";
 import { useCreateCustomer } from "./hooks";
@@ -36,6 +37,9 @@ export function NewCustomerPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold text-brand-primary">{customersCopy.create.title}</h1>
+      <LinkButton to="/clientes" variant="secondary">
+        {customersCopy.create.backToList}
+      </LinkButton>
       <CustomerForm
         mode="create"
         onSubmit={handleSubmit}

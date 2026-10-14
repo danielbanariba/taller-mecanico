@@ -101,6 +101,9 @@ export function EditVehiclePage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold text-brand-primary">{customersCopy.vehicles.edit.title}</h1>
+      <LinkButton to={`/clientes/${customerId}/vehiculos/${vehicleId}`} variant="secondary">
+        {customersCopy.vehicles.edit.backToVehicle}
+      </LinkButton>
       <VehicleForm
         mode="edit"
         initialValues={{

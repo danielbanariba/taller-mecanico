@@ -13,12 +13,29 @@ const SESSION = {
   workshop: { id: "w1", name: "Taller Ana" },
 };
 
+const ACTIVE_CUSTOMER = {
+  id: "c1",
+  full_name: "María Hernández",
+  phone: null,
+  phone_is_mobile: null,
+  notes: null,
+  billing_name: null,
+  rtn: null,
+  archived_at: null,
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+};
+
 // `NewVehiclePage` reads `useWorkshopId()` (for the create mutation's
-// query key), which fires a real `GET /api/auth/me` if nothing mocks it --
-// every test in this file needs the session, not just the ones that
-// assert on it.
+// query key), which fires a real `GET /api/auth/me` if nothing mocks it,
+// and now also fetches the owning customer (`useCustomer`) to check
+// whether it is archived -- every test in this file needs both, not just
+// the ones that assert on them.
 beforeEach(() => {
-  server.use(http.get("/api/auth/me", () => HttpResponse.json(SESSION)));
+  server.use(
+    http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
+    http.get("/api/customers/c1", () => HttpResponse.json(ACTIVE_CUSTOMER)),
+  );
 });
 
 function renderNewVehiclePage() {
@@ -71,7 +88,7 @@ describe("NewVehiclePage", () => {
     const user = userEvent.setup();
     renderNewVehiclePage();
 
-    await user.type(screen.getByLabelText(/marca/i), "Toyota");
+    await user.type(await screen.findByLabelText(/marca/i), "Toyota");
     await user.click(screen.getByRole("button", { name: /guardar vehículo/i }));
     await screen.findByText("Ocurrió un error. Intente de nuevo.");
     await user.click(screen.getByRole("button", { name: /guardar vehículo/i }));
@@ -90,7 +107,7 @@ describe("NewVehiclePage", () => {
     const user = userEvent.setup();
     renderNewVehiclePage();
 
-    await user.type(screen.getByLabelText(/marca/i), "Toyota");
+    await user.type(await screen.findByLabelText(/marca/i), "Toyota");
     await user.click(screen.getByRole("button", { name: /guardar vehículo/i }));
 
     expect(await screen.findByText("La placa no es válida.")).toBeInTheDocument();
@@ -104,7 +121,7 @@ describe("NewVehiclePage", () => {
     const user = userEvent.setup();
     renderNewVehiclePage();
 
-    await user.type(screen.getByLabelText(/marca/i), "Toyota");
+    await user.type(await screen.findByLabelText(/marca/i), "Toyota");
     await user.click(screen.getByRole("button", { name: /guardar vehículo/i }));
 
     expect(await screen.findByText("Ya existe un vehículo activo con esa placa.")).toBeInTheDocument();
@@ -133,11 +150,42 @@ describe("NewVehiclePage", () => {
     const user = userEvent.setup();
     renderNewVehiclePage();
 
-    await user.type(screen.getByLabelText(/marca/i), "Toyota");
+    await user.type(await screen.findByLabelText(/marca/i), "Toyota");
     expect(screen.getByText("Conéctese a internet para agregar vehículos.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /guardar vehículo/i })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: /guardar vehículo/i }));
     expect(apiWasCalled).toBe(false);
+  });
+
+  it("has a back link to the customer's own detail screen", async () => {
+    // Defect this catches: the normal (non-archived) render of this create
+    // screen had no way back except the bottom nav -- a QA sweep finding --
+    // stranding a mechanic who taps "Agregar vehículo" by mistake or changes
+    // their mind; a link whose `to` drifts from the customer actually being
+    // added to would send them to the wrong customer's detail screen.
+    renderNewVehiclePage();
+
+    expect(await screen.findByRole("link", { name: "Volver al cliente" })).toHaveAttribute(
+      "href",
+      "/clientes/c1",
+    );
+  });
+
+  it("shows the archived notice instead of the form when the owner is archived", async () => {
+    // Defect this catches: a direct link to an archived customer's
+    // "Agregar vehículo" rendering the create form anyway, which would
+    // only fail on submit with a 409 the mechanic never sees explained,
+    // instead of this screen showing the archived notice up front (the
+    // same `customer_archived` guard the API itself enforces).
+    server.use(
+      http.get("/api/customers/c1", () =>
+        HttpResponse.json({ ...ACTIVE_CUSTOMER, archived_at: "2026-02-01T00:00:00Z" }),
+      ),
+    );
+    renderNewVehiclePage();
+
+    expect(await screen.findByText(/archivado/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/marca/i)).not.toBeInTheDocument();
   });
 });

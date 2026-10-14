@@ -33,6 +33,7 @@ export const customersCopy = {
     title: "Agregar cliente",
     submit: "Guardar cliente",
     submitPending: "Guardando...",
+    backToList: "Volver a clientes",
   },
   edit: {
     title: "Editar cliente",
@@ -51,6 +52,13 @@ export const customersCopy = {
     editDisabled: "Conéctese a internet para editar clientes.",
     archiveDisabled: "Conéctese a internet para archivar clientes.",
   },
+  /**
+   * Shown wherever an archived customer would otherwise let the mechanic
+   * edit it or add a vehicle to it (detail, edit, and new-vehicle
+   * screens): editing an archived customer, and adding a vehicle to one,
+   * are both rejected by the API with `customer_archived`.
+   */
+  archivedNotice: "Este cliente está archivado. No se puede editar ni agregar vehículos nuevos.",
   detail: {
     backToList: "Volver a clientes",
     editCustomer: "Editar cliente",
@@ -59,6 +67,7 @@ export const customersCopy = {
     vehiclesTitle: "Vehículos",
     addVehicle: "Agregar vehículo",
     ordersTitle: "Órdenes",
+    archivedBadge: "Archivado",
   },
   vehicles: {
     form: {
@@ -86,12 +95,14 @@ export const customersCopy = {
       title: "Agregar vehículo",
       submit: "Guardar vehículo",
       submitPending: "Guardando...",
+      backToDetail: "Volver al cliente",
     },
     edit: {
       title: "Editar vehículo",
       submit: "Guardar cambios",
       submitPending: "Guardando...",
       backToDetail: "Volver al cliente",
+      backToVehicle: "Volver al vehículo",
       archiveAction: "Archivar vehículo",
       archiveConfirmTitle: "Archivar vehículo",
       archiveConfirmBody: "El vehículo se archivará y su placa quedará disponible para otro vehículo.",
@@ -125,6 +136,7 @@ export const customersCopy = {
 const ERROR_MESSAGES: Record<string, string> = {
   customer_id_conflict: "No se pudo guardar el cliente. Intente de nuevo.",
   customer_not_found: "No se encontró el cliente.",
+  customer_archived: "El cliente está archivado. No se pueden guardar cambios.",
   invalid_phone: "El teléfono no es válido. Use un número hondureño de 8 dígitos.",
   invalid_rtn: "El RTN no es válido. Debe tener 14 dígitos.",
   vehicle_id_conflict: "No se pudo guardar el vehículo. Intente de nuevo.",

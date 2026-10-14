@@ -10,7 +10,7 @@ Vehicles belong to exactly one customer within a workshop. A vehicle's plate is 
 
 ### Requirement: A Vehicle Belongs To Exactly One Customer
 
-The system MUST associate every vehicle with exactly one customer of the authenticated workshop at creation time.
+The system MUST associate every vehicle with exactly one customer of the authenticated workshop at creation time. A nonexistent or foreign customer id and an archived customer id MUST be distinguished: the former is rejected with HTTP 404 and `detail: "customer_not_found"`, the latter with HTTP 409 and `detail: "customer_archived"`, so the caller (and the web layer's error message) can tell "there is no such customer" apart from "that customer exists but is archived".
 
 #### Scenario: Creating a vehicle for an existing customer
 
@@ -29,7 +29,7 @@ The system MUST associate every vehicle with exactly one customer of the authent
 
 - GIVEN a customer that has been archived
 - WHEN a vehicle create request references that customer's id
-- THEN the response is HTTP 404 with `detail: "customer_not_found"`
+- THEN the response is HTTP 409 with `detail: "customer_archived"`
 - AND no vehicle is created
 
 ### Requirement: A Vehicle's Owning Customer Never Changes After Creation
