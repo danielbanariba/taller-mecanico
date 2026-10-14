@@ -29,6 +29,11 @@ export const appCopy = {
     message: "Ocurrió un error inesperado. Intente recargar la página.",
     reload: "Recargar",
   },
+  notFound: {
+    title: "Página no encontrada",
+    message: "La página que buscaba no existe o fue movida.",
+    backLink: "Volver al inventario",
+  },
 } as const;
 
 /**

@@ -101,3 +101,15 @@ The system MUST render the navigation shell and allow tab switching entirely fro
 - WHEN the user switches tabs
 - THEN the shell renders and the destination's cached content (if any) renders per that destination's own offline-read rules
 - AND switching tabs itself makes no network request
+
+### Requirement: An Unknown Route Shows A Spanish Not-Found Screen
+
+The system MUST render a Spanish "not found" screen, with a link back into the app, for any URL that matches no route in the protected tree — instead of falling through to react-router's own default error page.
+
+#### Scenario: An unknown URL shows a way back, inside the shell
+
+- GIVEN an authenticated user navigates to a URL that matches no route
+- WHEN the route renders
+- THEN a Spanish "Página no encontrada" screen renders inside the navigation shell, with the bottom nav and header still reachable
+- AND a link back to the Inventario screen is available
+- AND react-router's own default error page never renders

@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, Outlet } from "react-router";
+import { createBrowserRouter, Navigate, Outlet, type RouteObject } from "react-router";
 
 import { LoginPage } from "../features/auth/LoginPage";
 import { RegisterPage } from "../features/auth/RegisterPage";
@@ -12,9 +12,18 @@ import { invoicingShellRoutes } from "../features/invoicing/routes";
 import { workOrderRoutes } from "../features/workorders/routes";
 import { AppErrorBoundary } from "./AppErrorBoundary";
 import { AppShell } from "./AppShell";
+import { NotFoundPage } from "./NotFoundPage";
 import { RequireSession } from "./RequireSession";
 
-export const router = createBrowserRouter([
+/**
+ * Exported separately from `router` (not only passed inline to
+ * `createBrowserRouter`) so a test can build its own `createMemoryRouter`
+ * from the exact same route tree -- including the trailing catch-all below
+ * -- instead of asserting against `NotFoundPage` rendered in isolation,
+ * which stays green even if this route array's `path: "*"` entry is
+ * removed entirely.
+ */
+export const appRoutes: RouteObject[] = [
   { path: "/", element: <Navigate to="/inventario" replace /> },
   { path: "/login", element: <LoginPage /> },
   { path: "/registro", element: <RegisterPage /> },
@@ -58,6 +67,13 @@ export const router = createBrowserRouter([
             // regardless of declaration order.
             children: [...workOrderRoutes, ...invoicingShellRoutes],
           },
+          // Catch-all for any URL that matches nothing above: a static
+          // path always outranks this splat regardless of declaration
+          // order, so it only ever catches a genuinely unknown route.
+          // Nested here (not as a sibling of `RequireSession`'s own
+          // children) so a logged-in user sees it inside `AppShell`,
+          // with the bottom nav and header still reachable.
+          { path: "*", element: <NotFoundPage /> },
         ],
       },
       // Receipt routes render without `AppShell` (`design.md`'s AD-16),
@@ -110,4 +126,6 @@ export const router = createBrowserRouter([
       },
     ],
   },
-]);
+];
+
+export const router = createBrowserRouter(appRoutes);
