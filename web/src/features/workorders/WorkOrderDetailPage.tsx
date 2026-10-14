@@ -215,16 +215,19 @@ export function WorkOrderDetailPage() {
           <span>{formatCents(Math.abs(data.balance_cents))}</span>
         </p>
         <PaymentList orderId={orderId} payments={data.payments} />
-        {data.accepts_payments ? (
+        {data.accepts_payments && data.balance_cents > 0 ? (
           <PaymentForm
             key={paymentId}
             pending={recordPayment.isPending}
             errorMessage={paymentErrorMessage}
             offline={isOffline}
+            balanceCents={data.balance_cents}
             onSubmit={handleRecordPayment}
           />
         ) : (
-          <Alert variant="info">{workOrdersCopy.payments.notPayable}</Alert>
+          <Alert variant="info">
+            {data.accepts_payments ? workOrdersCopy.payments.paidInFull : workOrdersCopy.payments.notPayable}
+          </Alert>
         )}
       </section>
 

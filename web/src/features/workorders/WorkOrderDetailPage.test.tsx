@@ -1,16 +1,24 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
 
 import { sessionQueryKey } from "../auth/hooks";
+import { formatCents } from "../../shared/format/money";
 import { renderWithQueryClient } from "../../test/render";
 import { server } from "../../test/server";
 import { workOrderQueryKey } from "./hooks";
 import { WorkOrderDetailPage } from "./WorkOrderDetailPage";
 import type { PaymentOut, WorkOrderOut } from "./api";
+
+/** Builds the expected text for an amount with a plain space in place of
+ * `formatCents`'s non-breaking one (see `receipt/ReceiptBody.test.tsx`'s
+ * own `money()` helper for the same reason). */
+function money(cents: number): string {
+  return formatCents(cents).replace(/\u00a0/g, " ");
+}
 
 const SESSION = {
   user: { id: "u1", full_name: "Ana Pérez", phone: "99998888", role: "owner" },
@@ -304,6 +312,69 @@ describe("WorkOrderDetailPage", () => {
     await user.click(screen.getByRole("button", { name: "Registrar pago" }));
 
     expect(await screen.findByText("El monto supera el saldo pendiente.")).toBeInTheDocument();
+  });
+
+  it("shows the change and posts only the balance when a cash amount is larger than it", async () => {
+    // Defect this catches: a cash payment larger than the balance either
+    // gets rejected like every other method, or reaches the API with the
+    // full amount typed instead of only the balance the order still owes.
+    mockSessionAndOrder(PAYABLE_ORDER); // balance_cents: 30000
+    let capturedBody: Record<string, unknown> | undefined;
+    server.use(
+      http.post("/api/work-orders/order-1/payments", async ({ request }) => {
+        capturedBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...PAYABLE_ORDER, balance_cents: 0, paid_cents: 50000 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetailPage();
+
+    await user.type(await screen.findByLabelText("Monto del pago"), "500");
+
+    expect(screen.getByText(`Vuelto: ${money(20000)}`)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Registrar pago" }));
+
+    await waitFor(() => expect(capturedBody).toBeDefined());
+    expect(capturedBody?.amount_cents).toBe(30000);
+    expect(capturedBody?.method).toBe("cash");
+  });
+
+  it("blocks a card payment larger than the balance without sending a request", async () => {
+    // Defect this catches: a transfer/card/other payment larger than the
+    // balance reaching the API instead of being blocked client-side with
+    // the balance message, now that cash no longer rejects an
+    // over-balance amount the same way.
+    mockSessionAndOrder(PAYABLE_ORDER); // balance_cents: 30000
+    let paymentRequestWasSent = false;
+    server.use(
+      http.post("/api/work-orders/order-1/payments", () => {
+        paymentRequestWasSent = true;
+        return HttpResponse.json({ detail: "unexpected" }, { status: 500 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetailPage();
+
+    await user.click(await screen.findByRole("button", { name: "Tarjeta" }));
+    await user.type(screen.getByLabelText("Monto del pago"), "500");
+    await user.click(screen.getByRole("button", { name: "Registrar pago" }));
+
+    expect(screen.getByText("El monto supera el saldo pendiente.")).toBeInTheDocument();
+    expect(paymentRequestWasSent).toBe(false);
+  });
+
+  it("shows a paid-in-full note instead of the payment form once the balance reaches zero", async () => {
+    // Defect this catches: the payment form staying mounted and open for
+    // submission after the balance already reached zero, instead of
+    // being replaced by a note saying the order is fully paid.
+    mockSessionAndOrder({ ...PAYABLE_ORDER, balance_cents: 0 });
+    renderDetailPage();
+
+    await screen.findByRole("heading", { name: "Orden #42" });
+
+    expect(screen.queryByRole("button", { name: "Registrar pago" })).not.toBeInTheDocument();
+    expect(screen.getByText("Pagada en su totalidad.")).toBeInTheDocument();
   });
 
   it("maps a 409 work_order_not_payable to its own Spanish message, not the generic fallback", async () => {
