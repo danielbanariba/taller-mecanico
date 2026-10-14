@@ -120,6 +120,38 @@ function vehicleWithOwnerResponse() {
   };
 }
 
+function newCustomerResponse(id: string, fullName: string) {
+  return {
+    id,
+    full_name: fullName,
+    phone: null,
+    phone_is_mobile: null,
+    notes: null,
+    billing_name: null,
+    rtn: null,
+    archived_at: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  };
+}
+
+function newVehicleResponse(id: string, customerId: string, make: string) {
+  return {
+    id,
+    customer_id: customerId,
+    vehicle_type: "car",
+    make,
+    model: null,
+    year: null,
+    color: null,
+    plate: null,
+    notes: null,
+    archived_at: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  };
+}
+
 async function pickCustomerAndVehicle(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByText("María Hernández"));
   await user.click(await screen.findByText("Toyota Corolla"));
@@ -214,6 +246,102 @@ describe("NewWorkOrderPage", () => {
 
     await user.click(screen.getByRole("button", { name: /crear orden/i }));
     expect(await screen.findByText("Detalle de orden")).toBeInTheDocument();
+  });
+
+  it("creates a new customer and a new vehicle inline, then reaches confirm", async () => {
+    // Defect this catches: without an inline create path, a walk-in
+    // customer (or a customer's first vehicle) forces the mechanic to
+    // leave /ordenes/nueva for the Clientes screens and lose the order in
+    // progress; this exercises the real create POSTs and the step
+    // transitions a broken inline flow would get wrong (staying on the
+    // same step, selecting nothing, or leaving a new customer's empty
+    // vehicle list with no way to add one).
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
+      http.get("/api/customers", () => HttpResponse.json([])),
+      http.post("/api/customers", async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(newCustomerResponse(body.id as string, body.full_name as string), {
+          status: 201,
+        });
+      }),
+      http.get("/api/customers/:customerId/vehicles", () => HttpResponse.json([])),
+      http.post("/api/vehicles", async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(
+          newVehicleResponse(body.id as string, body.customer_id as string, body.make as string),
+          { status: 201 },
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderNewWorkOrderPage();
+
+    await user.click(await screen.findByRole("button", { name: /nuevo cliente/i }));
+    await user.type(screen.getByLabelText(/nombre completo/i), "Carlos Reyes");
+    await user.click(screen.getByRole("button", { name: /guardar cliente/i }));
+
+    expect(await screen.findByText("Carlos Reyes")).toBeInTheDocument();
+    expect(await screen.findByText("Todavía no hay vehículos")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /nuevo vehículo/i }));
+    await user.type(screen.getByLabelText(/marca/i), "Honda");
+    await user.click(screen.getByRole("button", { name: /guardar vehículo/i }));
+
+    expect(await screen.findByRole("button", { name: /crear orden/i })).toBeInTheDocument();
+    expect(screen.getByText("Carlos Reyes")).toBeInTheDocument();
+    expect(screen.getByText("Honda")).toBeInTheDocument();
+  });
+
+  it("generates a fresh client id for a second inline vehicle create in the same session", async () => {
+    // Defect this catches: newVehicleId was generated once per component
+    // mount and never regenerated, so creating vehicle A inline, going
+    // back with "Cambiar vehículo", then creating a different vehicle B
+    // inline would POST the exact same client id with different fields.
+    // The API's create_vehicle use case rejects that as a 409
+    // vehicle_id_conflict (VehicleIdConflict), and every retry hits the
+    // same conflict since the id never changes until the page reloads.
+    const capturedVehicleIds: string[] = [];
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
+      http.get("/api/customers", () => HttpResponse.json([])),
+      http.post("/api/customers", async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(newCustomerResponse(body.id as string, body.full_name as string), {
+          status: 201,
+        });
+      }),
+      http.get("/api/customers/:customerId/vehicles", () => HttpResponse.json([])),
+      http.post("/api/vehicles", async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        capturedVehicleIds.push(body.id as string);
+        return HttpResponse.json(
+          newVehicleResponse(body.id as string, body.customer_id as string, body.make as string),
+          { status: 201 },
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderNewWorkOrderPage();
+
+    await user.click(await screen.findByRole("button", { name: /nuevo cliente/i }));
+    await user.type(screen.getByLabelText(/nombre completo/i), "Carlos Reyes");
+    await user.click(screen.getByRole("button", { name: /guardar cliente/i }));
+
+    await user.click(await screen.findByRole("button", { name: /nuevo vehículo/i }));
+    await user.type(screen.getByLabelText(/marca/i), "Honda");
+    await user.click(screen.getByRole("button", { name: /guardar vehículo/i }));
+
+    await screen.findByRole("button", { name: /crear orden/i });
+    await user.click(screen.getByRole("button", { name: /cambiar vehículo/i }));
+
+    await user.click(await screen.findByRole("button", { name: /nuevo vehículo/i }));
+    await user.type(screen.getByLabelText(/marca/i), "Yamaha");
+    await user.click(screen.getByRole("button", { name: /guardar vehículo/i }));
+
+    await screen.findByRole("button", { name: /crear orden/i });
+    expect(capturedVehicleIds).toHaveLength(2);
+    expect(capturedVehicleIds[0]).not.toBe(capturedVehicleIds[1]);
   });
 
   it("disables creation and explains why when offline, without calling the API", async () => {
