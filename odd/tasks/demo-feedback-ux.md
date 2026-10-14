@@ -47,7 +47,7 @@ Each task is delegated to a single writer inside the workflow, followed by an in
 
 - [x] **T1** Make `Button`/`LinkButton` width controllable without conflicting classes (a `fullWidth` prop, default `true`), drop every `w-full`+`w-auto` conflict, and make the header's "Más" trigger compact.
   - Acceptance: the "Más" button is only as wide as its label plus padding, and no Button/LinkButton call site renders both `w-full` and `w-auto`.
-- [ ] **T2** Bottom navigation with an inline SVG icon per tab and an unmistakable active state (filled pill or indicator plus bold label), keeping `aria-current="page"`.
+- [x] **T2** Bottom navigation with an inline SVG icon per tab and an unmistakable active state (filled pill or indicator plus bold label), keeping `aria-current="page"`.
   - Acceptance: the active tab is distinguishable without relying on color alone.
 - [ ] **T3** Sync status banner without layout shift: render it as a fixed overlay (toast-like) that never moves page content, and show "Sincronizando..." only when a flush is still running after a short delay (about 600 ms), so a fast sync shows nothing.
   - Acceptance: a flush that finishes inside the delay never shows the banner, a longer one does, and the offline and pending messages still appear.
@@ -84,6 +84,7 @@ Each task is delegated to a single writer inside the workflow, followed by an in
 | Task | Route | Commit | Evidence |
 | --- | --- | --- | --- |
 | T1 | delegated (workflow writer) | (this commit) | lint, typecheck and 62 files / 265 tests pass; no `w-auto` left outside doc comments, verified via compiled CSS that `fullWidth`/`!min-h-10`/`!text-base` resolve the Tailwind cascade conflict |
+| T2 | delegated (workflow writer) | (this commit) | lint, typecheck and 63 files / 267 tests pass (2 new); RED confirmed first (`BottomNav > renders a decorative icon above each tab...` failed on `expected null not to be null` before the icon markup existed) |
 
 ## Next step
 
