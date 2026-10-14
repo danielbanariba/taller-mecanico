@@ -91,6 +91,8 @@ A work order's non-fiscal receipt (`web/src/features/workorders/receipt/`) is a 
 
 `copy.ts` holds every Spanish user-facing string for its feature in one object, plus a map from an API error `code` (the `detail` string FastAPI returns) to the Spanish message shown for it. The API itself never returns Spanish — it returns English error codes in `detail`, and the web layer is solely responsible for localizing them.
 
+The inventory list (`features/inventory/ItemList.tsx`) is window-virtualized with `@tanstack/react-virtual`'s `useWindowVirtualizer`, since the page itself scrolls the window rather than an inner container: a 3000-item shop otherwise puts tens of thousands of DOM nodes on the page and blocks the main thread while scrolling.
+
 ### App shell and navigation
 
 `web/src/app/AppShell.tsx` is a layout route (`Inventario · Clientes · Órdenes`) rendered inside `RequireSession`, wrapping every protected screen's `<Outlet/>` with `web/src/app/BottomNav.tsx`'s three tabs. The active tab tracks the first path segment, so nested routes like a vehicle's own detail screen under `/clientes/...` still highlight `Clientes`. The `Órdenes` tab is the real `workorders` feature (Abiertas/Historial list, detail, status actions, WhatsApp sharing); a customer's and a vehicle's detail screens list their own work orders (newest first), and a vehicle's "Nueva orden" button jumps straight to the confirm step of `/ordenes/nueva?vehiculo=<id>`, skipping the customer/vehicle pickers.
