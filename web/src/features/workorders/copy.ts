@@ -153,6 +153,12 @@ export const workOrdersCopy = {
     save: "Guardar línea",
     savePending: "Guardando...",
   },
+  removeLineConfirm: {
+    title: "Eliminar línea",
+    body: (description: string) => `¿Eliminar "${description}" de la orden? Esta acción no se puede deshacer.`,
+    cancel: "Cancelar",
+    confirm: "Sí, eliminar línea",
+  },
   itemPicker: {
     searchLabel: "Buscar repuesto",
     searchPlaceholder: "Nombre o categoría",
