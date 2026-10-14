@@ -4,6 +4,7 @@ import { NavLink } from "react-router";
 import { CustomersIcon } from "../shared/ui/icons/CustomersIcon";
 import { InventoryIcon } from "../shared/ui/icons/InventoryIcon";
 import { WorkOrdersIcon } from "../shared/ui/icons/WorkOrdersIcon";
+import { useCssHeightVariable } from "../shared/ui/useCssHeightVariable";
 import { appCopy } from "./copy";
 
 interface NavItemProps {
@@ -55,10 +56,21 @@ function NavItem({ to, label, icon: Icon }: NavItemProps) {
  * own, so the active tab needs no extra wiring here. The active tab is
  * never marked by color alone: its icon sits on a filled pill and its
  * label turns bold, both driven by the same `isActive` NavLink reports.
+ *
+ * Publishes its own rendered height (`useCssHeightVariable`, safe-area
+ * padding included) as `--bottom-nav-height` on `document.documentElement`,
+ * so `AppShell`'s `<main>` padding and `OfflineStatusBanner`'s own offset
+ * both measure the real nav instead of a hand-copied literal (a QA sweep
+ * found the hardcoded `3rem` guess was off by about 6px). The variable
+ * resets to `0px` when this unmounts, since the receipt and print routes
+ * render no bottom nav at all.
  */
 export function BottomNav() {
+  const navRef = useCssHeightVariable<HTMLElement>("--bottom-nav-height");
+
   return (
     <nav
+      ref={navRef}
       aria-label={appCopy.nav.label}
       className="fixed inset-x-0 bottom-0 flex border-t border-brand-border bg-brand-card pb-[env(safe-area-inset-bottom)]"
     >

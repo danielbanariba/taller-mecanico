@@ -26,6 +26,14 @@ import { appCopy, getAppErrorMessage } from "./copy";
  * top-level heading here would leave the page with two `<h1>`s, which
  * breaks the single-top-level-heading landmark assistive tech relies on
  * to navigate the page.
+ *
+ * `main`'s bottom padding reads `--bottom-nav-height` and
+ * `--sync-toast-height` (both published by `BottomNav`/`OfflineStatusBanner`
+ * via `useCssHeightVariable`) instead of a fixed `pb-20`: a QA sweep found
+ * that literal left the last inventory row's stock buttons partly covered
+ * by the sync toast, worse once a pending change grew it to two lines. The
+ * `5rem`/`0px` fallbacks keep the old, pre-measurement padding until both
+ * variables are published.
  */
 export function AppShell() {
   const navigate = useNavigate();
@@ -83,7 +91,7 @@ export function AppShell() {
           {appCopy.more.trigger}
         </Button>
       </header>
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-4 pb-20">
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-4 pb-[calc(var(--bottom-nav-height,5rem)+var(--sync-toast-height,0px)+1rem)]">
         <Outlet />
       </main>
       <BottomNav />

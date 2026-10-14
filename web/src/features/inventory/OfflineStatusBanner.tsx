@@ -1,4 +1,5 @@
 import { useOnlineStatus } from "../../shared/offline/useOnlineStatus";
+import { useCssHeightVariable } from "../../shared/ui/useCssHeightVariable";
 import { useOfflineSync } from "./hooks";
 import { SyncStatusBanner } from "./SyncStatusBanner";
 import { useDelayedFlag } from "./useDelayedFlag";
@@ -38,14 +39,39 @@ const SYNC_STATUS_DELAY_MS = 600;
  * `print:hidden` (phase 3): this renders inside `RequireSession`, above
  * every route including the receipt layouts, which must never print their
  * own chrome alongside the order content (`design.md`'s AD-19).
+ *
+ * Anchored at the BOTTOM, just above `BottomNav` (the mobile snackbar
+ * pattern) -- not the top. Anchoring it at the top used to land it right
+ * over `AppShell`'s header, covering the "Más" button: a QA sweep
+ * confirmed that made Caja del día, Facturación, Exportar todo and Cerrar
+ * sesión all unreachable while the banner was showing. The offset used to
+ * be a hand-copied literal guessing `BottomNav`'s height (`3rem` plus its
+ * border); a later QA sweep measured the real nav at ~54.7px, 6px taller
+ * than that guess, so the toast sat too close to it. It now reads
+ * `--bottom-nav-height`, the nav's own measured height published by
+ * `BottomNav` itself (`useCssHeightVariable`) -- `0px` on a route with no
+ * nav (a receipt or print layout), so the toast never floats at a stale
+ * nav offset there.
+ *
+ * Also publishes its OWN rendered height as `--sync-toast-height`
+ * (`useCssHeightVariable`, on the same fixed wrapper this measures, so it
+ * reads `0` the instant `empty:hidden` collapses it): `AppShell`'s `<main>`
+ * reads it back to keep its bottom padding clear of both the nav and
+ * whatever height the toast currently has -- one line for the offline
+ * message, two once a pending change grows it -- instead of a fixed
+ * padding that only accounted for the nav.
  */
 export function OfflineStatusBanner({ workshopId }: OfflineStatusBannerProps) {
   const isOffline = useOnlineStatus();
   const { pendingCount, syncing, lastErrorMessage } = useOfflineSync(workshopId);
   const showSyncStatus = useDelayedFlag(syncing || pendingCount > 0, SYNC_STATUS_DELAY_MS);
+  const toastRef = useCssHeightVariable<HTMLDivElement>("--sync-toast-height");
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center px-4 pt-[max(1rem,env(safe-area-inset-top))] print:hidden">
+    <div
+      ref={toastRef}
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--bottom-nav-height,0px)+0.75rem)] z-40 flex justify-center px-4 print:hidden"
+    >
       <div className="pointer-events-auto w-full max-w-sm rounded-xl shadow-md empty:hidden">
         <SyncStatusBanner
           isOffline={isOffline}
