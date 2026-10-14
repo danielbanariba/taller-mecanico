@@ -237,6 +237,23 @@ describe("AppShell", () => {
     expect(screen.getByText("Taller Ana")).toBeInTheDocument();
   });
 
+  it("offers a skip-to-content link as the shell's first focusable element", async () => {
+    // Defect this catches: no way for a keyboard user to bypass the header
+    // and "Más" button to reach the active screen's own content directly,
+    // instead of tabbing through both on every single page.
+    mockSession();
+    server.use(http.get("/api/inventory/items", () => HttpResponse.json([])));
+    renderShell("/inventario");
+
+    await screen.findByText("Taller Ana");
+    const user = userEvent.setup();
+    await user.tab();
+
+    const skipLink = screen.getByRole("link", { name: "Saltar al contenido" });
+    expect(skipLink).toHaveFocus();
+    expect(skipLink).toHaveAttribute("href", "#main-content");
+  });
+
   it("marks Órdenes active on its route", async () => {
     // Defect this catches: a shell that only highlights Inventario/
     // Clientes, leaving the third tab permanently unmarked.

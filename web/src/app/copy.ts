@@ -14,6 +14,7 @@ export const appCopy = {
     submit: "Cerrar sesión",
     offlineDisabled: "Conéctese a internet para cerrar sesión.",
   },
+  skipLink: "Saltar al contenido",
   more: {
     trigger: "Más",
     title: "Más opciones",

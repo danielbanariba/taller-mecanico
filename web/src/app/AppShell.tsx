@@ -81,6 +81,17 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-dvh flex-col">
+      {/* First focusable element in the shell: a keyboard user can jump
+          straight to the active screen's own content, skipping the header
+          and "Más" menu. Visually hidden until focused (the standard
+          skip-link pattern), so it changes nothing for a sighted mouse/touch
+          user. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-brand-primary focus:px-4 focus:py-2 focus:text-base focus:font-semibold focus:text-brand-on-primary"
+      >
+        {appCopy.skipLink}
+      </a>
       <header className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-4 py-6">
         <p className="text-2xl font-bold text-brand-primary">{session.data?.workshop.name}</p>
         {/* `fullWidth={false}` keeps this content-width instead of `Button`'s
@@ -99,7 +110,11 @@ export function AppShell() {
           {appCopy.more.trigger}
         </Button>
       </header>
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-4 pb-[calc(var(--bottom-nav-height,5rem)+var(--sync-toast-height,0px)+1rem)]">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-4 pb-[calc(var(--bottom-nav-height,5rem)+var(--sync-toast-height,0px)+1rem)]"
+      >
         <Outlet />
       </main>
       <BottomNav />
