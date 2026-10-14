@@ -44,6 +44,7 @@ function movement(overrides: Partial<MovementOut>): MovementOut {
     order_id: null,
     order_line_id: null,
     order_number: null,
+    is_initial_stock: false,
     ...overrides,
   };
 }
@@ -213,6 +214,22 @@ describe("ItemDetailPage", () => {
     expect(entries).toHaveLength(2);
     expect(entries[0]).toHaveTextContent("Salida −1");
     expect(entries[1]).toHaveTextContent("Entrada +3");
+  });
+
+  it("labels the initial-stock adjustment apart from a later physical count", async () => {
+    // Defect this catches: rendering create_item's implicit initial-stock
+    // adjustment the same way as a later physical count ("Conteo: X
+    // (+Y)"), since both are plain "adjust" movements -- the API's
+    // `is_initial_stock` (computed by identity, not by a free-text note
+    // match) is the only thing that tells them apart.
+    mockItemAndMovements([
+      movement({ id: "mv-count", kind: "adjust", quantity: 8, delta: 3, is_initial_stock: false }),
+      movement({ id: "mv-initial", kind: "adjust", quantity: 5, delta: 5, is_initial_stock: true }),
+    ]);
+    renderDetailPage();
+
+    expect(await screen.findByText("Stock inicial: 5")).toBeInTheDocument();
+    expect(screen.getByText("Conteo: 8 (+3)")).toBeInTheDocument();
   });
 
   it("links a movement to the order that caused it, and renders no such link for a manual one", async () => {

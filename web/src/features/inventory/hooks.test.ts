@@ -110,6 +110,7 @@ describe("fetchItemFolded", () => {
           order_id: null,
           order_line_id: null,
           order_number: null,
+          is_initial_stock: false,
         },
         item: { id: "item-1", stock: serverStock, needs_review: false, is_low: false },
       };

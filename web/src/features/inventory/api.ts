@@ -33,6 +33,8 @@ export interface MovementOut {
   order_line_id: string | null;
   /** Resolved alongside the movement on an item-history read; `null` when `order_id` is `null`. */
   order_number: number | null;
+  /** Whether this is the implicit adjustment recorded for the item's initial stock, not a later physical count. */
+  is_initial_stock: boolean;
 }
 
 /** The subset of `ItemOut` the movement endpoint returns to reconcile stock. */

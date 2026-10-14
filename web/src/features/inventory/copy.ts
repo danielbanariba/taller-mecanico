@@ -68,6 +68,7 @@ export const inventoryCopy = {
     historyTitle: "Historial de movimientos",
     historyEmpty: "Todavía no hay movimientos.",
     orderLink: (number: number) => `Orden #${number}`,
+    initialStock: (quantity: number) => `Stock inicial: ${quantity}`,
   },
   units: ["unidad", "galón", "litro", "juego", "par", "caja"],
   offline: {
@@ -80,13 +81,26 @@ export const inventoryCopy = {
   },
 } as const;
 
-/** Builds the Spanish label for one movement row, e.g. "Entrada +3". */
-export function movementLabel(movement: Pick<MovementOut, "kind" | "quantity" | "delta">): string {
+/**
+ * Builds the Spanish label for one movement row, e.g. "Entrada +3".
+ *
+ * An "adjust" movement renders as "Stock inicial: X" when it is the
+ * implicit adjustment `create_item` recorded for the item's initial stock
+ * (`is_initial_stock`, computed by the API from the movement's identity,
+ * never from its free-text `note` -- see `is_initial_stock_movement` in
+ * `use_cases.py`), and as "Conteo: X (+Y)" for every later physical count.
+ */
+export function movementLabel(
+  movement: Pick<MovementOut, "kind" | "quantity" | "delta" | "is_initial_stock">,
+): string {
   if (movement.kind === "in") {
     return `Entrada +${movement.quantity}`;
   }
   if (movement.kind === "out") {
     return `Salida −${movement.quantity}`;
+  }
+  if (movement.is_initial_stock) {
+    return inventoryCopy.detail.initialStock(movement.quantity);
   }
   const deltaLabel = movement.delta >= 0 ? `+${movement.delta}` : `−${Math.abs(movement.delta)}`;
   return `Conteo: ${movement.quantity} (${deltaLabel})`;

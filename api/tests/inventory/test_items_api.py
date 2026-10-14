@@ -91,6 +91,35 @@ def test_initial_stock_records_an_adjustment_as_the_first_history_entry(
     assert entries[0]["quantity"] == 5
     assert entries[0]["delta"] == 5
     assert entries[0]["note"] == "Inventario inicial"
+    assert entries[0]["is_initial_stock"] is True
+
+
+def test_a_later_physical_count_is_not_flagged_as_the_initial_stock(
+    authenticated_client: TestClient,
+) -> None:
+    """Defect this catches: flagging `is_initial_stock` by matching the
+    movement's free-text `note` against `INITIAL_STOCK_NOTE`, which would
+    also mark a later count as "initial" the moment it happens to carry the
+    same note text, instead of only the one implicit adjustment
+    `create_item` itself records.
+    """
+    item = _create_item(authenticated_client, name="Llanta de repuesto", initial_stock=5)
+
+    recorded = authenticated_client.put(
+        f"/api/inventory/movements/{uuid.uuid4()}",
+        json={
+            "item_id": item["id"],
+            "kind": "adjust",
+            "quantity": 8,
+            "note": "Inventario inicial",
+        },
+    )
+    assert recorded.status_code == 201, recorded.text
+
+    history = authenticated_client.get(f"/api/inventory/items/{item['id']}/movements")
+    entries_by_quantity = {entry["quantity"]: entry for entry in history.json()}
+    assert entries_by_quantity[5]["is_initial_stock"] is True
+    assert entries_by_quantity[8]["is_initial_stock"] is False
 
 
 def test_duplicate_active_name_is_rejected_case_and_accent_insensitive(

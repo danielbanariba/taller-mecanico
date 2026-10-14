@@ -36,6 +36,29 @@ def _initial_movement_id(item_id: uuid.UUID) -> uuid.UUID:
     return uuid.uuid5(_INITIAL_STOCK_NAMESPACE, str(item_id))
 
 
+def is_initial_stock_movement(movement: StockMovement) -> bool:
+    """Whether ``movement`` is the implicit adjustment `create_item` records
+    for an item's ``initial_stock``, never a later physical count.
+
+    Checked by identity, not by ``movement.note``: `record_movement` accepts
+    whatever free-text note a client sends, so a manual count that happened
+    to carry the same words as `INITIAL_STOCK_NOTE` would be misread as the
+    initial stock if this only compared text. `_initial_movement_id` is the
+    one id only `create_item` ever derives for this item, but a client can
+    still plant an unrelated movement there directly (see
+    `test_replay_does_not_take_another_movement_at_the_initial_stock_id_as_the_initial_stock`),
+    so the id match alone is not enough either -- every field `create_item`
+    itself always sets is checked together.
+    """
+    return (
+        movement.id == _initial_movement_id(movement.item_id)
+        and movement.kind == "adjust"
+        and movement.note == INITIAL_STOCK_NOTE
+        and movement.order_id is None
+        and movement.order_line_id is None
+    )
+
+
 def _initial_stock_matches(
     *,
     workshop_id: uuid.UUID,
