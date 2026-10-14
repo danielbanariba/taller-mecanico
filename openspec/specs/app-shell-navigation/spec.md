@@ -48,6 +48,20 @@ The system MUST offer the logout action from the navigation shell rather than fr
 - AND the user is redirected to `/login`
 - AND every cached query for the previous workshop is removed, consistent with the existing logout behavior
 
+#### Scenario: Logout is disabled offline
+
+- GIVEN an authenticated user viewing the "Más" menu
+- WHEN the device is offline
+- THEN the logout control is disabled
+- AND an offline message explains why
+
+#### Scenario: A failed logout shows an error instead of failing silently
+
+- GIVEN an authenticated user triggers logout from the shell
+- WHEN the logout request fails
+- THEN a Spanish error message is shown in the menu
+- AND the session is not cleared and the user is not redirected
+
 #### Scenario: Inventory no longer renders its own logout control
 
 (Previously: `InventoryPage` rendered its own header with a logout button.)

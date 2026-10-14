@@ -12,6 +12,7 @@ export const appCopy = {
   },
   logout: {
     submit: "Cerrar sesión",
+    offlineDisabled: "Conéctese a internet para cerrar sesión.",
   },
   more: {
     trigger: "Más",

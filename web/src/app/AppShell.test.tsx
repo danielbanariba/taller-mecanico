@@ -200,6 +200,43 @@ describe("AppShell", () => {
     clickSpy.mockRestore();
   });
 
+  it("disables 'Cerrar sesión' while offline, with the usual offline message", async () => {
+    // Defect this catches: logout was the only mutation in this menu not
+    // gated offline, so a mechanic with no connection could tap it and get
+    // no feedback at all, unlike every other online-only action here.
+    mockSession();
+    server.use(http.get("/api/inventory/items", () => HttpResponse.json([])));
+    const user = userEvent.setup();
+    renderShell("/inventario");
+
+    await screen.findByText("Taller Ana");
+    onlineManager.setOnline(false);
+    await user.click(screen.getByRole("button", { name: "Más" }));
+
+    expect(screen.getByRole("button", { name: "Cerrar sesión" })).toBeDisabled();
+    expect(screen.getByText("Conéctese a internet para cerrar sesión.")).toBeInTheDocument();
+  });
+
+  it("shows a Spanish error when logout fails, instead of failing silently", async () => {
+    // Defect this catches: `handleLogout` had no `onError`, so a failed
+    // logout request left the menu open with no feedback at all --
+    // indistinguishable from a tap that silently did nothing.
+    mockSession();
+    server.use(
+      http.get("/api/inventory/items", () => HttpResponse.json([])),
+      http.post("/api/auth/logout", () => HttpResponse.json({ detail: "unknown_error" }, { status: 500 })),
+    );
+    const user = userEvent.setup();
+    renderShell("/inventario");
+
+    await screen.findByText("Taller Ana");
+    await user.click(screen.getByRole("button", { name: "Más" }));
+    await user.click(screen.getByRole("button", { name: "Cerrar sesión" }));
+
+    expect(await screen.findByText("Ocurrió un error. Intente de nuevo.")).toBeInTheDocument();
+    expect(screen.getByText("Taller Ana")).toBeInTheDocument();
+  });
+
   it("marks Órdenes active on its route", async () => {
     // Defect this catches: a shell that only highlights Inventario/
     // Clientes, leaving the third tab permanently unmarked.

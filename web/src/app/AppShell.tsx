@@ -43,15 +43,21 @@ export function AppShell() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | undefined>(undefined);
+  const [logoutError, setLogoutError] = useState<string | undefined>(undefined);
 
   function handleLogout() {
+    setLogoutError(undefined);
     logout.mutate(undefined, {
       onSuccess: () => navigate("/login", { replace: true }),
+      onError: (error) => {
+        setLogoutError(getAppErrorMessage(error instanceof ApiError ? error.code : "unknown_error"));
+      },
     });
   }
 
   function openMore() {
     setExportError(undefined);
+    setLogoutError(undefined);
     setMoreOpen(true);
   }
 
@@ -122,7 +128,14 @@ export function AppShell() {
             {exporting ? appCopy.more.exportPending : appCopy.more.exportAction}
           </Button>
 
-          <Button variant="destructive" onClick={handleLogout} loading={logout.isPending}>
+          {isOffline ? <Alert variant="info">{appCopy.logout.offlineDisabled}</Alert> : null}
+          {logoutError ? <Alert variant="error">{logoutError}</Alert> : null}
+          <Button
+            variant="destructive"
+            onClick={handleLogout}
+            loading={logout.isPending}
+            disabled={isOffline || logout.isPending}
+          >
             {appCopy.logout.submit}
           </Button>
         </div>
