@@ -86,3 +86,74 @@ describe("ItemForm client-side upper bounds", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 });
+
+describe("ItemForm category and unit suggestion chips", () => {
+  it("fills the category field and submits it when a suggestion chip is tapped", async () => {
+    // Defect this catches: a chip that renders but isn't wired to update the
+    // category field, so tapping a visible suggestion does nothing and the
+    // mechanic still has to retype a value already on screen.
+    const onSubmit = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ItemForm mode="create" {...BASE_PROPS} categorySuggestions={["Frenos", "Motor"]} onSubmit={onSubmit} />,
+    );
+
+    await user.type(screen.getByLabelText(/^nombre$/i), "Pastillas delanteras");
+    await user.click(screen.getByRole("button", { name: "Frenos" }));
+    await user.click(screen.getByRole("button", { name: /guardar repuesto/i }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ category: "Frenos" });
+  });
+
+  it("still submits a hand-typed category that is not among the suggestions", async () => {
+    // Defect this catches: turning the category field into a chip-only
+    // picker (e.g. making the input read-only) would make it impossible to
+    // save a category that has never been used before.
+    const onSubmit = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ItemForm mode="create" {...BASE_PROPS} categorySuggestions={["Frenos", "Motor"]} onSubmit={onSubmit} />,
+    );
+
+    await user.type(screen.getByLabelText(/^nombre$/i), "Pastillas delanteras");
+    await user.type(screen.getByLabelText(/^categoría$/i), "Suspensión");
+    await user.click(screen.getByRole("button", { name: /guardar repuesto/i }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ category: "Suspensión" });
+  });
+
+  it("fills the unit field and submits it when a suggestion chip is tapped", async () => {
+    // Defect this catches: the same chip-wiring mistake on the unit field,
+    // which already has a default value, so a chip tap that silently fails
+    // to update it would be easy to miss visually.
+    const onSubmit = vi.fn();
+    const user = userEvent.setup();
+    render(<ItemForm mode="create" {...BASE_PROPS} onSubmit={onSubmit} />);
+
+    await user.type(screen.getByLabelText(/^nombre$/i), "Aceite de motor");
+    await user.click(screen.getByRole("button", { name: "galón" }));
+    await user.click(screen.getByRole("button", { name: /guardar repuesto/i }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ unit: "galón" });
+  });
+
+  it("still submits a hand-typed unit that is not among the suggestions", async () => {
+    // Defect this catches: a chip-only unit picker would make an unusual,
+    // never-suggested unit (e.g. "bolsa") impossible to save.
+    const onSubmit = vi.fn();
+    const user = userEvent.setup();
+    render(<ItemForm mode="create" {...BASE_PROPS} onSubmit={onSubmit} />);
+
+    await user.type(screen.getByLabelText(/^nombre$/i), "Empaques");
+    const unitField = screen.getByLabelText(/^unidad$/i);
+    await user.clear(unitField);
+    await user.type(unitField, "bolsa");
+    await user.click(screen.getByRole("button", { name: /guardar repuesto/i }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ unit: "bolsa" });
+  });
+});

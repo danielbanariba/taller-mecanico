@@ -33,6 +33,7 @@ export const inventoryCopy = {
     initialStockLabel: "Cantidad actual",
     unitLabel: "Unidad",
     categoryLabel: "Categoría",
+    suggestionHint: "Elija una o escriba una nueva.",
     minStockLabel: "Mínimo para avisar",
     minStockHelper: "Avisamos cuando el inventario llegue a esta cantidad o menos.",
     stockRangeInvalid: "Ingrese una cantidad entre 0 y 1,000,000.",
