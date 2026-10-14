@@ -78,15 +78,17 @@ export function AppShell() {
       <header className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-4 py-6">
         <p className="text-2xl font-bold text-brand-primary">{session.data?.workshop.name}</p>
         {/* `fullWidth={false}` keeps this content-width instead of `Button`'s
-            default full-bleed sizing; `!min-h-10`/`!text-base` need the `!`
+            default full-bleed sizing; `!min-h-11`/`!text-base` need the `!`
             important modifier to win over `Button`'s own `min-h-12`/`text-lg`
             -- Tailwind has no class-merging, so a plain conflicting class
-            loses to whichever rule the generated stylesheet orders later. */}
+            loses to whichever rule the generated stylesheet orders later.
+            `min-h-11` (44px) is the accessible tap-target floor; the
+            previous `min-h-10` (40px) fell short of it. */}
         <Button
           variant="secondary"
           onClick={openMore}
           fullWidth={false}
-          className="!min-h-10 px-4 !text-base"
+          className="!min-h-11 px-4 !text-base"
         >
           {appCopy.more.trigger}
         </Button>
