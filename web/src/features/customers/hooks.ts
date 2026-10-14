@@ -11,6 +11,8 @@ import {
   type UpdateCustomerPayload,
   type UpdateVehiclePayload,
 } from "./api";
+import type { CustomerFormValues } from "./CustomerForm";
+import type { VehicleFormValues } from "./VehicleForm";
 
 /**
  * Every customer key starts with the workshop it belongs to (see
@@ -63,6 +65,22 @@ export function useCustomer(id: string) {
     queryFn: () => customersApi.getCustomer(id),
     enabled: workshopId !== undefined,
   });
+}
+
+/**
+ * Maps a `CustomerForm` submission into the API payload, shared by every
+ * screen that creates a customer (the dedicated create screen and the new
+ * work order flow's inline form) so the mapping lives in one place.
+ */
+export function buildCreateCustomerPayload(id: string, values: CustomerFormValues): CreateCustomerPayload {
+  return {
+    id,
+    full_name: values.fullName,
+    phone: values.phone || undefined,
+    notes: values.notes || undefined,
+    billing_name: values.billingName || undefined,
+    rtn: values.rtn || undefined,
+  };
 }
 
 export function useCreateCustomer() {
@@ -128,6 +146,29 @@ export function useVehicle(id: string) {
     queryFn: () => customersApi.getVehicle(id),
     enabled: workshopId !== undefined && id !== "",
   });
+}
+
+/**
+ * Maps a `VehicleForm` submission into the API payload, shared by every
+ * screen that creates a vehicle (the dedicated create screen and the new
+ * work order flow's inline form) so the mapping lives in one place.
+ */
+export function buildCreateVehiclePayload(
+  id: string,
+  customerId: string,
+  values: VehicleFormValues,
+): CreateVehiclePayload {
+  return {
+    id,
+    customer_id: customerId,
+    vehicle_type: values.vehicleType,
+    make: values.make,
+    model: values.model || undefined,
+    year: values.year ?? undefined,
+    color: values.color || undefined,
+    plate: values.plate || undefined,
+    notes: values.notes || undefined,
+  };
 }
 
 export function useCreateVehicle(customerId: string) {

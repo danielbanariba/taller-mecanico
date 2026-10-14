@@ -76,7 +76,11 @@ export function VehicleDetailPage() {
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xl font-semibold text-brand-foreground">{customersCopy.vehicles.detail.ordersTitle}</h2>
-          <Button onClick={() => navigate(`/ordenes/nueva?vehiculo=${vehicleId}`)} className="w-auto px-4">
+          <Button
+            onClick={() => navigate(`/ordenes/nueva?vehiculo=${vehicleId}`)}
+            fullWidth={false}
+            className="px-4"
+          >
             {customersCopy.vehicles.detail.newOrder}
           </Button>
         </div>

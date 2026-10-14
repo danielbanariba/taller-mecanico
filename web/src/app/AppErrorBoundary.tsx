@@ -35,7 +35,7 @@ export function AppErrorBoundary() {
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
       <h1 className="text-2xl font-bold text-brand-primary">{appCopy.error.title}</h1>
       <p className="text-base text-brand-foreground">{appCopy.error.message}</p>
-      <Button onClick={() => void handleReload()} className="w-auto px-6">
+      <Button onClick={() => void handleReload()} fullWidth={false} className="px-6">
         {appCopy.error.reload}
       </Button>
     </div>

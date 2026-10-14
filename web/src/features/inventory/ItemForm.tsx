@@ -2,6 +2,7 @@ import { useId, useState, type FormEvent } from "react";
 
 import { Alert } from "../../shared/ui/Alert";
 import { Button } from "../../shared/ui/Button";
+import { Chip } from "../../shared/ui/Chip";
 import { TextArea } from "../../shared/ui/TextArea";
 import { TextField } from "../../shared/ui/TextField";
 import { inventoryCopy } from "./copy";
@@ -64,8 +65,8 @@ export function ItemForm({
   submitPendingLabel,
   offline = false,
 }: ItemFormProps) {
-  const unitListId = useId();
-  const categoryListId = useId();
+  const unitFieldId = useId();
+  const categoryFieldId = useId();
 
   const [name, setName] = useState(initialValues?.name ?? "");
   const [category, setCategory] = useState(initialValues?.category ?? "");
@@ -160,40 +161,48 @@ export function ItemForm({
         />
       ) : null}
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={unitListId} className="text-base font-medium text-brand-foreground">
+        <label htmlFor={unitFieldId} className="text-base font-medium text-brand-foreground">
           {inventoryCopy.create.unitLabel}
         </label>
         <input
-          id={unitListId}
+          id={unitFieldId}
           name="unit"
-          list={`${unitListId}-options`}
           value={unit}
           onChange={(event) => setUnit(event.target.value)}
           className="min-h-12 rounded-xl border border-brand-border px-4 text-base text-brand-foreground outline-none focus:ring-2 focus:ring-brand-accent"
         />
-        <datalist id={`${unitListId}-options`}>
+        <p className="text-sm text-brand-muted-foreground">{inventoryCopy.create.suggestionHint}</p>
+        <div className="flex flex-wrap gap-2">
           {inventoryCopy.units.map((option) => (
-            <option key={option} value={option} />
+            <Chip key={option} active={unit === option} onClick={() => setUnit(option)}>
+              {option}
+            </Chip>
           ))}
-        </datalist>
+        </div>
       </div>
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={categoryListId} className="text-base font-medium text-brand-foreground">
+        <label htmlFor={categoryFieldId} className="text-base font-medium text-brand-foreground">
           {inventoryCopy.create.categoryLabel}
         </label>
         <input
-          id={categoryListId}
+          id={categoryFieldId}
           name="category"
-          list={`${categoryListId}-options`}
           value={category}
           onChange={(event) => setCategory(event.target.value)}
           className="min-h-12 rounded-xl border border-brand-border px-4 text-base text-brand-foreground outline-none focus:ring-2 focus:ring-brand-accent"
         />
-        <datalist id={`${categoryListId}-options`}>
-          {categorySuggestions.map((option) => (
-            <option key={option} value={option} />
-          ))}
-        </datalist>
+        {categorySuggestions.length > 0 ? (
+          <>
+            <p className="text-sm text-brand-muted-foreground">{inventoryCopy.create.suggestionHint}</p>
+            <div className="flex flex-wrap gap-2">
+              {categorySuggestions.map((option) => (
+                <Chip key={option} active={category === option} onClick={() => setCategory(option)}>
+                  {option}
+                </Chip>
+              ))}
+            </div>
+          </>
+        ) : null}
       </div>
       <TextField
         label={inventoryCopy.create.minStockLabel}

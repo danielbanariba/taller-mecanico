@@ -1,0 +1,115 @@
+# demo-feedback-ux
+
+## Objective
+
+Fix the eight cheap UX problems a developer found while testing the public demo (a screen recording dated 2026-10-10), so the next demo shown to mechanics feels clear and polished.
+
+## Problem
+
+The feedback was checked against the code and the recording's frames before any work started:
+
+- The "Sincronizando... / N cambios por enviar" banner pushes the whole page down and up about 30px on every stock tap, so the page flickers.
+- The header's "Más" button stretches to about three times the workshop name. This is a bug: `Button` always applies `w-full`, `AppShell` adds `w-auto` on top, and no class merging decides between them.
+- The bottom navigation shows the active tab only by text color, so a user can't tell which section they are in.
+- Payments:
+  - A cash payment larger than the balance is rejected ("El monto supera el saldo pendiente."). The mechanic expects to enter what the customer handed over and see the change ("vuelto").
+  - With the balance at 0 the payment form stays active, and submitting it shows two errors at once.
+- The new-order flow can only pick an existing customer. A new customer means leaving the flow for Clientes.
+- A work order's status reads as plain bold text, with no visual badge.
+- The shared `Dialog` is a centered modal. On a phone, a bottom sheet is the expected pattern.
+- An item's category and unit are free-text fields with a native datalist, and nothing visual says the user can pick a used value or type a new one.
+
+## Why
+
+The app is shown to mechanics as a demo, and first impressions decide adoption. Every item above is something a first-time user hits in their first minutes.
+
+## Scope
+
+Web only (`web/`). No API, schema or migration change. Out of scope, for later: inventory import from Excel, pagination, cost price and margin, suppliers, a desktop layout, multi-user, and merging stock taps in the outbox.
+
+## Constraints
+
+- UI copy in Spanish (usted), in each feature's `copy.ts`. Code, identifiers and comments in English.
+- No new runtime dependency unless the task says so; icons are inline SVG.
+- The offline guarantees in `CLAUDE.md` stay intact: the outbox, the flush lock and the folded reads.
+- Every printed page keeps `print:hidden` on non-printing chrome.
+- Test Value Gate: every new test names the defect it catches, and pure styling gets no class-echo test.
+
+## Delivery
+
+- Branch `feat/demo-feedback-ux`, one PR at the end (`single-pr`), with one work-unit commit per task.
+- Forecast: about 700 authored changed lines, tests included.
+- Receipt-driven development is off for this clone (`gentle-ai review mode status`: off, clone_local), so ordinary checks apply. Each task gets an independent verifier pass.
+
+## Tasks
+
+Each task is delegated to a single writer inside the workflow, followed by an independent verifier.
+
+- [x] **T1** Make `Button`/`LinkButton` width controllable without conflicting classes (a `fullWidth` prop, default `true`), drop every `w-full`+`w-auto` conflict, and make the header's "Más" trigger compact.
+  - Acceptance: the "Más" button is only as wide as its label plus padding, and no Button/LinkButton call site renders both `w-full` and `w-auto`.
+- [x] **T2** Bottom navigation with an inline SVG icon per tab and an unmistakable active state (filled pill or indicator plus bold label), keeping `aria-current="page"`.
+  - Acceptance: the active tab is distinguishable without relying on color alone.
+- [x] **T3** Sync status banner without layout shift: render it as a fixed overlay (toast-like) that never moves page content, and show "Sincronizando..." only when a flush is still running after a short delay (about 600 ms), so a fast sync shows nothing.
+  - Acceptance: a flush that finishes inside the delay never shows the banner, a longer one does, and the offline and pending messages still appear.
+- [x] **T4** Shared `Dialog` as a bottom sheet on small screens (anchored to the bottom, full width, rounded top) and a centered modal from `sm` up, keeping its accessibility behavior (focus, Escape, labelled title).
+  - Acceptance: every existing dialog test still passes.
+- [x] **T5** A shared work-order status badge (a colored chip per status: draft, approved, in_progress, completed, delivered, cancelled), used wherever an order's status is shown.
+  - Acceptance: every status renders its Spanish label inside the badge in the list and the detail screens.
+- [x] **T6** Payments:
+  - for cash, accept the amount received; when it is larger than the balance, show "Vuelto" and record only the balance;
+  - non-cash methods keep rejecting an amount over the balance;
+  - once the balance is 0, replace the payment form with a "paid in full" note;
+  - never show two errors at once.
+  - Acceptance: cash 500 on a balance of 300 posts 30000 cents and shows a change of L 200.00; card 500 on 300 is still rejected; a balance of 0 renders no submit button.
+- [x] **T7** New-order flow:
+  - create a new customer from the customer step;
+  - create a vehicle from the vehicle step when the customer has none or the right one is missing;
+  - the new records are then selected and the flow continues to confirm.
+  - Acceptance: a brand-new customer and vehicle can reach the confirm step without leaving `/ordenes/nueva`.
+- [x] **T8** Item form category and unit:
+  - show the workshop's already-used values as tappable chips that fill the field, plus a one-line hint that a new value can be typed;
+  - keep the field as free text.
+  - Acceptance: tapping a chip fills the field, and typing a new value still saves it.
+
+## Checks
+
+- Per task: `cd web && npm run lint && npm run typecheck && npm test -- --run`.
+- At closure:
+  - the same checks plus `npm run build`;
+  - a local browser check at phone width (375px) and desktop width;
+  - the Test Value Gate pass 3 list for the PR.
+
+## Progress
+
+| Task | Route | Commit | Evidence |
+| --- | --- | --- | --- |
+| T1 | delegated (workflow writer) | dda0f6f | lint, typecheck and 62 files / 265 tests pass; no `w-auto` left outside doc comments, verified via compiled CSS that `fullWidth`/`!min-h-10`/`!text-base` resolve the Tailwind cascade conflict |
+| T2 | delegated (workflow writer) | f7e70cb | lint, typecheck and 63 files / 267 tests pass (2 new); RED confirmed first (`BottomNav > renders a decorative icon above each tab...` failed on `expected null not to be null` before the icon markup existed) |
+| T3 | delegated (workflow writer) | 5eda107 | lint, typecheck and 65 files / 273 tests pass (6 new: `useDelayedFlag.test.ts` x3, `OfflineStatusBanner.test.tsx` x3); RED confirmed first (`OfflineStatusBanner > never shows the pending count or syncing message for a flush that clears before the delay` failed, finding the `Sincronizando...` span, before the delay gate existed) |
+| T3 | bounded correction (workflow writer) | 5eda107 (amended) | verifier major: `SyncStatusBanner.tsx` was outside T3's allowed edit surface; reverted it byte-for-byte to its pre-T3 state and moved the toast look (`pointer-events-auto`, `shadow-md`, `w-full max-w-sm`, `empty:hidden` for the no-content case) onto a wrapper `div` inside `OfflineStatusBanner.tsx` instead, which owns the full surface; pure styling, no new test per the Test Value Gate exception; lint, typecheck and 65 files / 273 tests pass unchanged |
+| T4 | delegated (workflow writer) | 2323c36 | lint, typecheck and 65 files / 273 tests pass unchanged (no new tests: pure layout change, class-echo exception per Test Value Gate); `Dialog.tsx` panel is `items-end`/full-width/`rounded-t-2xl`/safe-area `pb-[max(...)]`/`max-h-[85vh] overflow-y-auto` below `sm`, and unchanged `items-center`/`max-w-sm`/`rounded-2xl` from `sm` up; all 3 `Dialog.test.tsx` cases and every dialog-using test file pass |
+| T5 | delegated (workflow writer) | d011b04 | lint, typecheck and 66 files / 279 tests pass (6 new in `StatusBadge.test.tsx`); RED confirmed first (`Failed to resolve import "./StatusBadge"` before the component existed); new `StatusBadge.tsx` reuses `statusLabel`/`workOrdersCopy.status` (no copy duplicated) with one Tailwind color pair per status, wired into `WorkOrderList.tsx` and `WorkOrderDetailPage.tsx` (the only two existing `statusLabel(...)` call sites); `CustomerDetailPage`/`VehicleDetailPage` show status only through `WorkOrderList`, so neither needed its own edit; skipped the color-class-echo test per the Test Value Gate hint, and dropped a planned "non-empty badge color" map test because exporting that map tripped `react-refresh/only-export-components` and a new file to hold it sat outside this task's allowed edit surface |
+| T6 | delegated (workflow writer) | 0a9c480 | lint, typecheck and 66 files / 285 tests pass (6 new: 3 in `PaymentForm.test.tsx`, 3 in `WorkOrderDetailPage.test.tsx`); RED confirmed first by stashing the implementation files and re-running both suites (3 new PaymentForm cases and the 3 new WorkOrderDetailPage cases failed, all 2+15 pre-existing cases still green), then restoring and confirming all 23 green; `PaymentForm` takes a new `balanceCents` prop: cash caps the submitted amount at the balance and shows "Vuelto: ..." (via `formatCents`) as soon as it is typed, every other method is still blocked client-side with the existing `payment_exceeds_balance` message (reused via `getWorkOrdersErrorMessage`, not duplicated), and the field's own current error now replaces a stale server banner instead of showing both; `WorkOrderDetailPage` renders the form only while `accepts_payments && balance_cents > 0`, else a "Pagada en su totalidad." note when the order is still payable |
+| T7 | delegated (workflow writer) | 6dd64b7 | lint, typecheck and 66 files / 286 tests pass (1 new: `NewWorkOrderPage.test.tsx`); RED confirmed first (`findByRole("button", { name: /nuevo cliente/i })` found nothing before the button existed, with the other 4 pre-existing cases in the file still green); `NewWorkOrderPage` gained a "Nuevo cliente" action on the customer step and a "Nuevo vehículo" action on the vehicle step (shown there regardless of whether the customer already has vehicles), each toggling an inline `CustomerForm`/`VehicleForm` that reuses the existing `useCreateCustomer`/`useCreateVehicle` mutations unchanged (so the id-replay guarantee, offline disablement and query invalidation all carry over); the request-to-payload mapping itself moved out of `NewCustomerPage.tsx`/`NewVehiclePage.tsx` duplication into two new exported pure functions in `customers/hooks.ts` (`buildCreateCustomerPayload`, `buildCreateVehiclePayload`), reused by the new inline forms without touching those two pages (outside this task's edit surface); on success each form selects the new record and advances the step exactly like picking an existing one; the pick-existing paths and the `?vehiculo=` shortcut are unchanged and their tests still pass |
+| T7 | bounded correction (workflow writer) | 6dd64b7 (amended) | verifier major: `newCustomerId`/`newVehicleId` were generated once per mount and never regenerated, so going back ("Cambiar cliente"/"Cambiar vehículo") and creating a second, different record inline reused the first create's id and hit a 409 `vehicle_id_conflict`/`customer_id_conflict` with no way to retry short of a reload; fixed by regenerating each id with `crypto.randomUUID()` at the moment its inline form is opened (`handleOpenNewCustomerForm`/`handleOpenNewVehicleForm`), not on every render, so a failed submit's own retry still reuses the same id (idempotent replay intact) while two distinct opens never collide; lint, typecheck and 66 files / 287 tests pass (1 new); RED confirmed first (`generates a fresh client id for a second inline vehicle create in the same session` failed with both captured vehicle POST ids identical before the fix) |
+| T8 | delegated (workflow writer) | 97cc6f5 | lint, typecheck and 66 files / 291 tests pass (4 new in `ItemForm.test.tsx`); RED confirmed first for the two chip-tap cases (`fills the category/unit field and submits it when a suggestion chip is tapped` both failed on `getByRole("button", ...)` finding nothing before the chip markup existed); the two hand-typed-value cases already passed pre-implementation since free typing predates this task, kept as regression guards against a chip-only picker; dropped the native `<datalist>` on both fields (replaced by the chip list, per the task's "avoid duplicate suggestion UI") and reused the existing `Chip` component (`shared/ui/Chip.tsx`, already used by `InventoryPage`'s filter row) at its default size rather than overriding its Tailwind classes, which risks the same cascade-order conflict T1 fixed for `Button`; the one-line hint (`copy.ts`'s `create.suggestionHint`) shows next to each chip row, only when `categorySuggestions` is non-empty for the category field (the fixed `units` list always shows its row) |
+
+## Closure
+
+- **Checks.** `npm run lint`, `npm run typecheck`, `npm test -- --run` (65 files / 285 tests) and `npm run build` pass. The diff is 33 files, about 1,300 authored lines. That is larger than the forecast, mostly tests, and kept as one PR per the delivery choice.
+- **Test Value Gate pass 3.** All 20 new tests are kept: `BottomNav` 2, `useDelayedFlag` 3, `OfflineStatusBanner` 3, `ItemForm` 4, `PaymentForm` 3, `WorkOrderDetailPage` 3 and `NewWorkOrderPage` 2. Each fails under a real implementation change. The parameterized `StatusBadge.test.tsx` test (6 cases) was removed (folded into d011b04): they repeated each label literally from `copy.ts`, and the existing list and detail tests that find status text already catch a badge rendering the wrong label.
+- **Browser check** on the local stack, at 375x812 and 1280x800:
+  - **T1:** the "Más" button measured 66px wide, against 197px for the workshop name.
+  - **T2:** `aria-current` was set on exactly one tab on each of `/`, `/clientes` and `/ordenes`.
+  - **T3:** the first card's top stayed at 310px over 21 samples while tapping "+" three times.
+  - **T4:** on the phone, the sheet's bottom sat exactly at `innerHeight`; on the desktop, the gaps above and below the modal were equal (66px each).
+  - **T5:** the status chip showed on both the list and the detail.
+  - **T6:** cash 500 against a balance of 300 showed "Vuelto: L 200.00" and posted L 300.00. The form was then replaced by "Pagada en su totalidad.". Card 500 against 300 showed one single error.
+  - **T7:** a new customer and vehicle were created inline and the order was created.
+  - **T8:** tapping a chip filled the field, and a typed new category saved.
+  - **Offline:** two taps offline, then back online and a reload, left the stock at exactly +2, with two "Entrada +1" history rows.
+  - Console: no errors apart from the expected offline `ERR_INTERNET_DISCONNECTED`.
+
+## Next step
+
+Open the PR. Merging needs the user's explicit OK, and the public demo is redeployed after the merge.

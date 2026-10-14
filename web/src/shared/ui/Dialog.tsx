@@ -89,14 +89,21 @@ export function Dialog({ open, title, onClose, children }: DialogProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:px-4"
+      onClick={onClose}
+    >
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="w-full max-w-sm rounded-2xl bg-brand-card p-6 shadow-xl outline-none"
+        // Below `sm`, anchored to the bottom as a full-width sheet: rounded
+        // only on top, capped height with its own scroll for long content,
+        // and bottom padding that grows to clear a phone's home-indicator
+        // safe area. From `sm` up, the original centered card is unchanged.
+        className="max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-brand-card p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-xl outline-none sm:max-h-none sm:max-w-sm sm:overflow-visible sm:rounded-2xl sm:pb-6"
         onClick={(event) => event.stopPropagation()}
       >
         <h2 className="mb-4 text-xl font-bold text-brand-primary">{title}</h2>

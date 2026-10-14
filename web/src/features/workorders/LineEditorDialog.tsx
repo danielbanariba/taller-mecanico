@@ -162,7 +162,7 @@ export function LineEditorDialog({
               {selectedItem ? (
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-base text-brand-foreground">{selectedItem.name}</span>
-                  <Button variant="secondary" onClick={() => setPickingItem(true)} className="w-auto px-4">
+                  <Button variant="secondary" onClick={() => setPickingItem(true)} fullWidth={false} className="px-4">
                     {workOrdersCopy.itemPicker.changeItem}
                   </Button>
                 </div>

@@ -1,5 +1,6 @@
-import { statusLabel, workOrdersCopy } from "./copy";
+import { workOrdersCopy } from "./copy";
 import { formatCents } from "../../shared/format/money";
+import { StatusBadge } from "./StatusBadge";
 import type { WorkOrderSummaryOut } from "./api";
 
 export interface WorkOrderListProps {
@@ -37,7 +38,7 @@ export function WorkOrderList({ orders, onOpen }: WorkOrderListProps) {
               {order.customer.full_name}
             </span>
             <span className="flex w-full items-center justify-between">
-              <span className="text-sm font-medium text-brand-primary">{statusLabel(order.status)}</span>
+              <StatusBadge status={order.status} />
               <span className="text-sm font-semibold text-brand-foreground">{formatCents(order.total_cents)}</span>
             </span>
           </button>
