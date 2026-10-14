@@ -266,7 +266,7 @@ def test_at_the_identification_threshold_with_no_identification_is_rejected(
         authenticated_client, status="completed", unit_price_cents=_IDENTIFICATION_THRESHOLD_CENTS
     )
     response = _issue_invoice(authenticated_client, order["id"])
-    assert response.status_code == 422
+    assert response.status_code == 409
     assert response.json()["detail"] == "buyer_identification_required"
 
 

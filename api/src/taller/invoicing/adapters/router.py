@@ -369,7 +369,7 @@ def issue_invoice_route(
     except BuyerIdentificationRequired as exc:
         db.rollback()
         raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="buyer_identification_required"
+            status.HTTP_409_CONFLICT, detail="buyer_identification_required"
         ) from exc
     except (FiscalProfileMissing, CaiRangeMissing) as exc:
         # Both configuration gaps share one code at issuance (the
@@ -435,7 +435,7 @@ def issue_invoice_route(
         except BuyerIdentificationRequired as exc:
             db.rollback()
             raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, detail="buyer_identification_required"
+                status.HTTP_409_CONFLICT, detail="buyer_identification_required"
             ) from exc
         except (FiscalProfileMissing, CaiRangeMissing) as exc:
             db.rollback()
