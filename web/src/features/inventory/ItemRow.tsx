@@ -2,6 +2,7 @@ import { memo } from "react";
 
 import type { ItemOut } from "./api";
 import { inventoryCopy } from "./copy";
+import { formatQuantity } from "./format";
 
 export interface ItemRowProps {
   item: ItemOut;
@@ -59,7 +60,7 @@ export const ItemRow = memo(function ItemRow({ item, onOpen, onIncrement, onDecr
         ) : null}
       </button>
       <div className="flex flex-col items-center gap-2">
-        <span className="text-3xl font-bold tabular-nums text-brand-primary">{item.stock}</span>
+        <span className="text-3xl font-bold tabular-nums text-brand-primary">{formatQuantity(item.stock)}</span>
         <div className="flex gap-2">
           <button
             type="button"

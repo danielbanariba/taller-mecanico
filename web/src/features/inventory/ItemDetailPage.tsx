@@ -10,7 +10,7 @@ import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
 import { TextField } from "../../shared/ui/TextField";
 import { getInventoryErrorMessage, inventoryCopy } from "./copy";
-import { formatCents, MAX_STOCK, parseStockQuantity } from "./format";
+import { formatCents, formatQuantity, MAX_STOCK, parseStockQuantity } from "./format";
 import { useArchiveItem, useItem, useMovements, useRecordMovement, useUnarchiveItem } from "./hooks";
 import { MovementHistory } from "./MovementHistory";
 
@@ -125,7 +125,7 @@ export function ItemDetailPage() {
 
       <section className="flex flex-col items-center gap-4 rounded-2xl border border-brand-border bg-brand-card py-8">
         <p className="text-base text-brand-muted-foreground">{inventoryCopy.detail.stockLabel}</p>
-        <p className="text-6xl font-bold tabular-nums text-brand-primary">{data.stock}</p>
+        <p className="text-6xl font-bold tabular-nums text-brand-primary">{formatQuantity(data.stock)}</p>
         <div className="flex gap-4">
           <button
             type="button"

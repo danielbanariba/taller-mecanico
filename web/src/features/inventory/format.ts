@@ -29,3 +29,15 @@ const dateTimeFormatter = new Intl.DateTimeFormat("es-HN", {
 export function formatDateTime(iso: string): string {
   return dateTimeFormatter.format(new Date(iso));
 }
+
+const quantityFormatter = new Intl.NumberFormat("es-HN");
+
+/**
+ * Formats an integer quantity (stock on hand, a movement's quantity or
+ * delta) with thousands separators, e.g. 1000000 -> "1,000,000". Without
+ * this a large inventory's stock figure renders as an unreadable run of
+ * digits; use it everywhere a stock or movement quantity is displayed.
+ */
+export function formatQuantity(quantity: number): string {
+  return quantityFormatter.format(quantity);
+}

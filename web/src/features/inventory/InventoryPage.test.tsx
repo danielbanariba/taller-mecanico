@@ -155,6 +155,25 @@ describe("InventoryPage", () => {
     expect(within(row as HTMLElement).queryByText("Por acabarse")).not.toBeInTheDocument();
   });
 
+  it("formats a large stock number with thousands separators", async () => {
+    // Defect this catches: rendering a large stock count as a raw run of
+    // digits ("1000000") instead of a grouped, human-readable number
+    // ("1,000,000") -- unreadable at a glance for a shop with a large
+    // inventory.
+    mockSession();
+    server.use(
+      http.get("/api/inventory/items", () =>
+        HttpResponse.json([baseItem({ name: "Aceite al mayor", stock: 1_000_000 })]),
+      ),
+    );
+    renderInventoryPage();
+
+    const row = (await screen.findByText("Aceite al mayor")).closest("li");
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getByText("1,000,000")).toBeInTheDocument();
+    expect(within(row as HTMLElement).queryByText("1000000")).not.toBeInTheDocument();
+  });
+
   it("requests low_stock=true when 'Por acabarse' is tapped", async () => {
     mockSession();
     let lastLowStockParam: string | null = null;

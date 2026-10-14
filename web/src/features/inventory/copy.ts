@@ -1,4 +1,5 @@
 import type { MovementOut } from "./api";
+import { formatQuantity } from "./format";
 
 /**
  * All Spanish user-facing strings for the inventory feature live here, in
@@ -75,7 +76,7 @@ export const inventoryCopy = {
     historyTitle: "Historial de movimientos",
     historyEmpty: "Todavía no hay movimientos.",
     orderLink: (number: number) => `Orden #${number}`,
-    initialStock: (quantity: number) => `Stock inicial: ${quantity}`,
+    initialStock: (quantity: number) => `Stock inicial: ${formatQuantity(quantity)}`,
   },
   units: ["unidad", "galón", "litro", "juego", "par", "caja"],
   offline: {
@@ -102,16 +103,19 @@ export function movementLabel(
   movement: Pick<MovementOut, "kind" | "quantity" | "delta" | "is_initial_stock">,
 ): string {
   if (movement.kind === "in") {
-    return `Entrada +${movement.quantity}`;
+    return `Entrada +${formatQuantity(movement.quantity)}`;
   }
   if (movement.kind === "out") {
-    return `Salida −${movement.quantity}`;
+    return `Salida −${formatQuantity(movement.quantity)}`;
   }
   if (movement.is_initial_stock) {
     return inventoryCopy.detail.initialStock(movement.quantity);
   }
-  const deltaLabel = movement.delta >= 0 ? `+${movement.delta}` : `−${Math.abs(movement.delta)}`;
-  return `Conteo: ${movement.quantity} (${deltaLabel})`;
+  const deltaLabel =
+    movement.delta >= 0
+      ? `+${formatQuantity(movement.delta)}`
+      : `−${formatQuantity(Math.abs(movement.delta))}`;
+  return `Conteo: ${formatQuantity(movement.quantity)} (${deltaLabel})`;
 }
 
 /**

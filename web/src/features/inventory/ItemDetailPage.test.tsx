@@ -232,6 +232,21 @@ describe("ItemDetailPage", () => {
     expect(screen.getByText("Conteo: 8 (+3)")).toBeInTheDocument();
   });
 
+  it("formats the stock figure and movement quantities with thousands separators", async () => {
+    // Defect this catches: rendering a large stock count or movement
+    // quantity as a raw run of digits ("1000000") instead of a grouped,
+    // human-readable number ("1,000,000"), unreadable at a glance.
+    mockItemAndMovements(
+      [movement({ id: "mv-big", kind: "in", quantity: 2_500, delta: 2_500 })],
+      { ...ITEM, stock: 1_000_000 },
+    );
+    renderDetailPage();
+
+    expect(await screen.findByText("1,000,000")).toBeInTheDocument();
+    expect(screen.queryByText("1000000")).not.toBeInTheDocument();
+    expect(screen.getByText("Entrada +2,500")).toBeInTheDocument();
+  });
+
   it("links a movement to the order that caused it, and renders no such link for a manual one", async () => {
     // Defect this catches: the API already links a movement to the work
     // order that caused it (`order_id`/`order_number`), but the history
