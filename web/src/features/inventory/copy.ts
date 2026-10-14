@@ -87,6 +87,7 @@ export const inventoryCopy = {
     editDisabled: "Conéctese a internet para editar repuestos.",
     archiveDisabled: "Conéctese a internet para archivar repuestos.",
     restoreDisabled: "Conéctese a internet para restaurar repuestos.",
+    listUnavailable: "Conéctese a internet para ver sus repuestos.",
   },
 } as const;
 

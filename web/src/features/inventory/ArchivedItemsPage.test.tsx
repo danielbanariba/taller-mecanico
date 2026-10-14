@@ -77,6 +77,24 @@ describe("ArchivedItemsPage", () => {
     expect(await screen.findByText("No hay repuestos archivados.")).toBeInTheDocument();
   });
 
+  it("shows the offline message, not the empty state, when the first load fails offline", async () => {
+    // Defect this catches: a cold offline load settles into `network_error`
+    // and, branching only on `isPending`, renders "No hay repuestos
+    // archivados." as if nothing had ever been archived.
+    mockSession();
+    server.use(http.get("/api/inventory/items", () => HttpResponse.error()));
+    Object.defineProperty(window.navigator, "onLine", { configurable: true, get: () => false });
+
+    try {
+      renderArchivedItemsPage();
+
+      expect(await screen.findByText("Conéctese a internet para ver sus repuestos.")).toBeInTheDocument();
+      expect(screen.queryByText("No hay repuestos archivados.")).not.toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(window.navigator, "onLine");
+    }
+  });
+
   it("links each archived row to the item's detail screen", async () => {
     mockSession();
     server.use(

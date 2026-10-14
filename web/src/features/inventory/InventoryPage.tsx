@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { ApiError } from "../../shared/api/http";
+import { useOnlineStatus } from "../../shared/offline/useOnlineStatus";
 import { Alert } from "../../shared/ui/Alert";
 import { Button } from "../../shared/ui/Button";
 import { Chip } from "../../shared/ui/Chip";
@@ -30,6 +31,15 @@ export function InventoryPage() {
     q: debouncedQuery.trim() || undefined,
     lowStock: filter === "low" ? true : undefined,
   });
+  const isOffline = useOnlineStatus();
+  // No cached data AND the reason is connectivity: either already offline,
+  // or the first fetch already settled into `network_error`. Without this,
+  // a cold load that starts offline falls through to the empty state --
+  // indistinguishable from a workshop that genuinely has none (the same
+  // QA sweep finding as `CustomersPage` and `NewWorkOrderPage`).
+  const itemsUnavailable =
+    items.data === undefined &&
+    (isOffline || (items.error instanceof ApiError && items.error.code === "network_error"));
 
   const visibleItems = useMemo(() => {
     const list = items.data ?? [];
@@ -88,7 +98,9 @@ export function InventoryPage() {
         {inventoryCopy.list.viewArchived}
       </LinkButton>
 
-      {items.isPending ? (
+      {itemsUnavailable ? (
+        <Alert variant="info">{inventoryCopy.offline.listUnavailable}</Alert>
+      ) : items.isPending ? (
         <div className="flex justify-center py-8">
           <Spinner />
         </div>

@@ -366,6 +366,25 @@ describe("InventoryPage", () => {
     expect(screen.queryByText("Ocurrió un error. Intente de nuevo.")).not.toBeInTheDocument();
   });
 
+  it("shows the offline message, not the empty state, when the first load fails offline", async () => {
+    // Defect this catches: branching only on `items.isPending` falls
+    // through to the empty state the moment a cold offline load settles
+    // into `network_error`, telling the mechanic "Todavía no hay
+    // repuestos" as if the workshop had none.
+    mockSession();
+    server.use(http.get("/api/inventory/items", () => HttpResponse.error()));
+    Object.defineProperty(window.navigator, "onLine", { configurable: true, get: () => false });
+
+    try {
+      renderInventoryPage();
+
+      expect(await screen.findByText("Conéctese a internet para ver sus repuestos.")).toBeInTheDocument();
+      expect(screen.queryByText("Todavía no hay repuestos")).not.toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(window.navigator, "onLine");
+    }
+  });
+
   it("ends with the correct final stock when two rapid taps' server responses would resolve in reverse order", async () => {
     // Defect this catches (the out-of-order reconciliation bug found in
     // the T5 review): if each tap sent its own independent, unsynchronized

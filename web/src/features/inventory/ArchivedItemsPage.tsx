@@ -1,6 +1,9 @@
 import { useMemo } from "react";
 import { Link } from "react-router";
 
+import { ApiError } from "../../shared/api/http";
+import { useOnlineStatus } from "../../shared/offline/useOnlineStatus";
+import { Alert } from "../../shared/ui/Alert";
 import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
 import { inventoryCopy } from "./copy";
@@ -22,6 +25,16 @@ export function ArchivedItemsPage() {
     () => (items.data ?? []).filter((item) => item.archived_at !== null),
     [items.data],
   );
+  const isOffline = useOnlineStatus();
+  // No cached data AND the reason is connectivity: either already offline,
+  // or the first fetch already settled into `network_error`. Without this,
+  // a cold load that starts offline falls through to "No hay repuestos
+  // archivados." -- indistinguishable from a workshop that never archived
+  // anything (the same QA sweep finding as `CustomersPage` and
+  // `NewWorkOrderPage`).
+  const itemsUnavailable =
+    items.data === undefined &&
+    (isOffline || (items.error instanceof ApiError && items.error.code === "network_error"));
 
   return (
     <div className="flex flex-col gap-6">
@@ -31,7 +44,9 @@ export function ArchivedItemsPage() {
         {inventoryCopy.detail.backToList}
       </LinkButton>
 
-      {items.isPending ? (
+      {itemsUnavailable ? (
+        <Alert variant="info">{inventoryCopy.offline.listUnavailable}</Alert>
+      ) : items.isPending ? (
         <div className="flex justify-center py-8">
           <Spinner />
         </div>
