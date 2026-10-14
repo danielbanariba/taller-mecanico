@@ -301,6 +301,39 @@ def archive_item(*, workshop_id: uuid.UUID, item_id: uuid.UUID, item_repo: ItemR
         item_repo.save(item)
 
 
+def unarchive_item(
+    *, workshop_id: uuid.UUID, item_id: uuid.UUID, item_repo: ItemRepository
+) -> Item:
+    """Restore an archived item to the default (active) list.
+
+    Idempotent: calling this on an item that is already active is a no-op
+    that returns it unchanged, never an error -- the same shape
+    `archive_item` already gives an already-archived item.
+
+    Raises:
+        ItemNotFound: no such item in this workshop.
+        ItemNameTaken: another active item already has this name (the
+            partial unique index only applies to active items, so a name
+            freed by archiving the original owner, or reused by a new item
+            since, can collide only now, when this item becomes active
+            again).
+    """
+    item = item_repo.get_by_id(workshop_id=workshop_id, item_id=item_id)
+    if item is None:
+        raise ItemNotFound(item_id)
+    if item.archived_at is not None:
+        collision = item_repo.get_active_by_name(
+            workshop_id=workshop_id, name=item.name, exclude_id=item.id
+        )
+        if collision is not None:
+            raise ItemNameTaken(item.name)
+        now = datetime.now(UTC)
+        item.archived_at = None
+        item.updated_at = now
+        item_repo.save(item)
+    return item
+
+
 def list_item_movements(
     *,
     workshop_id: uuid.UUID,

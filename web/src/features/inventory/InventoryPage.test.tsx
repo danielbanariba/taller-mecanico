@@ -71,6 +71,18 @@ describe("InventoryPage", () => {
     vi.useRealTimers();
   });
 
+  it("shows a link to the archived items list", async () => {
+    // Defect this catches: no way to reach the archived items (listing or
+    // restoring one) from the main inventory screen, leaving an archived
+    // item unreachable once it is hidden from the default list.
+    mockSession();
+    server.use(http.get("/api/inventory/items", () => HttpResponse.json([baseItem({})])));
+    renderInventoryPage();
+
+    const link = await screen.findByRole("link", { name: "Ver archivados" });
+    expect(link).toHaveAttribute("href", "/inventario/archivados");
+  });
+
   it("never shows another workshop's cached items once the session belongs to a different workshop", async () => {
     // Defect this catches: inventory query keys that are not scoped by
     // workshop. When the session changes workshop without this tab's cache

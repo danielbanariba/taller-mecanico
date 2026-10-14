@@ -250,6 +250,40 @@ describe("ItemDetailPage", () => {
     expect(orderLinks[0]).toHaveAttribute("href", "/ordenes/order-1");
   });
 
+  it("shows 'Restaurar' instead of 'Archivar' for an already-archived item, and sends the unarchive request", async () => {
+    // Defect this catches: an archived item's detail screen still showed
+    // "Archivar" (archiving an already-archived item is a no-op, so this
+    // left no way to bring it back) instead of the "Restaurar" action that
+    // actually reverses it.
+    let unarchiveWasCalled = false;
+    mockItemAndMovements([], { ...ITEM, archived_at: "2026-01-02T00:00:00Z" });
+    server.use(
+      http.post("/api/inventory/items/item-1/unarchive", () => {
+        unarchiveWasCalled = true;
+        return HttpResponse.json({ ...ITEM, archived_at: null });
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetailPage();
+
+    await screen.findByText("10");
+    expect(screen.queryByRole("button", { name: "Archivar" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Restaurar" }));
+
+    expect(unarchiveWasCalled).toBe(true);
+  });
+
+  it("disables 'Restaurar' offline with a message, for an archived item", async () => {
+    mockItemAndMovements([], { ...ITEM, archived_at: "2026-01-02T00:00:00Z" });
+    renderDetailPage();
+
+    await screen.findByText("10");
+    goOffline();
+
+    expect(await screen.findByText("Conéctese a internet para restaurar repuestos.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Restaurar" })).toBeDisabled();
+  });
+
   it("asks for confirmation before archiving, then sends the archive request and returns to the list", async () => {
     mockItemAndMovements();
     let archiveWasCalled = false;

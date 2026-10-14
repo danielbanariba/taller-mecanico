@@ -5,6 +5,7 @@ import { ApiError } from "../../shared/api/http";
 import { Alert } from "../../shared/ui/Alert";
 import { Button } from "../../shared/ui/Button";
 import { Chip } from "../../shared/ui/Chip";
+import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
 import { TextField } from "../../shared/ui/TextField";
 import { getInventoryErrorMessage, inventoryCopy } from "./copy";
@@ -83,6 +84,9 @@ export function InventoryPage() {
       </div>
 
       <Button onClick={() => navigate("/inventario/nuevo")}>{inventoryCopy.list.addItem}</Button>
+      <LinkButton to="/inventario/archivados" variant="secondary">
+        {inventoryCopy.list.viewArchived}
+      </LinkButton>
 
       {items.isPending ? (
         <div className="flex justify-center py-8">

@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate, Outlet } from "react-router";
 import { LoginPage } from "../features/auth/LoginPage";
 import { RegisterPage } from "../features/auth/RegisterPage";
 import { customerRoutes } from "../features/customers/routes";
+import { ArchivedItemsPage } from "../features/inventory/ArchivedItemsPage";
 import { EditItemPage } from "../features/inventory/EditItemPage";
 import { InventoryPage } from "../features/inventory/InventoryPage";
 import { ItemDetailPage } from "../features/inventory/ItemDetailPage";
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <InventoryPage /> },
               { path: "nuevo", element: <NewItemPage /> },
+              { path: "archivados", element: <ArchivedItemsPage /> },
               { path: ":id", element: <ItemDetailPage /> },
               { path: ":id/editar", element: <EditItemPage /> },
             ],

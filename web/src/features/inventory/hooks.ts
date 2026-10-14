@@ -171,6 +171,18 @@ export function useArchiveItem() {
   });
 }
 
+export function useUnarchiveItem() {
+  const queryClient = useQueryClient();
+  const workshopId = useWorkshopId();
+  return useMutation({
+    mutationFn: (id: string) => inventoryApi.unarchiveItem(id),
+    onSuccess: (item, id) => {
+      queryClient.setQueryData(itemQueryKey(workshopId, id), item);
+      queryClient.invalidateQueries({ queryKey: itemsQueryBase(workshopId) });
+    },
+  });
+}
+
 interface RecordMovementSnapshot {
   previousItem: ItemOut | undefined;
   previousLists: [QueryKey, ItemOut[] | undefined][];

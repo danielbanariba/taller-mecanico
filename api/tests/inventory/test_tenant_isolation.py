@@ -89,6 +89,22 @@ def test_second_workshop_cannot_patch_archive_or_read_history_of_first_workshops
     assert unaffected.json()["archived_at"] is None
 
 
+def test_second_workshop_cannot_unarchive_first_workshops_item(
+    authenticated_client: TestClient, second_authenticated_client: TestClient
+) -> None:
+    item = _create_item(authenticated_client)
+    archive_response = authenticated_client.post(f"/api/inventory/items/{item['id']}/archive")
+    assert archive_response.status_code == 204
+
+    response = second_authenticated_client.post(f"/api/inventory/items/{item['id']}/unarchive")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "item_not_found"
+
+    unaffected = authenticated_client.get(f"/api/inventory/items/{item['id']}")
+    assert unaffected.json()["archived_at"] is not None
+
+
 def test_second_workshop_cannot_record_a_movement_on_first_workshops_item(
     authenticated_client: TestClient, second_authenticated_client: TestClient
 ) -> None:

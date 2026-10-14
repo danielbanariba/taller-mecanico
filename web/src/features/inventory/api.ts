@@ -102,6 +102,7 @@ export const inventoryApi = {
   updateItem: (id: string, payload: UpdateItemPayload) =>
     http.patch<ItemOut>(`/api/inventory/items/${id}`, payload),
   archiveItem: (id: string) => http.post<void>(`/api/inventory/items/${id}/archive`),
+  unarchiveItem: (id: string) => http.post<ItemOut>(`/api/inventory/items/${id}/unarchive`),
   listMovements: (id: string, limit = 50) =>
     http.get<MovementOut[]>(`/api/inventory/items/${id}/movements?limit=${limit}`),
   putMovement: (movementId: string, payload: PutMovementPayload) =>

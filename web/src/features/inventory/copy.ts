@@ -20,6 +20,11 @@ export const inventoryCopy = {
     emptyFilteredBody: "Pruebe con otra búsqueda o quite el filtro.",
     decrementLabel: (name: string) => `Quitar una unidad de ${name}`,
     incrementLabel: (name: string) => `Agregar una unidad de ${name}`,
+    viewArchived: "Ver archivados",
+  },
+  archived: {
+    title: "Repuestos archivados",
+    empty: "No hay repuestos archivados.",
   },
   badges: {
     lowStock: "Por acabarse",
@@ -62,9 +67,11 @@ export const inventoryCopy = {
     backToList: "Volver al inventario",
     archiveAction: "Archivar",
     archiveConfirmTitle: "Archivar repuesto",
-    archiveConfirmBody: "Ya no aparecerá en la lista de inventario. Esta acción no se puede deshacer desde aquí.",
+    archiveConfirmBody:
+      'Ya no aparecerá en la lista de inventario. Podrá restaurarlo luego desde "Ver archivados".',
     archiveConfirmSubmit: "Archivar",
     archiveConfirmCancel: "Cancelar",
+    restoreAction: "Restaurar",
     historyTitle: "Historial de movimientos",
     historyEmpty: "Todavía no hay movimientos.",
     orderLink: (number: number) => `Orden #${number}`,
@@ -78,6 +85,7 @@ export const inventoryCopy = {
     createDisabled: "Conéctese a internet para agregar repuestos.",
     editDisabled: "Conéctese a internet para editar repuestos.",
     archiveDisabled: "Conéctese a internet para archivar repuestos.",
+    restoreDisabled: "Conéctese a internet para restaurar repuestos.",
   },
 } as const;
 

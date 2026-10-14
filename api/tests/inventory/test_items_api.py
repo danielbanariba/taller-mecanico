@@ -29,7 +29,12 @@ Defects these catch:
   that no longer maps a rename losing the race to a concurrent one to 409;
 - a create replay that accepts whatever movement sits at the derived
   initial-stock id as "the same initial stock", even one recorded with a
-  different kind or note.
+  different kind or note;
+- an unarchive that silently bumps `updated_at` for an item that was
+  already active, instead of leaving it untouched;
+- an unarchive that loses a rename/create race to a name collision
+  committed after its own pre-check ran, letting the database's
+  IntegrityError surface as a raw 500 instead of a 409.
 """
 
 import uuid
@@ -38,9 +43,15 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from taller.inventory.adapters.repositories import SqlAlchemyItemRepository
-from taller.inventory.application.use_cases import INITIAL_STOCK_NOTE, _initial_movement_id
+from taller.inventory.application.use_cases import (
+    INITIAL_STOCK_NOTE,
+    _initial_movement_id,
+    unarchive_item,
+)
+from taller.inventory.domain.errors import ItemNameTaken
 
 
 def _create_item(client: TestClient, **overrides: object) -> dict:
@@ -372,6 +383,105 @@ def test_get_unknown_item_returns_404(authenticated_client: TestClient) -> None:
     response = authenticated_client.get("/api/inventory/items/00000000-0000-0000-0000-000000000000")
     assert response.status_code == 404
     assert response.json()["detail"] == "item_not_found"
+
+
+def test_unarchive_restores_the_item_to_the_default_list(
+    authenticated_client: TestClient,
+) -> None:
+    item = _create_item(authenticated_client, name="Filtro de aire usado")
+    archive_response = authenticated_client.post(f"/api/inventory/items/{item['id']}/archive")
+    assert archive_response.status_code == 204
+
+    response = authenticated_client.post(f"/api/inventory/items/{item['id']}/unarchive")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["archived_at"] is None
+
+    default_list = authenticated_client.get("/api/inventory/items")
+    assert item["id"] in [row["id"] for row in default_list.json()]
+
+
+def test_unarchive_is_idempotent_for_an_already_active_item(
+    authenticated_client: TestClient,
+) -> None:
+    """Defect this catches: `unarchive_item` running its name-collision
+    pre-check and save unconditionally, even for an item that is already
+    active, instead of returning it untouched. A 200 with `archived_at:
+    null` alone cannot tell a true no-op apart from a redundant write that
+    happens to land on the same values -- asserting `updated_at` stayed
+    exactly what it was before the call can.
+    """
+    item = _create_item(authenticated_client, name="Manguera de radiador")
+
+    response = authenticated_client.post(f"/api/inventory/items/{item['id']}/unarchive")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["archived_at"] is None
+    assert body["updated_at"] == item["updated_at"]
+
+
+def test_unarchive_unknown_item_returns_404(authenticated_client: TestClient) -> None:
+    response = authenticated_client.post(
+        "/api/inventory/items/00000000-0000-0000-0000-000000000000/unarchive"
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "item_not_found"
+
+
+def test_unarchive_pre_check_rejects_a_colliding_name_before_touching_the_database(
+    authenticated_client: TestClient, db_session: Session
+) -> None:
+    """Defect this catches: `unarchive_item`'s own pre-check (`if collision
+    is not None: raise ItemNameTaken`) never running at all. Calling the
+    use case directly, with no monkeypatching, means only that pre-check --
+    not the database's unique index, which `SqlAlchemyItemRepository.save`
+    is never even reached to trigger -- can be what raises here; removing
+    it would let this call through to `save()` and raise a plain
+    `IntegrityError` instead of the domain's own `ItemNameTaken`.
+    """
+    me = authenticated_client.get("/api/auth/me").json()
+    workshop_id = uuid.UUID(me["workshop"]["id"])
+
+    archived = _create_item(authenticated_client, name="Radiador usado")
+    archive_response = authenticated_client.post(f"/api/inventory/items/{archived['id']}/archive")
+    assert archive_response.status_code == 204
+    _create_item(authenticated_client, name="RADIADOR USADO")
+
+    item_repo = SqlAlchemyItemRepository(db_session)
+    with pytest.raises(ItemNameTaken):
+        unarchive_item(
+            workshop_id=workshop_id, item_id=uuid.UUID(archived["id"]), item_repo=item_repo
+        )
+
+
+def test_unarchive_that_loses_a_rename_race_reports_the_name_as_taken(
+    authenticated_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Defect this catches: a concurrent create/rename that commits the
+    same name after the pre-check ran and saw no collision, with the
+    router no longer mapping the resulting database IntegrityError on the
+    partial unique index on active names to a 409 -- letting a raw 500
+    through instead (or, if the index itself were missing, silently
+    creating two active items that share one name).
+    """
+    archived = _create_item(authenticated_client, name="Bomba de agua")
+    archive_response = authenticated_client.post(f"/api/inventory/items/{archived['id']}/archive")
+    assert archive_response.status_code == 204
+    _create_item(authenticated_client, name="BOMBA DE AGUA")
+    # A concurrent create/rename committed after the pre-check ran: the
+    # pre-check sees no collision, so only the database's unique index (and
+    # this route's IntegrityError mapping) catches it. Mirrors
+    # `test_patch_that_loses_a_rename_race_reports_the_name_as_taken`.
+    monkeypatch.setattr(SqlAlchemyItemRepository, "get_active_by_name", lambda *a, **kw: None)
+
+    response = authenticated_client.post(f"/api/inventory/items/{archived['id']}/unarchive")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "item_name_taken"
+
+    unaffected = authenticated_client.get(f"/api/inventory/items/{archived['id']}")
+    assert unaffected.json()["archived_at"] is not None
 
 
 def test_items_endpoints_require_authentication(client: TestClient) -> None:

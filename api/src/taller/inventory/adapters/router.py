@@ -28,6 +28,7 @@ from taller.inventory.application.use_cases import (
     list_item_movements,
     list_items,
     record_movement,
+    unarchive_item,
     update_item,
 )
 from taller.inventory.domain.entities import Item
@@ -209,6 +210,33 @@ def archive_item_route(
     except ItemNotFound as exc:
         db.rollback()
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="item_not_found") from exc
+
+
+@router.post("/items/{item_id}/unarchive", response_model=ItemOut)
+def unarchive_item_route(
+    item_id: uuid.UUID,
+    workshop_id: uuid.UUID = Depends(get_current_workshop_id),
+    db: Session = Depends(get_db),
+) -> ItemOut:
+    item_repo = SqlAlchemyItemRepository(db)
+    try:
+        item = unarchive_item(workshop_id=workshop_id, item_id=item_id, item_repo=item_repo)
+        db.commit()
+    except ItemNotFound as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="item_not_found") from exc
+    except ItemNameTaken as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="item_name_taken") from exc
+    except IntegrityError as exc:
+        db.rollback()
+        # A concurrent create/rename committed the same name after our
+        # pre-check: the unique index is the real guarantee, mirroring
+        # `update_item_route`'s own retry-free handling of this race.
+        if _violated_constraint(exc) != _ACTIVE_NAME_INDEX:
+            raise
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="item_name_taken") from exc
+    return ItemOut.from_domain(item)
 
 
 @router.get("/items/{item_id}/movements", response_model=list[MovementOut])
