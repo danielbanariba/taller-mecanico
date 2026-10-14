@@ -69,7 +69,17 @@ export function AppShell() {
     <div className="flex min-h-dvh flex-col">
       <header className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-4 py-6">
         <p className="text-2xl font-bold text-brand-primary">{session.data?.workshop.name}</p>
-        <Button variant="secondary" onClick={openMore} className="w-auto px-4">
+        {/* `fullWidth={false}` keeps this content-width instead of `Button`'s
+            default full-bleed sizing; `!min-h-10`/`!text-base` need the `!`
+            important modifier to win over `Button`'s own `min-h-12`/`text-lg`
+            -- Tailwind has no class-merging, so a plain conflicting class
+            loses to whichever rule the generated stylesheet orders later. */}
+        <Button
+          variant="secondary"
+          onClick={openMore}
+          fullWidth={false}
+          className="!min-h-10 px-4 !text-base"
+        >
           {appCopy.more.trigger}
         </Button>
       </header>

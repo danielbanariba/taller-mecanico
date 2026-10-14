@@ -9,6 +9,15 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   /** Shows a spinner and disables the button; use for in-flight submits. */
   loading?: boolean;
+  /**
+   * Whether the button stretches to fill its container. Defaults to `true`
+   * for the common full-bleed mobile layout; set to `false` for a button
+   * that should size to its label plus padding instead (e.g. a header
+   * trigger). Never combine this with a `w-auto`/`w-*` class in `className`
+   * -- Tailwind has no class-merging, so two conflicting width utilities
+   * leave the outcome to generated-CSS source order, not JSX order.
+   */
+  fullWidth?: boolean;
   children: ReactNode;
 }
 
@@ -20,6 +29,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 export function Button({
   variant = "primary",
   loading = false,
+  fullWidth = true,
   disabled,
   className = "",
   children,
@@ -32,7 +42,7 @@ export function Button({
       {...rest}
       disabled={isDisabled}
       aria-busy={loading}
-      className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-lg font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${BUTTON_VARIANT_CLASSES[variant]} ${className}`}
+      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-lg font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${fullWidth ? "w-full" : ""} ${BUTTON_VARIANT_CLASSES[variant]} ${className}`}
     >
       {loading ? <Spinner /> : null}
       {children}

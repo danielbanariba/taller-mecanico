@@ -5,6 +5,12 @@ import { BUTTON_VARIANT_CLASSES, type ButtonVariant } from "./buttonVariants";
 
 export interface LinkButtonProps extends Omit<LinkProps, "className" | "children"> {
   variant?: ButtonVariant;
+  /**
+   * Whether the link stretches to fill its container. Defaults to `true`,
+   * matching `Button`'s own default; see `Button`'s `fullWidth` doc for why
+   * it must never be combined with a `w-auto`/`w-*` class in `className`.
+   */
+  fullWidth?: boolean;
   className?: string;
   children: ReactNode;
 }
@@ -17,11 +23,17 @@ export interface LinkButtonProps extends Omit<LinkProps, "className" | "children
  * Use this instead of wrapping a `Button` in a `Link` for any action that
  * navigates rather than submitting or mutating something in place.
  */
-export function LinkButton({ variant = "primary", className = "", children, ...rest }: LinkButtonProps) {
+export function LinkButton({
+  variant = "primary",
+  fullWidth = true,
+  className = "",
+  children,
+  ...rest
+}: LinkButtonProps) {
   return (
     <Link
       {...rest}
-      className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-lg font-semibold transition-colors ${BUTTON_VARIANT_CLASSES[variant]} ${className}`}
+      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-lg font-semibold transition-colors ${fullWidth ? "w-full" : ""} ${BUTTON_VARIANT_CLASSES[variant]} ${className}`}
     >
       {children}
     </Link>

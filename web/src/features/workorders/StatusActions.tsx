@@ -61,7 +61,8 @@ export function StatusActions({ order }: StatusActionsProps) {
             onClick={() => changeStatus.mutate({ status: target })}
             loading={changeStatus.isPending && changeStatus.variables?.status === target}
             disabled={isOffline || changeStatus.isPending}
-            className="w-auto px-4"
+            fullWidth={false}
+            className="px-4"
           >
             {statusActionLabel(target)}
           </Button>
@@ -72,7 +73,8 @@ export function StatusActions({ order }: StatusActionsProps) {
             onClick={() => setCancelConfirmOpen(true)}
             loading={cancelling}
             disabled={isOffline || changeStatus.isPending}
-            className="w-auto px-4"
+            fullWidth={false}
+            className="px-4"
           >
             {statusActionLabel("cancelled")}
           </Button>

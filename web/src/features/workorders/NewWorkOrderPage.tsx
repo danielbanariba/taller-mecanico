@@ -119,7 +119,7 @@ export function NewWorkOrderPage() {
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">
             <p className="text-base font-semibold text-brand-foreground">{effectiveCustomer.full_name}</p>
-            <Button variant="secondary" onClick={() => setStep("customer")} className="w-auto px-4">
+            <Button variant="secondary" onClick={() => setStep("customer")} fullWidth={false} className="px-4">
               {workOrdersCopy.newOrder.changeCustomer}
             </Button>
           </div>

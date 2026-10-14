@@ -87,7 +87,8 @@ export function PaymentList({ orderId, payments }: PaymentListProps) {
               variant="destructive"
               onClick={() => openVoidDialog(payment)}
               disabled={isOffline}
-              className="w-auto px-4"
+              fullWidth={false}
+              className="px-4"
             >
               {workOrdersCopy.payments.voidAction}
             </Button>

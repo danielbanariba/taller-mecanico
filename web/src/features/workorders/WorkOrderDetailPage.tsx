@@ -176,7 +176,13 @@ export function WorkOrderDetailPage() {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-brand-primary">{workOrdersCopy.detail.linesTitle}</h2>
           {data.lines_editable ? (
-            <Button variant="secondary" onClick={handleOpenCreateLine} disabled={isOffline} className="w-auto px-4">
+            <Button
+              variant="secondary"
+              onClick={handleOpenCreateLine}
+              disabled={isOffline}
+              fullWidth={false}
+              className="px-4"
+            >
               {workOrdersCopy.lineEditor.addLine}
             </Button>
           ) : null}
