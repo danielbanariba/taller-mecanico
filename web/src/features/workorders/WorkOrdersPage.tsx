@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router";
 
 import { Button } from "../../shared/ui/Button";
@@ -25,6 +25,22 @@ export function WorkOrdersPage() {
   const [statusGroup, setStatusGroup] = useState<StatusGroup>("open");
   const orders = useWorkOrders(statusGroup);
   const flatOrders = orders.data?.pages.flat() ?? [];
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // ARIA tabs roving-tabindex pattern: only the selected tab is in the tab
+  // order (`tabIndex 0`); the arrows move focus AND selection together,
+  // wrapping past either end, so a screen-reader/keyboard user never has
+  // to Tab through every tab one at a time.
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+      return;
+    }
+    event.preventDefault();
+    const direction = event.key === "ArrowRight" ? 1 : -1;
+    const nextIndex = (index + direction + TABS.length) % TABS.length;
+    setStatusGroup(TABS[nextIndex].group);
+    tabRefs.current[nextIndex]?.focus();
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -33,13 +49,18 @@ export function WorkOrdersPage() {
       <Button onClick={() => navigate("/ordenes/nueva")}>{workOrdersCopy.list.newOrder}</Button>
 
       <div role="tablist" className="flex gap-2">
-        {TABS.map(({ group, label }) => (
+        {TABS.map(({ group, label }, index) => (
           <button
             key={group}
+            ref={(node) => {
+              tabRefs.current[index] = node;
+            }}
             type="button"
             role="tab"
             aria-selected={statusGroup === group}
+            tabIndex={statusGroup === group ? 0 : -1}
             onClick={() => setStatusGroup(group)}
+            onKeyDown={(event) => handleTabKeyDown(event, index)}
             className={tabClassName(statusGroup === group)}
           >
             {label}
