@@ -128,4 +128,32 @@ describe("WorkOrdersPage", () => {
     expect(openTab).toHaveAttribute("aria-selected", "true");
     expect(await screen.findByText("Orden #1")).toBeInTheDocument();
   });
+
+  it("shows the offline message, not the empty state, when the first load settles into network_error while already offline", async () => {
+    // Defect this catches: branching only on `orders.isPending` falls
+    // straight through to `WorkOrderList`'s own empty state the instant the
+    // query settles into its error state -- which a cold load that starts
+    // offline does almost immediately -- showing "Todavía no hay órdenes"
+    // as if this workshop genuinely had none, the same bug
+    // `NewWorkOrderPage`'s customer/vehicle steps had.
+    server.use(
+      http.get("/api/auth/me", () =>
+        HttpResponse.json({
+          user: { id: "u1", full_name: "Ana Pérez", phone: "99998888", role: "owner" },
+          workshop: { id: "w1", name: "Taller Ana" },
+        }),
+      ),
+      http.get("/api/work-orders", () => HttpResponse.error()),
+    );
+    Object.defineProperty(window.navigator, "onLine", { configurable: true, get: () => false });
+
+    try {
+      renderWorkOrdersPage();
+
+      expect(await screen.findByText("Conéctese a internet para ver sus órdenes.")).toBeInTheDocument();
+      expect(screen.queryByText("Todavía no hay órdenes")).not.toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(window.navigator, "onLine");
+    }
+  });
 });

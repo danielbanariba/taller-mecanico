@@ -62,4 +62,27 @@ describe("CustomersPage", () => {
 
     expect(await screen.findByText("María Hernández")).toBeInTheDocument();
   });
+
+  it("shows the offline message, not the empty state, when the first load settles into network_error while already offline", async () => {
+    // Defect this catches: branching only on `customers.isPending` falls
+    // straight through to `CustomerList`'s own empty state the instant the
+    // query settles into its error state -- which a cold load that starts
+    // offline does almost immediately -- showing "Todavía no hay clientes"
+    // as if this workshop genuinely had none, the same bug
+    // `NewWorkOrderPage`'s customer step had.
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION_RESPONSE)),
+      http.get("/api/customers", () => HttpResponse.error()),
+    );
+    Object.defineProperty(window.navigator, "onLine", { configurable: true, get: () => false });
+
+    try {
+      renderCustomersPage();
+
+      expect(await screen.findByText("Conéctese a internet para ver sus clientes.")).toBeInTheDocument();
+      expect(screen.queryByText("Todavía no hay clientes")).not.toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(window.navigator, "onLine");
+    }
+  });
 });

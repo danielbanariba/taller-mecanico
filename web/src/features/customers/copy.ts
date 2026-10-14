@@ -51,6 +51,7 @@ export const customersCopy = {
     createDisabled: "Conéctese a internet para agregar clientes.",
     editDisabled: "Conéctese a internet para editar clientes.",
     archiveDisabled: "Conéctese a internet para archivar clientes.",
+    listDisabled: "Conéctese a internet para ver sus clientes.",
   },
   /**
    * Shown wherever an archived customer would otherwise let the mechanic

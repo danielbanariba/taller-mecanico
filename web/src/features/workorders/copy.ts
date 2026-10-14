@@ -58,6 +58,7 @@ export const workOrdersCopy = {
     statusChangeDisabled: "Conéctese a internet para cambiar el estado de la orden.",
     paymentDisabled: "Conéctese a internet para registrar un pago.",
     voidPaymentDisabled: "Conéctese a internet para anular un pago.",
+    listDisabled: "Conéctese a internet para ver sus órdenes.",
   },
   statusActions: {
     // `quote` is never a reachable target (`TRANSITIONS` has no edge into

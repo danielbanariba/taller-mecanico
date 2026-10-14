@@ -1,6 +1,9 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router";
 
+import { ApiError } from "../../shared/api/http";
+import { useOnlineStatus } from "../../shared/offline/useOnlineStatus";
+import { Alert } from "../../shared/ui/Alert";
 import { Button } from "../../shared/ui/Button";
 import { Spinner } from "../../shared/ui/Spinner";
 import { workOrdersCopy } from "./copy";
@@ -22,10 +25,21 @@ function tabClassName(isActive: boolean): string {
 /** Container: the work orders list, split into the Abiertas and Historial tabs. Status actions and search arrive in later slices. */
 export function WorkOrdersPage() {
   const navigate = useNavigate();
+  const isOffline = useOnlineStatus();
   const [statusGroup, setStatusGroup] = useState<StatusGroup>("open");
   const orders = useWorkOrders(statusGroup);
   const flatOrders = orders.data?.pages.flat() ?? [];
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // No cached page AND the reason is connectivity: either already offline,
+  // or the first fetch already settled into `network_error`. Without this,
+  // a cold load that starts offline falls through to `WorkOrderList`'s own
+  // empty state ("Todavía no hay órdenes") -- indistinguishable from a
+  // workshop that genuinely has none (a QA sweep finding, the same bug
+  // `NewWorkOrderPage`'s customer/vehicle steps had).
+  const ordersUnavailable =
+    orders.data === undefined &&
+    (isOffline || (orders.error instanceof ApiError && orders.error.code === "network_error"));
 
   // ARIA tabs roving-tabindex pattern: only the selected tab is in the tab
   // order (`tabIndex 0`); the arrows move focus AND selection together,
@@ -68,7 +82,9 @@ export function WorkOrdersPage() {
         ))}
       </div>
 
-      {orders.isPending ? (
+      {ordersUnavailable ? (
+        <Alert variant="info">{workOrdersCopy.offline.listDisabled}</Alert>
+      ) : orders.isPending ? (
         <div className="flex justify-center py-8">
           <Spinner />
         </div>
