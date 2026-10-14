@@ -45,6 +45,32 @@ describe("RegisterPage", () => {
     expect(await screen.findByText("Ese número de teléfono ya está registrado.")).toBeInTheDocument();
   });
 
+  it("blocks submission for a malformed phone without calling the API", async () => {
+    // Defect this catches: a malformed phone (too short, wrong first
+    // digit) is sent straight to the API, which can only reject it as a
+    // generic 422 the user sees as "Ocurrió un error".
+    let apiWasCalled = false;
+    server.use(
+      http.post("/api/auth/register", () => {
+        apiWasCalled = true;
+        return HttpResponse.json({ detail: "unexpected" }, { status: 500 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderRegisterPage();
+
+    await user.type(screen.getByLabelText(/nombre del taller/i), "Taller Ana");
+    await user.type(screen.getByLabelText(/nombre del propietario/i), "Ana Pérez");
+    await user.type(screen.getByLabelText(/teléfono/i), "12345");
+    await user.type(screen.getByLabelText(/contraseña/i), "password123");
+    await user.click(screen.getByRole("button", { name: /crear cuenta/i }));
+
+    expect(
+      await screen.findByText("Ingrese un teléfono hondureño válido de 8 dígitos."),
+    ).toBeInTheDocument();
+    expect(apiWasCalled).toBe(false);
+  });
+
   it("blocks submission for a password shorter than 8 characters without calling the API", async () => {
     let apiWasCalled = false;
     server.use(

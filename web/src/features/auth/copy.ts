@@ -8,6 +8,7 @@ export const authCopy = {
     title: "Iniciar sesión",
     phoneLabel: "Teléfono",
     phonePlaceholder: "9999-9999",
+    phoneInvalid: "Ingrese un teléfono hondureño válido de 8 dígitos.",
     passwordLabel: "Contraseña",
     submit: "Iniciar sesión",
     submitPending: "Ingresando...",
@@ -21,6 +22,7 @@ export const authCopy = {
     ownerNameLabel: "Nombre del propietario",
     phoneLabel: "Teléfono",
     phonePlaceholder: "9999-9999",
+    phoneInvalid: "Ingrese un teléfono hondureño válido de 8 dígitos.",
     passwordLabel: "Contraseña",
     passwordHelper: "Mínimo 8 caracteres.",
     passwordTooShort: "La contraseña debe tener al menos 8 caracteres.",
@@ -49,6 +51,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   too_many_login_attempts: "Demasiados intentos fallidos. Espere unos minutos e intente de nuevo.",
   not_authenticated: "Debe iniciar sesión para continuar.",
   network_error: "No se pudo conectar. Verifique su conexión e intente de nuevo.",
+  validation_error: "Verifique los datos ingresados e intente de nuevo.",
 };
 
 const GENERIC_ERROR_MESSAGE = "Ocurrió un error. Intente de nuevo.";
