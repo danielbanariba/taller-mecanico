@@ -51,6 +51,8 @@ export const workOrdersCopy = {
     submitPending: "Creando...",
   },
   offline: {
+    customerSearchDisabled: "Conéctese a internet para buscar clientes.",
+    vehicleListDisabled: "Conéctese a internet para buscar vehículos.",
     createOrderDisabled: "Conéctese a internet para crear órdenes.",
     lineEditDisabled: "Conéctese a internet para editar líneas.",
     statusChangeDisabled: "Conéctese a internet para cambiar el estado de la orden.",
