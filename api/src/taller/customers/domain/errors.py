@@ -15,6 +15,20 @@ class CustomerNotFound(Exception):
         self.customer_id = customer_id
 
 
+class CustomerArchived(Exception):
+    """Raised when a write targets a customer that is archived.
+
+    Covers editing an archived customer and registering a new vehicle for
+    one: both are refused once `archived_at` is set, distinct from
+    `CustomerNotFound` so the caller can tell "there is no such customer"
+    apart from "that customer exists but is archived".
+    """
+
+    def __init__(self, customer_id: uuid.UUID) -> None:
+        super().__init__(f"Customer is archived: {customer_id}")
+        self.customer_id = customer_id
+
+
 class CustomerIdConflict(Exception):
     """Raised when a client-supplied customer id exists with different fields."""
 

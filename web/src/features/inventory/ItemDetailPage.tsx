@@ -10,8 +10,8 @@ import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
 import { TextField } from "../../shared/ui/TextField";
 import { getInventoryErrorMessage, inventoryCopy } from "./copy";
-import { formatCents, MAX_STOCK, parseStockQuantity } from "./format";
-import { useArchiveItem, useItem, useMovements, useRecordMovement } from "./hooks";
+import { formatCents, formatQuantity, MAX_STOCK, parseStockQuantity } from "./format";
+import { useArchiveItem, useItem, useMovements, useRecordMovement, useUnarchiveItem } from "./hooks";
 import { MovementHistory } from "./MovementHistory";
 
 /**
@@ -30,6 +30,7 @@ export function ItemDetailPage() {
   const movements = useMovements(itemId);
   const recordMovement = useRecordMovement();
   const archiveItem = useArchiveItem();
+  const unarchiveItem = useUnarchiveItem();
 
   const [countOpen, setCountOpen] = useState(false);
   const [countText, setCountText] = useState("");
@@ -95,6 +96,16 @@ export function ItemDetailPage() {
     });
   }
 
+  function handleRestore() {
+    unarchiveItem.mutate(itemId);
+  }
+
+  const isArchived = data.archived_at !== null;
+  const unarchiveErrorMessage =
+    unarchiveItem.error instanceof ApiError
+      ? getInventoryErrorMessage(unarchiveItem.error.code)
+      : undefined;
+
   return (
     <div className="flex flex-col gap-6">
       <header>
@@ -110,10 +121,11 @@ export function ItemDetailPage() {
       </header>
 
       {movementErrorMessage ? <Alert variant="error">{movementErrorMessage}</Alert> : null}
+      {unarchiveErrorMessage ? <Alert variant="error">{unarchiveErrorMessage}</Alert> : null}
 
       <section className="flex flex-col items-center gap-4 rounded-2xl border border-brand-border bg-brand-card py-8">
         <p className="text-base text-brand-muted-foreground">{inventoryCopy.detail.stockLabel}</p>
-        <p className="text-6xl font-bold tabular-nums text-brand-primary">{data.stock}</p>
+        <p className="text-6xl font-bold tabular-nums text-brand-primary">{formatQuantity(data.stock)}</p>
         <div className="flex gap-4">
           <button
             type="button"
@@ -137,15 +149,38 @@ export function ItemDetailPage() {
         </Button>
       </section>
 
-      {isOffline ? <Alert variant="info">{inventoryCopy.offline.archiveDisabled}</Alert> : null}
+      {isOffline ? (
+        <Alert variant="info">
+          {isArchived ? inventoryCopy.offline.restoreDisabled : inventoryCopy.offline.archiveDisabled}
+        </Alert>
+      ) : null}
 
       <div className="flex gap-3">
-        <LinkButton to={`/inventario/${itemId}/editar`} variant="secondary" className="flex-1">
+        <LinkButton to={`/inventario/${itemId}/editar`} variant="secondary" className="flex-1" fullWidth={false}>
           {inventoryCopy.detail.editAction}
         </LinkButton>
-        <Button variant="destructive" onClick={() => setArchiveOpen(true)} disabled={isOffline}>
-          {inventoryCopy.detail.archiveAction}
-        </Button>
+        {isArchived ? (
+          <Button
+            variant="secondary"
+            className="flex-1"
+            fullWidth={false}
+            onClick={handleRestore}
+            loading={unarchiveItem.isPending}
+            disabled={isOffline || unarchiveItem.isPending}
+          >
+            {inventoryCopy.detail.restoreAction}
+          </Button>
+        ) : (
+          <Button
+            variant="destructive"
+            className="flex-1"
+            fullWidth={false}
+            onClick={() => setArchiveOpen(true)}
+            disabled={isOffline}
+          >
+            {inventoryCopy.detail.archiveAction}
+          </Button>
+        )}
       </div>
 
       <section className="flex flex-col gap-2">

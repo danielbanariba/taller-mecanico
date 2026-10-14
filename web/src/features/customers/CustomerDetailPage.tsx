@@ -51,11 +51,17 @@ export function CustomerDetailPage() {
   }
 
   const data = customer.data;
+  const isArchived = data.archived_at !== null;
 
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold text-brand-primary">{data.full_name}</h1>
+        {isArchived ? (
+          <span className="inline-flex w-fit items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+            {customersCopy.detail.archivedBadge}
+          </span>
+        ) : null}
         {data.phone ? (
           <p className="text-base text-brand-muted-foreground">
             {formatPhone(data.phone)}
@@ -78,15 +84,21 @@ export function CustomerDetailPage() {
         ) : null}
       </header>
 
-      <LinkButton to={`/clientes/${customerId}/editar`} variant="secondary">
-        {customersCopy.detail.editCustomer}
-      </LinkButton>
+      {isArchived ? (
+        <Alert variant="info">{customersCopy.archivedNotice}</Alert>
+      ) : (
+        <LinkButton to={`/clientes/${customerId}/editar`} variant="secondary">
+          {customersCopy.detail.editCustomer}
+        </LinkButton>
+      )}
 
       <section className="flex flex-col gap-3">
         <h2 className="text-xl font-semibold text-brand-foreground">{customersCopy.detail.vehiclesTitle}</h2>
-        <Button onClick={() => navigate(`/clientes/${customerId}/vehiculos/nuevo`)}>
-          {customersCopy.detail.addVehicle}
-        </Button>
+        {isArchived ? null : (
+          <Button onClick={() => navigate(`/clientes/${customerId}/vehiculos/nuevo`)}>
+            {customersCopy.detail.addVehicle}
+          </Button>
+        )}
         {vehicles.isPending ? (
           <div className="flex justify-center py-8">
             <Spinner />

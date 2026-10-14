@@ -65,8 +65,11 @@ async function request<T>(path: string, options: RequestOptions): Promise<T> {
     const detail = isRecord(data) ? data.detail : undefined;
     // FastAPI's own validation errors (422) put a list of issues in
     // `detail` instead of a string; every error this app raises on purpose
-    // uses a string code, so a non-string detail falls back to a generic one.
-    const code = typeof detail === "string" ? detail : "unknown_error";
+    // uses a string code. An array detail gets its own stable code
+    // ("validation_error") so a caller can show a specific message
+    // instead of the fully generic "unknown_error" fallback; any other
+    // shape (not a string, not an array) still falls back to that.
+    const code = typeof detail === "string" ? detail : Array.isArray(detail) ? "validation_error" : "unknown_error";
     throw new ApiError(response.status, code);
   }
 

@@ -33,6 +33,7 @@ from taller.customers.application.use_cases import (
 )
 from taller.customers.domain.entities import Customer, Vehicle
 from taller.customers.domain.errors import (
+    CustomerArchived,
     CustomerIdConflict,
     CustomerNotFound,
     InvalidPlate,
@@ -189,6 +190,9 @@ def update_customer_route(
     except CustomerNotFound as exc:
         db.rollback()
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="customer_not_found") from exc
+    except CustomerArchived as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="customer_archived") from exc
     except InvalidPhoneNumber as exc:
         db.rollback()
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid_phone") from exc
@@ -280,6 +284,9 @@ def create_vehicle_route(
     except CustomerNotFound as exc:
         db.rollback()
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="customer_not_found") from exc
+    except CustomerArchived as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="customer_archived") from exc
     except InvalidPlate as exc:
         db.rollback()
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid_plate") from exc
@@ -297,6 +304,9 @@ def create_vehicle_route(
         except CustomerNotFound as exc:
             db.rollback()
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="customer_not_found") from exc
+        except CustomerArchived as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_409_CONFLICT, detail="customer_archived") from exc
         except InvalidPlate as exc:
             db.rollback()
             raise HTTPException(

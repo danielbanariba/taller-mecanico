@@ -7,6 +7,7 @@ import { formatCents } from "../../shared/format/money";
 import { useOnlineStatus } from "../../shared/offline/useOnlineStatus";
 import { Alert } from "../../shared/ui/Alert";
 import { Button } from "../../shared/ui/Button";
+import { Dialog } from "../../shared/ui/Dialog";
 import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
 import { InvoiceSection } from "../invoicing/issue/InvoiceSection";
@@ -45,6 +46,11 @@ export function WorkOrderDetailPage() {
   const [lineDialog, setLineDialog] = useState<LineDialogState>(null);
   const [pendingLineId, setPendingLineId] = useState<string | null>(null);
   const [removingLineId, setRemovingLineId] = useState<string | undefined>(undefined);
+  // The line pending a remove confirmation (`handleRemoveLine` only opens
+  // this dialog; the removal itself fires from `handleRemoveConfirm`, like
+  // every other destructive action in this app -- `StatusActions`'s cancel
+  // confirm, `PaymentList`'s void confirm).
+  const [removeTarget, setRemoveTarget] = useState<WorkOrderLineOut | null>(null);
   // Stable across a failed submit and its retry, like every other
   // client-generated id in this app (`design.md`'s "Create with
   // double-submit"); regenerated only once the payment is actually
@@ -104,8 +110,20 @@ export function WorkOrderDetailPage() {
   }
 
   function handleRemoveLine(line: WorkOrderLineOut) {
-    setRemovingLineId(line.id);
-    removeLine.mutate(line.id, { onSettled: () => setRemovingLineId(undefined) });
+    removeLine.reset();
+    setRemoveTarget(line);
+  }
+
+  function handleRemoveConfirm() {
+    if (!removeTarget) {
+      return;
+    }
+    const lineId = removeTarget.id;
+    setRemovingLineId(lineId);
+    removeLine.mutate(lineId, {
+      onSuccess: () => setRemoveTarget(null),
+      onSettled: () => setRemovingLineId(undefined),
+    });
   }
 
   function handleLineDialogSubmit(values: LineEditorValues) {
@@ -189,7 +207,6 @@ export function WorkOrderDetailPage() {
           ) : null}
         </div>
         {data.lines_editable && isOffline ? <Alert variant="info">{workOrdersCopy.offline.lineEditDisabled}</Alert> : null}
-        {removeErrorMessage ? <Alert variant="error">{removeErrorMessage}</Alert> : null}
         <WorkOrderLines
           lines={data.lines}
           editable={data.lines_editable}
@@ -247,6 +264,33 @@ export function WorkOrderDetailPage() {
         onClose={() => setLineDialog(null)}
         onSubmit={handleLineDialogSubmit}
       />
+
+      <Dialog
+        open={removeTarget !== null}
+        title={workOrdersCopy.removeLineConfirm.title}
+        onClose={() => setRemoveTarget(null)}
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-base text-brand-foreground">
+            {removeTarget ? workOrdersCopy.removeLineConfirm.body(removeTarget.description) : null}
+          </p>
+          {isOffline ? <Alert variant="info">{workOrdersCopy.offline.lineEditDisabled}</Alert> : null}
+          {removeErrorMessage ? <Alert variant="error">{removeErrorMessage}</Alert> : null}
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setRemoveTarget(null)}>
+              {workOrdersCopy.removeLineConfirm.cancel}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRemoveConfirm}
+              loading={removeLine.isPending}
+              disabled={isOffline || removeLine.isPending}
+            >
+              {workOrdersCopy.removeLineConfirm.confirm}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

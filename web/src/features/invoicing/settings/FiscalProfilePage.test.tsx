@@ -6,6 +6,7 @@ import { http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
 
 import { sessionQueryKey } from "../../auth/hooks";
+import { AppProviders } from "../../../app/providers";
 import { renderWithQueryClient } from "../../../test/render";
 import { server } from "../../../test/server";
 import { invoicingSettingsQueryKey } from "../hooks";
@@ -103,6 +104,32 @@ describe("FiscalProfilePage", () => {
 
     expect(screen.getByLabelText(/razón social/i)).toHaveValue("Taller Ana S. de R.L.");
     expect(screen.getByLabelText(/^RTN$/i)).toHaveValue("08011990123456");
+  });
+
+  it("disables saving once a cold-load fetch reveals the device is offline", async () => {
+    // Defect this catches: on a cold load that is already offline, neither
+    // `onlineManager` (starts every page assuming online) nor
+    // `navigator.onLine` (can lag real connectivity) has any reason to be
+    // right yet -- `useOnlineStatus()` reads "online" and this screen
+    // renders fully enabled with no offline message, until an unrelated
+    // browser event eventually fires (`providers.tsx`'s own comment). The
+    // settings fetch failing with a real `network_error` must correct that.
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
+      http.get("/api/invoicing/settings", () => HttpResponse.error()),
+    );
+    render(
+      <AppProviders>
+        <MemoryRouter initialEntries={["/ordenes/facturacion/datos"]}>
+          <Routes>
+            <Route path="/ordenes/facturacion/datos" element={<FiscalProfilePage />} />
+          </Routes>
+        </MemoryRouter>
+      </AppProviders>,
+    );
+
+    expect(await screen.findByText("Conéctese a internet para guardar los datos fiscales.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /guardar datos fiscales/i })).toBeDisabled();
   });
 
   it("shows the Spanish message for invalid_establishment_code on a 422, not the generic fallback", async () => {

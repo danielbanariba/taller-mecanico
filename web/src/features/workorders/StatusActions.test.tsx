@@ -167,7 +167,27 @@ describe("StatusActions", () => {
       ),
     );
     const user = userEvent.setup();
-    renderStatusActions(order({ status: "in_progress", allowed_transitions: ["completed", "cancelled"] }));
+    // A non-voided payment, matching what actually triggers this 409 in
+    // production -- the order's own payments are what the stale-error
+    // test right below this one relies on to tell "still blocking" apart
+    // from "voided elsewhere".
+    renderStatusActions(
+      order({
+        status: "in_progress",
+        allowed_transitions: ["completed", "cancelled"],
+        payments: [
+          {
+            id: "payment-1",
+            amount_cents: 20000,
+            method: "cash",
+            note: null,
+            paid_at: "2026-01-02T00:00:00Z",
+            voided_at: null,
+            void_reason: null,
+          },
+        ],
+      }),
+    );
 
     await user.click(screen.getByRole("button", { name: statusActionLabel("cancelled") }));
     await user.click(screen.getByRole("button", { name: workOrdersCopy.cancelConfirm.confirm }));
@@ -175,6 +195,57 @@ describe("StatusActions", () => {
     expect(
       await screen.findByText("No se puede cancelar una orden con pagos registrados. Anule los pagos primero."),
     ).toBeInTheDocument();
+  });
+
+  it("clears the stale 'cannot cancel' error once the blocking payment is voided elsewhere", async () => {
+    // Defect this catches: `useChangeStatus`'s mutation error only clears
+    // on a new `mutate()` or an explicit `reset()`, so after the mechanic
+    // voids the payment that was blocking cancellation (from `PaymentList`,
+    // a sibling under `WorkOrderDetailPage`), the stale
+    // `work_order_has_payments` message from the earlier failed attempt
+    // stayed on screen even though cancelling would now succeed -- forcing
+    // a pointless retry just to clear it.
+    mockSession();
+    server.use(
+      http.put("/api/work-orders/order-1/status", () =>
+        HttpResponse.json({ detail: "work_order_has_payments" }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    const payment = {
+      id: "payment-1",
+      amount_cents: 20000,
+      method: "cash" as const,
+      note: null,
+      paid_at: "2026-01-02T00:00:00Z",
+      voided_at: null,
+      void_reason: null,
+    };
+    const activeOrder = order({
+      status: "in_progress",
+      allowed_transitions: ["completed", "cancelled"],
+      payments: [payment],
+    });
+    const { queryClient, rerender } = renderStatusActions(activeOrder);
+
+    await user.click(screen.getByRole("button", { name: statusActionLabel("cancelled") }));
+    await user.click(screen.getByRole("button", { name: workOrdersCopy.cancelConfirm.confirm }));
+
+    expect(
+      await screen.findByText("No se puede cancelar una orden con pagos registrados. Anule los pagos primero."),
+    ).toBeInTheDocument();
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <StatusActions
+          order={{ ...activeOrder, payments: [{ ...payment, voided_at: "2026-01-03T00:00:00Z" }] }}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(
+      screen.queryByText("No se puede cancelar una orden con pagos registrados. Anule los pagos primero."),
+    ).not.toBeInTheDocument();
   });
 
   it("disables every status button offline, with the Spanish explanation", () => {

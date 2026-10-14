@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from taller.inventory.application.use_cases import is_initial_stock_movement
 from taller.inventory.domain.entities import Item, StockMovement
 from taller.inventory.domain.errors import InvalidItemName, InvalidMovementQuantity
 from taller.inventory.domain.item_name import normalize_item_name
@@ -126,6 +127,11 @@ class MovementOut(BaseModel):
     order_id: uuid.UUID | None
     order_line_id: uuid.UUID | None
     order_number: int | None
+    #: Whether this is the implicit adjustment `create_item` recorded for
+    #: the item's `initial_stock`, as opposed to a later physical count --
+    #: see `is_initial_stock_movement` for why this is computed by identity
+    #: rather than by matching `note`'s free text.
+    is_initial_stock: bool
 
     @classmethod
     def from_domain(
@@ -150,6 +156,7 @@ class MovementOut(BaseModel):
             order_id=movement.order_id,
             order_line_id=movement.order_line_id,
             order_number=order_number,
+            is_initial_stock=is_initial_stock_movement(movement),
         )
 
 

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 
+import { isValidPhone } from "../../shared/format/phone";
 import { Alert } from "../../shared/ui/Alert";
 import { Button } from "../../shared/ui/Button";
 import { TextField } from "../../shared/ui/TextField";
@@ -14,13 +15,25 @@ export interface LoginFormProps {
   initialValues?: Partial<LoginPayload>;
 }
 
-/** Presentational: owns only the two input values, nothing else. */
+/**
+ * Presentational, except for the one client-side rule worth enforcing
+ * before spending a round trip: the phone shape, mirroring the API's own
+ * `PhoneNumber` rule exactly (`isValidPhone`). Everything else (whether
+ * that phone/password combination is correct) is the API's call.
+ */
 export function LoginForm({ onSubmit, pending, errorMessage, initialValues }: LoginFormProps) {
   const [phone, setPhone] = useState(initialValues?.phone ?? "");
   const [password, setPassword] = useState(initialValues?.password ?? "");
+  const [phoneTouched, setPhoneTouched] = useState(false);
+
+  const phoneError = phoneTouched && !isValidPhone(phone) ? authCopy.login.phoneInvalid : undefined;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setPhoneTouched(true);
+    if (!isValidPhone(phone)) {
+      return;
+    }
     onSubmit({ phone, password });
   }
 
@@ -36,6 +49,8 @@ export function LoginForm({ onSubmit, pending, errorMessage, initialValues }: Lo
         placeholder={authCopy.login.phonePlaceholder}
         value={phone}
         onChange={(event) => setPhone(event.target.value)}
+        onBlur={() => setPhoneTouched(true)}
+        error={phoneError}
         required
       />
       <TextField

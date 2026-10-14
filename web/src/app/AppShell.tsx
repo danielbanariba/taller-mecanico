@@ -26,6 +26,14 @@ import { appCopy, getAppErrorMessage } from "./copy";
  * top-level heading here would leave the page with two `<h1>`s, which
  * breaks the single-top-level-heading landmark assistive tech relies on
  * to navigate the page.
+ *
+ * `main`'s bottom padding reads `--bottom-nav-height` and
+ * `--sync-toast-height` (both published by `BottomNav`/`OfflineStatusBanner`
+ * via `useCssHeightVariable`) instead of a fixed `pb-20`: a QA sweep found
+ * that literal left the last inventory row's stock buttons partly covered
+ * by the sync toast, worse once a pending change grew it to two lines. The
+ * `5rem`/`0px` fallbacks keep the old, pre-measurement padding until both
+ * variables are published.
  */
 export function AppShell() {
   const navigate = useNavigate();
@@ -35,15 +43,21 @@ export function AppShell() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | undefined>(undefined);
+  const [logoutError, setLogoutError] = useState<string | undefined>(undefined);
 
   function handleLogout() {
+    setLogoutError(undefined);
     logout.mutate(undefined, {
       onSuccess: () => navigate("/login", { replace: true }),
+      onError: (error) => {
+        setLogoutError(getAppErrorMessage(error instanceof ApiError ? error.code : "unknown_error"));
+      },
     });
   }
 
   function openMore() {
     setExportError(undefined);
+    setLogoutError(undefined);
     setMoreOpen(true);
   }
 
@@ -67,23 +81,40 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-dvh flex-col">
+      {/* First focusable element in the shell: a keyboard user can jump
+          straight to the active screen's own content, skipping the header
+          and "Más" menu. Visually hidden until focused (the standard
+          skip-link pattern), so it changes nothing for a sighted mouse/touch
+          user. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-brand-primary focus:px-4 focus:py-2 focus:text-base focus:font-semibold focus:text-brand-on-primary"
+      >
+        {appCopy.skipLink}
+      </a>
       <header className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-4 py-6">
         <p className="text-2xl font-bold text-brand-primary">{session.data?.workshop.name}</p>
         {/* `fullWidth={false}` keeps this content-width instead of `Button`'s
-            default full-bleed sizing; `!min-h-10`/`!text-base` need the `!`
+            default full-bleed sizing; `!min-h-11`/`!text-base` need the `!`
             important modifier to win over `Button`'s own `min-h-12`/`text-lg`
             -- Tailwind has no class-merging, so a plain conflicting class
-            loses to whichever rule the generated stylesheet orders later. */}
+            loses to whichever rule the generated stylesheet orders later.
+            `min-h-11` (44px) is the accessible tap-target floor; the
+            previous `min-h-10` (40px) fell short of it. */}
         <Button
           variant="secondary"
           onClick={openMore}
           fullWidth={false}
-          className="!min-h-10 px-4 !text-base"
+          className="!min-h-11 px-4 !text-base"
         >
           {appCopy.more.trigger}
         </Button>
       </header>
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-4 pb-20">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-4 pb-[calc(var(--bottom-nav-height,5rem)+var(--sync-toast-height,0px)+1rem)]"
+      >
         <Outlet />
       </main>
       <BottomNav />
@@ -112,7 +143,14 @@ export function AppShell() {
             {exporting ? appCopy.more.exportPending : appCopy.more.exportAction}
           </Button>
 
-          <Button variant="destructive" onClick={handleLogout} loading={logout.isPending}>
+          {isOffline ? <Alert variant="info">{appCopy.logout.offlineDisabled}</Alert> : null}
+          {logoutError ? <Alert variant="error">{logoutError}</Alert> : null}
+          <Button
+            variant="destructive"
+            onClick={handleLogout}
+            loading={logout.isPending}
+            disabled={isOffline || logout.isPending}
+          >
             {appCopy.logout.submit}
           </Button>
         </div>

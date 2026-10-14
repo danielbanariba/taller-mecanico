@@ -56,20 +56,26 @@ export function ReceiptBody({ order }: ReceiptBodyProps) {
         </ul>
       </section>
 
+      {/* `gap-2` guarantees a minimum gap between label and amount even
+          when both are long (a 4+ digit balance used to run straight into
+          "Saldo pendiente" with no gap at all); `min-w-0` on the label lets
+          it wrap onto a second line on the narrow 58 mm layout instead of
+          overflowing, while `whitespace-nowrap` keeps the amount itself
+          intact on one line. */}
       <section className="flex flex-col gap-1 border-t border-current pt-2">
-        <p className="flex items-center justify-between font-semibold">
-          <span>{workOrdersCopy.detail.totalLabel}</span>
-          <span>{formatCents(order.total_cents)}</span>
+        <p className="flex items-center justify-between gap-2 font-semibold">
+          <span className="min-w-0">{workOrdersCopy.detail.totalLabel}</span>
+          <span className="whitespace-nowrap">{formatCents(order.total_cents)}</span>
         </p>
-        <p className="flex items-center justify-between">
-          <span>{workOrdersCopy.payments.paidLabel}</span>
-          <span>{formatCents(order.paid_cents)}</span>
+        <p className="flex items-center justify-between gap-2">
+          <span className="min-w-0">{workOrdersCopy.payments.paidLabel}</span>
+          <span className="whitespace-nowrap">{formatCents(order.paid_cents)}</span>
         </p>
-        <p className="flex items-center justify-between font-semibold">
-          <span>
+        <p className="flex items-center justify-between gap-2 font-semibold">
+          <span className="min-w-0">
             {order.balance_cents < 0 ? workOrdersCopy.payments.creditLabel : workOrdersCopy.payments.balanceLabel}
           </span>
-          <span>{formatCents(Math.abs(order.balance_cents))}</span>
+          <span className="whitespace-nowrap">{formatCents(Math.abs(order.balance_cents))}</span>
         </p>
       </section>
 

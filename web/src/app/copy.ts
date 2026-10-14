@@ -12,7 +12,9 @@ export const appCopy = {
   },
   logout: {
     submit: "Cerrar sesión",
+    offlineDisabled: "Conéctese a internet para cerrar sesión.",
   },
+  skipLink: "Saltar al contenido",
   more: {
     trigger: "Más",
     title: "Más opciones",
@@ -26,6 +28,11 @@ export const appCopy = {
     title: "Algo salió mal",
     message: "Ocurrió un error inesperado. Intente recargar la página.",
     reload: "Recargar",
+  },
+  notFound: {
+    title: "Página no encontrada",
+    message: "La página que buscaba no existe o fue movida.",
+    backLink: "Volver al inventario",
   },
 } as const;
 

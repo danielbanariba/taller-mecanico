@@ -146,6 +146,16 @@ def save_profile(
             if any(r.usable_on(today) for r in ranges):
                 raise FiscalProfileCodesLocked(workshop_id)
 
+        fields_changed = (
+            existing.rtn != normalized_rtn
+            or existing.legal_name != normalized_legal_name
+            or existing.trade_name != normalized_trade_name
+            or existing.address != normalized_address
+            or existing.phone != normalized_phone
+            or existing.email != normalized_email
+            or codes_changed
+        )
+
         existing.rtn = normalized_rtn
         existing.legal_name = normalized_legal_name
         existing.trade_name = normalized_trade_name
@@ -154,7 +164,8 @@ def save_profile(
         existing.email = normalized_email
         existing.establishment_code = normalized_establishment
         existing.emission_point_code = normalized_emission_point
-        existing.updated_at = now
+        if fields_changed:
+            existing.updated_at = now
         profile_repo.save(existing)
         return existing, False
 

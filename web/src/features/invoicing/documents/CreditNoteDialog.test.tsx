@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter } from "react-router";
 
+import { AppProviders } from "../../../app/providers";
 import { renderWithQueryClient } from "../../../test/render";
 import { server } from "../../../test/server";
 import { workOrderQueryKey } from "../../workorders/hooks";
@@ -194,6 +195,31 @@ describe("CreditNoteDialog", () => {
     goOffline();
 
     expect(screen.getByText("Conéctese a internet para emitir una nota de crédito.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Emitir nota de crédito" })).toBeDisabled();
+  });
+
+  it("disables the issue action once a cold-load fetch reveals the device is offline", async () => {
+    // Defect this catches: on a cold load that is already offline, neither
+    // `onlineManager` (starts every page assuming online) nor
+    // `navigator.onLine` (can lag real connectivity) has any reason to be
+    // right yet -- `useOnlineStatus()` reads "online" and the dialog opens
+    // fully enabled with no offline message, until an unrelated browser
+    // event eventually fires (`providers.tsx`'s own comment). The
+    // readiness fetch failing with a real `network_error` must correct
+    // that for this dialog too, not only for a live online/offline toggle.
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
+      http.get("/api/invoicing/settings", () => HttpResponse.error()),
+    );
+    render(
+      <AppProviders>
+        <MemoryRouter>
+          <CreditNoteDialog open orderId="order-1" invoiceId="invoice-1" onClose={() => {}} />
+        </MemoryRouter>
+      </AppProviders>,
+    );
+
+    expect(await screen.findByText("Conéctese a internet para emitir una nota de crédito.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Emitir nota de crédito" })).toBeDisabled();
   });
 

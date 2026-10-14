@@ -75,6 +75,52 @@ describe("LoginPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("blocks submission for a malformed phone without calling the API", async () => {
+    // Defect this catches: a malformed phone (too short, wrong first
+    // digit) is sent straight to the API, which can only reject it as a
+    // generic 422 the user sees as "Ocurrió un error".
+    let apiWasCalled = false;
+    server.use(
+      http.post("/api/auth/login", () => {
+        apiWasCalled = true;
+        return HttpResponse.json({ detail: "invalid_credentials" }, { status: 401 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await user.type(screen.getByLabelText(/teléfono/i), "12345");
+    await user.type(screen.getByLabelText(/contraseña/i), "password123");
+    await user.click(screen.getByRole("button", { name: /iniciar sesión/i }));
+
+    expect(
+      await screen.findByText("Ingrese un teléfono hondureño válido de 8 dígitos."),
+    ).toBeInTheDocument();
+    expect(apiWasCalled).toBe(false);
+  });
+
+  it("shows a specific Spanish message for the API's own (array) validation error", async () => {
+    // Defect this catches: an unhandled 422 (FastAPI's own validation
+    // array, not this app's string codes) falls back to the fully
+    // generic "Ocurrió un error" message instead of a specific one.
+    server.use(
+      http.post("/api/auth/login", () =>
+        HttpResponse.json(
+          { detail: [{ type: "string_too_short", loc: ["body", "phone"], msg: "Too short" }] },
+          { status: 422 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await fillAndSubmit(user, "password123");
+
+    expect(
+      await screen.findByText("Verifique los datos ingresados e intente de nuevo."),
+    ).toBeInTheDocument();
+  });
+
   it("disables the submit button while the login request is pending", async () => {
     server.use(http.post("/api/auth/login", () => new Promise<Response>(() => {})));
     const user = userEvent.setup();

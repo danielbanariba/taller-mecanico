@@ -154,6 +154,26 @@ def test_editing_a_nonexistent_customer_is_not_found(authenticated_client: TestC
     assert response.json()["detail"] == "customer_not_found"
 
 
+def test_editing_an_archived_customer_is_rejected(authenticated_client: TestClient) -> None:
+    """A direct link to an archived customer's "Editar cliente" must not
+
+    silently rename the archived record (a QA sweep finding): the API
+    must refuse the write distinctly from a nonexistent customer.
+    """
+    customer = _create_customer(authenticated_client)
+    archive_response = authenticated_client.post(f"/api/customers/{customer['id']}/archive")
+    assert archive_response.status_code == 204
+
+    response = authenticated_client.patch(
+        f"/api/customers/{customer['id']}", json={"full_name": "Hijacked"}
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "customer_archived"
+    unaffected = authenticated_client.get(f"/api/customers/{customer['id']}")
+    assert unaffected.json()["full_name"] == customer["full_name"]
+
+
 def test_patching_full_name_to_an_explicit_null_is_a_clean_validation_error(
     authenticated_client: TestClient,
 ) -> None:

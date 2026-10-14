@@ -71,6 +71,18 @@ describe("InventoryPage", () => {
     vi.useRealTimers();
   });
 
+  it("shows a link to the archived items list", async () => {
+    // Defect this catches: no way to reach the archived items (listing or
+    // restoring one) from the main inventory screen, leaving an archived
+    // item unreachable once it is hidden from the default list.
+    mockSession();
+    server.use(http.get("/api/inventory/items", () => HttpResponse.json([baseItem({})])));
+    renderInventoryPage();
+
+    const link = await screen.findByRole("link", { name: "Ver archivados" });
+    expect(link).toHaveAttribute("href", "/inventario/archivados");
+  });
+
   it("never shows another workshop's cached items once the session belongs to a different workshop", async () => {
     // Defect this catches: inventory query keys that are not scoped by
     // workshop. When the session changes workshop without this tab's cache
@@ -141,6 +153,25 @@ describe("InventoryPage", () => {
     expect(within(row as HTMLElement).getByText("-3")).toBeInTheDocument();
     expect(within(row as HTMLElement).getByText("Revisar")).toBeInTheDocument();
     expect(within(row as HTMLElement).queryByText("Por acabarse")).not.toBeInTheDocument();
+  });
+
+  it("formats a large stock number with thousands separators", async () => {
+    // Defect this catches: rendering a large stock count as a raw run of
+    // digits ("1000000") instead of a grouped, human-readable number
+    // ("1,000,000") -- unreadable at a glance for a shop with a large
+    // inventory.
+    mockSession();
+    server.use(
+      http.get("/api/inventory/items", () =>
+        HttpResponse.json([baseItem({ name: "Aceite al mayor", stock: 1_000_000 })]),
+      ),
+    );
+    renderInventoryPage();
+
+    const row = (await screen.findByText("Aceite al mayor")).closest("li");
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getByText("1,000,000")).toBeInTheDocument();
+    expect(within(row as HTMLElement).queryByText("1000000")).not.toBeInTheDocument();
   });
 
   it("requests low_stock=true when 'Por acabarse' is tapped", async () => {
@@ -333,6 +364,25 @@ describe("InventoryPage", () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(screen.getByText("6")).toBeInTheDocument();
     expect(screen.queryByText("Ocurrió un error. Intente de nuevo.")).not.toBeInTheDocument();
+  });
+
+  it("shows the offline message, not the empty state, when the first load fails offline", async () => {
+    // Defect this catches: branching only on `items.isPending` falls
+    // through to the empty state the moment a cold offline load settles
+    // into `network_error`, telling the mechanic "Todavía no hay
+    // repuestos" as if the workshop had none.
+    mockSession();
+    server.use(http.get("/api/inventory/items", () => HttpResponse.error()));
+    Object.defineProperty(window.navigator, "onLine", { configurable: true, get: () => false });
+
+    try {
+      renderInventoryPage();
+
+      expect(await screen.findByText("Conéctese a internet para ver sus repuestos.")).toBeInTheDocument();
+      expect(screen.queryByText("Todavía no hay repuestos")).not.toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(window.navigator, "onLine");
+    }
   });
 
   it("ends with the correct final stock when two rapid taps' server responses would resolve in reverse order", async () => {

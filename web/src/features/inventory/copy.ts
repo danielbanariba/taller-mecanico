@@ -1,4 +1,5 @@
 import type { MovementOut } from "./api";
+import { formatQuantity } from "./format";
 
 /**
  * All Spanish user-facing strings for the inventory feature live here, in
@@ -20,6 +21,11 @@ export const inventoryCopy = {
     emptyFilteredBody: "Pruebe con otra búsqueda o quite el filtro.",
     decrementLabel: (name: string) => `Quitar una unidad de ${name}`,
     incrementLabel: (name: string) => `Agregar una unidad de ${name}`,
+    viewArchived: "Ver archivados",
+  },
+  archived: {
+    title: "Repuestos archivados",
+    empty: "No hay repuestos archivados.",
   },
   badges: {
     lowStock: "Por acabarse",
@@ -62,12 +68,15 @@ export const inventoryCopy = {
     backToList: "Volver al inventario",
     archiveAction: "Archivar",
     archiveConfirmTitle: "Archivar repuesto",
-    archiveConfirmBody: "Ya no aparecerá en la lista de inventario. Esta acción no se puede deshacer desde aquí.",
+    archiveConfirmBody:
+      'Ya no aparecerá en la lista de inventario. Podrá restaurarlo luego desde "Ver archivados".',
     archiveConfirmSubmit: "Archivar",
     archiveConfirmCancel: "Cancelar",
+    restoreAction: "Restaurar",
     historyTitle: "Historial de movimientos",
     historyEmpty: "Todavía no hay movimientos.",
     orderLink: (number: number) => `Orden #${number}`,
+    initialStock: (quantity: number) => `Stock inicial: ${formatQuantity(quantity)}`,
   },
   units: ["unidad", "galón", "litro", "juego", "par", "caja"],
   offline: {
@@ -77,19 +86,37 @@ export const inventoryCopy = {
     createDisabled: "Conéctese a internet para agregar repuestos.",
     editDisabled: "Conéctese a internet para editar repuestos.",
     archiveDisabled: "Conéctese a internet para archivar repuestos.",
+    restoreDisabled: "Conéctese a internet para restaurar repuestos.",
+    listUnavailable: "Conéctese a internet para ver sus repuestos.",
   },
 } as const;
 
-/** Builds the Spanish label for one movement row, e.g. "Entrada +3". */
-export function movementLabel(movement: Pick<MovementOut, "kind" | "quantity" | "delta">): string {
+/**
+ * Builds the Spanish label for one movement row, e.g. "Entrada +3".
+ *
+ * An "adjust" movement renders as "Stock inicial: X" when it is the
+ * implicit adjustment `create_item` recorded for the item's initial stock
+ * (`is_initial_stock`, computed by the API from the movement's identity,
+ * never from its free-text `note` -- see `is_initial_stock_movement` in
+ * `use_cases.py`), and as "Conteo: X (+Y)" for every later physical count.
+ */
+export function movementLabel(
+  movement: Pick<MovementOut, "kind" | "quantity" | "delta" | "is_initial_stock">,
+): string {
   if (movement.kind === "in") {
-    return `Entrada +${movement.quantity}`;
+    return `Entrada +${formatQuantity(movement.quantity)}`;
   }
   if (movement.kind === "out") {
-    return `Salida −${movement.quantity}`;
+    return `Salida −${formatQuantity(movement.quantity)}`;
   }
-  const deltaLabel = movement.delta >= 0 ? `+${movement.delta}` : `−${Math.abs(movement.delta)}`;
-  return `Conteo: ${movement.quantity} (${deltaLabel})`;
+  if (movement.is_initial_stock) {
+    return inventoryCopy.detail.initialStock(movement.quantity);
+  }
+  const deltaLabel =
+    movement.delta >= 0
+      ? `+${formatQuantity(movement.delta)}`
+      : `−${formatQuantity(Math.abs(movement.delta))}`;
+  return `Conteo: ${formatQuantity(movement.quantity)} (${deltaLabel})`;
 }
 
 /**

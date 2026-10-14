@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from taller.customers.application.ports import CustomerRepository, VehicleRepository
 from taller.customers.domain.entities import Customer, Vehicle, VehicleType
 from taller.customers.domain.errors import (
+    CustomerArchived,
     CustomerIdConflict,
     CustomerNotFound,
     PlateTaken,
@@ -169,12 +170,15 @@ def update_customer(
 
     Raises:
         CustomerNotFound: no such customer in this workshop.
+        CustomerArchived: the customer exists but is archived.
         InvalidPhoneNumber: ``fields["phone"]`` is present but invalid.
         InvalidRtn: ``fields["rtn"]`` is present but invalid.
     """
     customer = customer_repo.get_by_id(workshop_id=workshop_id, customer_id=customer_id)
     if customer is None:
         raise CustomerNotFound(customer_id)
+    if customer.archived_at is not None:
+        raise CustomerArchived(customer_id)
 
     if "full_name" in fields:
         customer.full_name = fields["full_name"].strip()
@@ -281,9 +285,9 @@ def create_vehicle(
             valid plate.
         VehicleIdConflict: ``vehicle_id`` already exists with different
             fields.
-        CustomerNotFound: no active customer ``customer_id`` in this
-            workshop (also raised for an archived customer: new links to
-            an archived customer are refused).
+        CustomerNotFound: no customer ``customer_id`` in this workshop.
+        CustomerArchived: that customer exists but is archived: new links
+            to an archived customer are refused.
         PlateTaken: another active vehicle in the workshop already has
             this normalized plate.
     """
@@ -315,8 +319,10 @@ def create_vehicle(
     # interleave between this check and the vehicle insert and leave a new
     # vehicle active under a customer that is being archived right now.
     owner = customer_repo.get_for_update(workshop_id=workshop_id, customer_id=customer_id)
-    if owner is None or owner.archived_at is not None:
+    if owner is None:
         raise CustomerNotFound(customer_id)
+    if owner.archived_at is not None:
+        raise CustomerArchived(customer_id)
 
     if normalized_plate is not None:
         collision = vehicle_repo.get_active_by_plate(

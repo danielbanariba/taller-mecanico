@@ -107,7 +107,13 @@ def test_create_with_a_foreign_customer_id_is_not_found(
     assert response.json()["detail"] == "customer_not_found"
 
 
-def test_create_with_an_archived_customer_id_is_not_found(authenticated_client: TestClient) -> None:
+def test_create_with_an_archived_customer_id_is_rejected(authenticated_client: TestClient) -> None:
+    """A direct link to an archived customer's "Agregar vehículo" must tell
+
+    the mechanic the owner is archived, not a generic "not found" (a QA
+    sweep finding: the detail/web layer rendered that 404 as if the
+    customer existed but the vehicle create silently failed).
+    """
     customer = _create_customer(authenticated_client)
     archive_response = authenticated_client.post(f"/api/customers/{customer['id']}/archive")
     assert archive_response.status_code == 204
@@ -117,8 +123,8 @@ def test_create_with_an_archived_customer_id_is_not_found(authenticated_client: 
         json={"customer_id": customer["id"], "vehicle_type": "car", "make": "Toyota"},
     )
 
-    assert response.status_code == 404
-    assert response.json()["detail"] == "customer_not_found"
+    assert response.status_code == 409
+    assert response.json()["detail"] == "customer_archived"
 
 
 def test_an_edit_cannot_reassign_the_vehicle_to_a_different_customer(

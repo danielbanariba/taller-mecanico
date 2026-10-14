@@ -1,15 +1,17 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { ApiError } from "../../shared/api/http";
+import { useOnlineStatus } from "../../shared/offline/useOnlineStatus";
 import { Alert } from "../../shared/ui/Alert";
 import { Button } from "../../shared/ui/Button";
 import { Chip } from "../../shared/ui/Chip";
+import { LinkButton } from "../../shared/ui/LinkButton";
 import { Spinner } from "../../shared/ui/Spinner";
 import { TextField } from "../../shared/ui/TextField";
 import { getInventoryErrorMessage, inventoryCopy } from "./copy";
 import { useDebouncedValue, useItems, useRecordMovement } from "./hooks";
-import { ItemRow } from "./ItemRow";
+import { ItemList } from "./ItemList";
 import type { ItemOut } from "./api";
 
 type InventoryFilter = "all" | "low" | "needsReview";
@@ -29,19 +31,40 @@ export function InventoryPage() {
     q: debouncedQuery.trim() || undefined,
     lowStock: filter === "low" ? true : undefined,
   });
+  const isOffline = useOnlineStatus();
+  // No cached data AND the reason is connectivity: either already offline,
+  // or the first fetch already settled into `network_error`. Without this,
+  // a cold load that starts offline falls through to the empty state --
+  // indistinguishable from a workshop that genuinely has none (the same
+  // QA sweep finding as `CustomersPage` and `NewWorkOrderPage`).
+  const itemsUnavailable =
+    items.data === undefined &&
+    (isOffline || (items.error instanceof ApiError && items.error.code === "network_error"));
 
   const visibleItems = useMemo(() => {
     const list = items.data ?? [];
     return filter === "needsReview" ? list.filter((item) => item.needs_review) : list;
   }, [items.data, filter]);
 
-  function handleIncrement(item: ItemOut) {
-    recordMovement.mutate({ itemId: item.id, kind: "in", quantity: 1 });
-  }
+  // `mutate` itself is stable across renders (TanStack Query's own
+  // `useCallback`, keyed only on the mutation observer instance) even
+  // though `recordMovement` is a fresh object every render; destructuring
+  // it out keeps the dependency array -- and `react-hooks/exhaustive-deps`
+  // -- honest, instead of depending on the whole (unstable) object.
+  const { mutate: recordStockMovement } = recordMovement;
 
-  function handleDecrement(item: ItemOut) {
-    recordMovement.mutate({ itemId: item.id, kind: "out", quantity: 1 });
-  }
+  // Stable across renders, so every row in `ItemList` receives the exact
+  // same function -- required for `ItemRow`'s `memo` to actually skip
+  // re-rendering untapped rows; see `ItemRow.tsx`'s own comment.
+  const handleOpen = useCallback((item: ItemOut) => navigate(`/inventario/${item.id}`), [navigate]);
+  const handleIncrement = useCallback(
+    (item: ItemOut) => recordStockMovement({ itemId: item.id, kind: "in", quantity: 1 }),
+    [recordStockMovement],
+  );
+  const handleDecrement = useCallback(
+    (item: ItemOut) => recordStockMovement({ itemId: item.id, kind: "out", quantity: 1 }),
+    [recordStockMovement],
+  );
 
   const movementErrorMessage =
     recordMovement.error instanceof ApiError ? getInventoryErrorMessage(recordMovement.error.code) : undefined;
@@ -71,8 +94,13 @@ export function InventoryPage() {
       </div>
 
       <Button onClick={() => navigate("/inventario/nuevo")}>{inventoryCopy.list.addItem}</Button>
+      <LinkButton to="/inventario/archivados" variant="secondary">
+        {inventoryCopy.list.viewArchived}
+      </LinkButton>
 
-      {items.isPending ? (
+      {itemsUnavailable ? (
+        <Alert variant="info">{inventoryCopy.offline.listUnavailable}</Alert>
+      ) : items.isPending ? (
         <div className="flex justify-center py-8">
           <Spinner />
         </div>
@@ -86,17 +114,12 @@ export function InventoryPage() {
           </p>
         </div>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {visibleItems.map((item) => (
-            <ItemRow
-              key={item.id}
-              item={item}
-              onOpen={() => navigate(`/inventario/${item.id}`)}
-              onIncrement={() => handleIncrement(item)}
-              onDecrement={() => handleDecrement(item)}
-            />
-          ))}
-        </ul>
+        <ItemList
+          items={visibleItems}
+          onOpen={handleOpen}
+          onIncrement={handleIncrement}
+          onDecrement={handleDecrement}
+        />
       )}
     </>
   );

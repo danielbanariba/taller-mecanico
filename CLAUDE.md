@@ -91,6 +91,8 @@ A work order's non-fiscal receipt (`web/src/features/workorders/receipt/`) is a 
 
 `copy.ts` holds every Spanish user-facing string for its feature in one object, plus a map from an API error `code` (the `detail` string FastAPI returns) to the Spanish message shown for it. The API itself never returns Spanish — it returns English error codes in `detail`, and the web layer is solely responsible for localizing them.
 
+The inventory list (`features/inventory/ItemList.tsx`) is window-virtualized with `@tanstack/react-virtual`'s `useWindowVirtualizer`, since the page itself scrolls the window rather than an inner container: a 3000-item shop otherwise puts tens of thousands of DOM nodes on the page and blocks the main thread while scrolling.
+
 ### App shell and navigation
 
 `web/src/app/AppShell.tsx` is a layout route (`Inventario · Clientes · Órdenes`) rendered inside `RequireSession`, wrapping every protected screen's `<Outlet/>` with `web/src/app/BottomNav.tsx`'s three tabs. The active tab tracks the first path segment, so nested routes like a vehicle's own detail screen under `/clientes/...` still highlight `Clientes`. The `Órdenes` tab is the real `workorders` feature (Abiertas/Historial list, detail, status actions, WhatsApp sharing); a customer's and a vehicle's detail screens list their own work orders (newest first), and a vehicle's "Nueva orden" button jumps straight to the confirm step of `/ordenes/nueva?vehiculo=<id>`, skipping the customer/vehicle pickers.
@@ -111,6 +113,8 @@ Movements carry a client-generated UUID. If that id already exists with the exac
 
 Negative stock is allowed and flagged (`needs_review`/`is_low` on the item), never blocked: a mechanic mid-job must not be stopped by the app, and a queued offline movement must always apply once it reaches the server. Search is accent-insensitive via an `IMMUTABLE` plpgsql wrapper function, `taller_unaccent_lower`, used both for search filtering and for the name-uniqueness constraint.
 
+Archiving an item is not a one-way trip: `POST /api/inventory/items/{id}/unarchive` (idempotent, 409 `item_name_taken` if another active item has since taken its name) restores it to the default list, reachable from the web's "Ver archivados" screen and the "Restaurar" action on an archived item's own detail page.
+
 ### Offline
 
 `recordMovement` (`web/src/features/inventory/commands.ts`) never calls the API directly — it only enqueues the movement into an IndexedDB outbox, then triggers a flush. `flushOutboxOnce` → `withFlushLock` (`web/src/features/inventory/offlineSync.ts`) sends the outbox's entries to the server FIFO, one at a time, serialized by a Web Locks–based mutex (with an in-tab `Promise` chain fallback where Web Locks aren't available, e.g. the test runner) — responses can never be reconciled out of order. Reading items (`fetchItemsFolded` / the single-item fetch in `hooks.ts`) runs inside that *same* lock and folds any still-pending outbox entries onto the fetched data, so a read can never land in the gap between a flush's PUT succeeding and it removing the entry, and a queued tap is never invisible because a refetch happened to win a race.
@@ -120,6 +124,8 @@ Creating or editing an item requires a live connection (disabled in the UI with 
 `RequireSession` (`web/src/app/RequireSession.tsx`) treats a `network_error` specially: if a cached session is still present (restored from the persisted cache, or just stale after a failed background refetch), protected content renders anyway — only a real 401 ("not logged in") redirects to `/login`. An offline user with no cached session at all sees a dedicated "sin conexión" screen instead of a login form they could fill in for nothing.
 
 The service worker (`vite-plugin-pwa`, configured in `vite.config.ts`) precaches the app shell but routes every `/api/` request `NetworkOnly` — API responses are never served from the service worker's cache, because the persisted query cache above is the one offline data source, and a stale cached API response must never win a race against the real backend.
+
+A request that throws `ApiError("network_error")` marks the app offline (`providers.tsx`'s `QueryCache`/`MutationCache` `onError`, calling `reachability.ts`'s `reportNetworkError`), and a bounded `/api/health` probe every 10 s (also fired on window focus and `visibilitychange`) restores it once the server answers again, since the browser's own `online` event never fires when `navigator.onLine` stayed true the whole time.
 
 ## Public test deployment
 

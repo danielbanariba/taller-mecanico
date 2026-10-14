@@ -33,6 +33,8 @@ export interface MovementOut {
   order_line_id: string | null;
   /** Resolved alongside the movement on an item-history read; `null` when `order_id` is `null`. */
   order_number: number | null;
+  /** Whether this is the implicit adjustment recorded for the item's initial stock, not a later physical count. */
+  is_initial_stock: boolean;
 }
 
 /** The subset of `ItemOut` the movement endpoint returns to reconcile stock. */
@@ -100,6 +102,7 @@ export const inventoryApi = {
   updateItem: (id: string, payload: UpdateItemPayload) =>
     http.patch<ItemOut>(`/api/inventory/items/${id}`, payload),
   archiveItem: (id: string) => http.post<void>(`/api/inventory/items/${id}/archive`),
+  unarchiveItem: (id: string) => http.post<ItemOut>(`/api/inventory/items/${id}/unarchive`),
   listMovements: (id: string, limit = 50) =>
     http.get<MovementOut[]>(`/api/inventory/items/${id}/movements?limit=${limit}`),
   putMovement: (movementId: string, payload: PutMovementPayload) =>

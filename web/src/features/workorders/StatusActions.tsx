@@ -38,8 +38,20 @@ export function StatusActions({ order }: StatusActionsProps) {
     return null;
   }
 
+  const rawErrorCode = changeStatus.error instanceof ApiError ? changeStatus.error.code : undefined;
+  // A `useMutation`'s error only clears on a new `mutate()` call or an
+  // explicit `reset()`; neither happens here on its own, so a
+  // `work_order_has_payments` 409 from an earlier cancel attempt would
+  // otherwise linger on screen forever. Voiding the blocking payment (in
+  // `PaymentList`, a sibling under `WorkOrderDetailPage`) updates this
+  // same `order` prop with no non-voided payments left, so deriving the
+  // displayed message from that current state -- instead of from the
+  // mutation's own stale error -- clears it the moment voiding succeeds.
+  const hasBlockingPayment = order.payments.some((payment) => payment.voided_at === null);
   const errorMessage =
-    changeStatus.error instanceof ApiError ? getWorkOrdersErrorMessage(changeStatus.error.code) : undefined;
+    rawErrorCode && !(rawErrorCode === "work_order_has_payments" && !hasBlockingPayment)
+      ? getWorkOrdersErrorMessage(rawErrorCode)
+      : undefined;
 
   const forwardTransitions = order.allowed_transitions.filter((target) => target !== "cancelled");
   const canCancel = order.allowed_transitions.includes("cancelled");

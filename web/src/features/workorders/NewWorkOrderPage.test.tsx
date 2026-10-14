@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { onlineManager } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
 
@@ -342,6 +343,118 @@ describe("NewWorkOrderPage", () => {
     await screen.findByRole("button", { name: /crear orden/i });
     expect(capturedVehicleIds).toHaveLength(2);
     expect(capturedVehicleIds[0]).not.toBe(capturedVehicleIds[1]);
+  });
+
+  it("shows the offline message instead of an endless spinner when there is no cached customer list", async () => {
+    // Defect this catches: with nothing cached yet, `customers.isPending`
+    // stays true forever while offline -- TanStack's default
+    // `networkMode: "online"` pauses the fetch instead of running it and
+    // erroring -- so the customer-search step rendered an endless,
+    // unlabeled spinner with no indication anything was wrong, instead of
+    // the usual offline message every other step of this same flow
+    // already shows (e.g. `VehicleForm`'s own `offline` prop).
+    mockSessionCustomerAndVehicle();
+    onlineManager.setOnline(false);
+
+    renderNewWorkOrderPage();
+
+    expect(await screen.findByText("Conéctese a internet para buscar clientes.")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("shows the offline message instead of an endless spinner when there is no cached vehicle list", async () => {
+    // Defect this catches: the vehicle-picker step right after the
+    // customer-search step above has the identical shape -- `vehicles`
+    // has no cached data and the device is offline -- yet it kept
+    // rendering the unlabeled spinner forever instead of the same
+    // offline message the customer step was just fixed to show.
+    mockSessionCustomerAndVehicle();
+    server.use(http.get("/api/customers/c1/vehicles", () => new Promise(() => {})));
+    const user = userEvent.setup();
+    renderNewWorkOrderPage();
+
+    await user.click(await screen.findByText("María Hernández"));
+    await screen.findByRole("status");
+
+    onlineManager.setOnline(false);
+
+    expect(await screen.findByText("Conéctese a internet para buscar vehículos.")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("shows the offline message, not the empty state, when the very first customer search settles into network_error while already offline", async () => {
+    // Defect this catches: branching only on `customers.isPending` falls
+    // straight through to `CustomerList`'s own empty state the instant a
+    // query settles into its error state -- which a cold load that starts
+    // offline does almost immediately, since the actual `fetch()` throws
+    // right away instead of being paused (unlike the `onlineManager`-paused
+    // case the previous two tests cover) -- showing "Todavía no hay
+    // clientes" as if this workshop genuinely had none. The old branch
+    // already checked `isOffline` while `isPending` was still true, so
+    // this waits for the request to actually fire -- and gives the
+    // settled query one more real tick to re-render -- instead of
+    // asserting during that same pending window, where the message shows
+    // either way and the assertion would pass whether or not the fix is
+    // in place.
+    let customersRequestCount = 0;
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
+      http.get("/api/customers", () => {
+        customersRequestCount += 1;
+        return HttpResponse.error();
+      }),
+    );
+    Object.defineProperty(window.navigator, "onLine", { configurable: true, get: () => false });
+
+    try {
+      renderNewWorkOrderPage();
+
+      await waitFor(() => expect(customersRequestCount).toBeGreaterThan(0));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(screen.getByText("Conéctese a internet para buscar clientes.")).toBeInTheDocument();
+      expect(screen.queryByText("Todavía no hay clientes")).not.toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(window.navigator, "onLine");
+    }
+  });
+
+  it("shows the offline message, not the empty state, when a selected customer's vehicles settle into network_error while already offline", async () => {
+    // Defect this catches: the vehicle-picker step has the identical shape
+    // as the customer step above -- it fell through to `VehicleList`'s own
+    // empty state ("Todavía no hay vehículos") for a customer whose
+    // vehicles were never fetched before this cold load started offline.
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
+      http.get("/api/customers", () =>
+        HttpResponse.json([
+          {
+            id: "c1",
+            full_name: "María Hernández",
+            phone: "98765432",
+            phone_is_mobile: true,
+            notes: null,
+            archived_at: null,
+            created_at: "2026-01-01T00:00:00Z",
+            updated_at: "2026-01-01T00:00:00Z",
+          },
+        ]),
+      ),
+      http.get("/api/customers/c1/vehicles", () => HttpResponse.error()),
+    );
+    Object.defineProperty(window.navigator, "onLine", { configurable: true, get: () => false });
+
+    try {
+      const user = userEvent.setup();
+      renderNewWorkOrderPage();
+
+      await user.click(await screen.findByText("María Hernández"));
+
+      expect(await screen.findByText("Conéctese a internet para buscar vehículos.")).toBeInTheDocument();
+      expect(screen.queryByText("Todavía no hay vehículos")).not.toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(window.navigator, "onLine");
+    }
   });
 
   it("disables creation and explains why when offline, without calling the API", async () => {

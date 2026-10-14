@@ -97,7 +97,7 @@ The customer's billing name (razón social, for fiscal issuance) and RTN MUST bo
 
 ### Requirement: Customer Edit
 
-The system MUST allow updating a customer's editable fields (at minimum, name and phone) for a customer belonging to the authenticated workshop. Omitted fields MUST remain unchanged; the phone field follows the same normalization and validation as creation.
+The system MUST allow updating a customer's editable fields (at minimum, name and phone) for an active customer belonging to the authenticated workshop. Omitted fields MUST remain unchanged; the phone field follows the same normalization and validation as creation. An edit request targeting an archived customer MUST be rejected with HTTP 409 and `detail: "customer_archived"`, distinct from a nonexistent or foreign customer.
 
 #### Scenario: Editing a customer's name
 
@@ -111,6 +111,13 @@ The system MUST allow updating a customer's editable fields (at minimum, name an
 - GIVEN a customer id that does not exist, or belongs to another workshop
 - WHEN an edit request targets that id
 - THEN the response is HTTP 404 with `detail: "customer_not_found"`
+
+#### Scenario: Editing an archived customer is rejected
+
+- GIVEN a customer belonging to the authenticated workshop has been archived
+- WHEN an edit request targets that customer's id
+- THEN the response is HTTP 409 with `detail: "customer_archived"`
+- AND the customer's fields are unchanged
 
 ### Requirement: Customer Archive Is Soft And Idempotent
 

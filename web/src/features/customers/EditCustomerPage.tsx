@@ -77,6 +77,23 @@ export function EditCustomerPage() {
 
   const data = customer.data;
 
+  // Reached directly by URL (e.g. a stale link, or an archived-customer
+  // detail page a mechanic navigated here from before this guard
+  // existed): the API itself rejects an edit of an archived customer with
+  // `customer_archived`, so this screen must not render a form that
+  // would silently fail (or, before this fix, silently rename the
+  // archived record).
+  if (data.archived_at !== null) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Alert variant="info">{customersCopy.archivedNotice}</Alert>
+        <LinkButton to="/clientes" variant="secondary">
+          {customersCopy.edit.backToList}
+        </LinkButton>
+      </div>
+    );
+  }
+
   function handleSubmit(values: CustomerFormValues) {
     const payload = diffCustomer(data, values);
     updateCustomer.mutate(payload, {
@@ -96,6 +113,9 @@ export function EditCustomerPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold text-brand-primary">{customersCopy.edit.title}</h1>
+      <LinkButton to="/clientes" variant="secondary">
+        {customersCopy.edit.backToList}
+      </LinkButton>
       <CustomerForm
         mode="edit"
         initialValues={{

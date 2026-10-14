@@ -51,11 +51,14 @@ export const workOrdersCopy = {
     submitPending: "Creando...",
   },
   offline: {
+    customerSearchDisabled: "Conéctese a internet para buscar clientes.",
+    vehicleListDisabled: "Conéctese a internet para buscar vehículos.",
     createOrderDisabled: "Conéctese a internet para crear órdenes.",
     lineEditDisabled: "Conéctese a internet para editar líneas.",
     statusChangeDisabled: "Conéctese a internet para cambiar el estado de la orden.",
     paymentDisabled: "Conéctese a internet para registrar un pago.",
     voidPaymentDisabled: "Conéctese a internet para anular un pago.",
+    listDisabled: "Conéctese a internet para ver sus órdenes.",
   },
   statusActions: {
     // `quote` is never a reachable target (`TRANSITIONS` has no edge into
@@ -150,6 +153,12 @@ export const workOrdersCopy = {
     cancel: "Cancelar",
     save: "Guardar línea",
     savePending: "Guardando...",
+  },
+  removeLineConfirm: {
+    title: "Eliminar línea",
+    body: (description: string) => `¿Eliminar "${description}" de la orden? Esta acción no se puede deshacer.`,
+    cancel: "Cancelar",
+    confirm: "Sí, eliminar línea",
   },
   itemPicker: {
     searchLabel: "Buscar repuesto",

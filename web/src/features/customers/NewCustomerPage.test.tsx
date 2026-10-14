@@ -46,6 +46,15 @@ function customerResponse(id: string, fullName: string) {
 }
 
 describe("NewCustomerPage", () => {
+  it("has a back link to the customer list", () => {
+    // Defect this catches: this create screen has no way back except the
+    // bottom nav (a QA sweep finding); a link whose `to` drifts from
+    // "/clientes" would silently strand the mechanic on the wrong screen.
+    renderNewCustomerPage();
+
+    expect(screen.getByRole("link", { name: "Volver a clientes" })).toHaveAttribute("href", "/clientes");
+  });
+
   it("reuses the same client-generated id across a failed submit and its retry", async () => {
     // Defect this catches: generating a new client id per submit attempt
     // (instead of once per form mount) would turn a retry after a failed

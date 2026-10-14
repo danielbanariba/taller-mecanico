@@ -44,6 +44,7 @@ function movement(overrides: Partial<MovementOut>): MovementOut {
     order_id: null,
     order_line_id: null,
     order_number: null,
+    is_initial_stock: false,
     ...overrides,
   };
 }
@@ -215,6 +216,37 @@ describe("ItemDetailPage", () => {
     expect(entries[1]).toHaveTextContent("Entrada +3");
   });
 
+  it("labels the initial-stock adjustment apart from a later physical count", async () => {
+    // Defect this catches: rendering create_item's implicit initial-stock
+    // adjustment the same way as a later physical count ("Conteo: X
+    // (+Y)"), since both are plain "adjust" movements -- the API's
+    // `is_initial_stock` (computed by identity, not by a free-text note
+    // match) is the only thing that tells them apart.
+    mockItemAndMovements([
+      movement({ id: "mv-count", kind: "adjust", quantity: 8, delta: 3, is_initial_stock: false }),
+      movement({ id: "mv-initial", kind: "adjust", quantity: 5, delta: 5, is_initial_stock: true }),
+    ]);
+    renderDetailPage();
+
+    expect(await screen.findByText("Stock inicial: 5")).toBeInTheDocument();
+    expect(screen.getByText("Conteo: 8 (+3)")).toBeInTheDocument();
+  });
+
+  it("formats the stock figure and movement quantities with thousands separators", async () => {
+    // Defect this catches: rendering a large stock count or movement
+    // quantity as a raw run of digits ("1000000") instead of a grouped,
+    // human-readable number ("1,000,000"), unreadable at a glance.
+    mockItemAndMovements(
+      [movement({ id: "mv-big", kind: "in", quantity: 2_500, delta: 2_500 })],
+      { ...ITEM, stock: 1_000_000 },
+    );
+    renderDetailPage();
+
+    expect(await screen.findByText("1,000,000")).toBeInTheDocument();
+    expect(screen.queryByText("1000000")).not.toBeInTheDocument();
+    expect(screen.getByText("Entrada +2,500")).toBeInTheDocument();
+  });
+
   it("links a movement to the order that caused it, and renders no such link for a manual one", async () => {
     // Defect this catches: the API already links a movement to the work
     // order that caused it (`order_id`/`order_number`), but the history
@@ -231,6 +263,40 @@ describe("ItemDetailPage", () => {
     expect(orderLinks).toHaveLength(1);
     expect(orderLinks[0]).toHaveTextContent("Orden #42");
     expect(orderLinks[0]).toHaveAttribute("href", "/ordenes/order-1");
+  });
+
+  it("shows 'Restaurar' instead of 'Archivar' for an already-archived item, and sends the unarchive request", async () => {
+    // Defect this catches: an archived item's detail screen still showed
+    // "Archivar" (archiving an already-archived item is a no-op, so this
+    // left no way to bring it back) instead of the "Restaurar" action that
+    // actually reverses it.
+    let unarchiveWasCalled = false;
+    mockItemAndMovements([], { ...ITEM, archived_at: "2026-01-02T00:00:00Z" });
+    server.use(
+      http.post("/api/inventory/items/item-1/unarchive", () => {
+        unarchiveWasCalled = true;
+        return HttpResponse.json({ ...ITEM, archived_at: null });
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetailPage();
+
+    await screen.findByText("10");
+    expect(screen.queryByRole("button", { name: "Archivar" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Restaurar" }));
+
+    expect(unarchiveWasCalled).toBe(true);
+  });
+
+  it("disables 'Restaurar' offline with a message, for an archived item", async () => {
+    mockItemAndMovements([], { ...ITEM, archived_at: "2026-01-02T00:00:00Z" });
+    renderDetailPage();
+
+    await screen.findByText("10");
+    goOffline();
+
+    expect(await screen.findByText("Conéctese a internet para restaurar repuestos.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Restaurar" })).toBeDisabled();
   });
 
   it("asks for confirmation before archiving, then sends the archive request and returns to the list", async () => {

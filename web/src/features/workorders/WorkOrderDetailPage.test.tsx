@@ -250,6 +250,50 @@ describe("WorkOrderDetailPage", () => {
     expect(lineRequestWasSent).toBe(false);
   });
 
+  it("asks for confirmation before removing a line, and sends no request when it is dismissed", async () => {
+    // Defect this catches: tapping "Eliminar" on a line removes it (and
+    // reverses any stock it already consumed, shrinking the order total)
+    // immediately, with no chance to back out -- unlike every other
+    // destructive action in this app (cancelling an order, voiding a
+    // payment), which all confirm first.
+    mockSessionAndOrder();
+    let removeRequests = 0;
+    server.use(
+      http.delete("/api/work-orders/order-1/lines/line-1", () => {
+        removeRequests += 1;
+        return HttpResponse.json({ ...ORDER, lines: [] });
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetailPage();
+
+    await user.click(await screen.findByRole("button", { name: "Eliminar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Eliminar línea" });
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+
+    expect(removeRequests).toBe(0);
+    expect(screen.getByText("Cambio de aceite")).toBeInTheDocument();
+  });
+
+  it("removes the line only once the confirmation is accepted", async () => {
+    mockSessionAndOrder();
+    let removeRequests = 0;
+    server.use(
+      http.delete("/api/work-orders/order-1/lines/line-1", () => {
+        removeRequests += 1;
+        return HttpResponse.json({ ...ORDER, lines: [] });
+      }),
+    );
+    const user = userEvent.setup();
+    renderDetailPage();
+
+    await user.click(await screen.findByRole("button", { name: "Eliminar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Eliminar línea" });
+    await user.click(within(dialog).getByRole("button", { name: "Sí, eliminar línea" }));
+
+    await waitFor(() => expect(removeRequests).toBe(1));
+  });
+
   it("disables the payment form's submit with its offline message once the connection drops", async () => {
     // Defect this catches: the payment form keeps "Registrar pago" enabled
     // after the connection drops, so the mutation would hang on a

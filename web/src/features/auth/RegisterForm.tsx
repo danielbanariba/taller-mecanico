@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 
+import { isValidPhone } from "../../shared/format/phone";
 import { Alert } from "../../shared/ui/Alert";
 import { Button } from "../../shared/ui/Button";
 import { TextField } from "../../shared/ui/TextField";
@@ -17,18 +18,22 @@ const MAX_PASSWORD_LENGTH = 128;
 
 /**
  * Presentational, except for the client-side rules worth enforcing before
- * spending a round trip: password length, both bounds. `maxLength` on the
- * input stops typing past the limit, but a pasted or programmatically set
- * value can still exceed it, so the length check here is the one that
- * actually blocks submission. Everything else (phone format, duplicate
- * phone) is the API's call.
+ * spending a round trip: password length (both bounds) and the phone
+ * shape, mirroring the API's own `PhoneNumber` rule exactly
+ * (`isValidPhone`). `maxLength` on the password input stops typing past
+ * the limit, but a pasted or programmatically set value can still exceed
+ * it, so the length check here is the one that actually blocks
+ * submission. Everything else (a duplicate phone) is the API's call.
  */
 export function RegisterForm({ onSubmit, pending, errorMessage }: RegisterFormProps) {
   const [workshopName, setWorkshopName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [phoneTouched, setPhoneTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
+
+  const phoneError = phoneTouched && !isValidPhone(phone) ? authCopy.register.phoneInvalid : undefined;
 
   const passwordTooShort = password.length > 0 && password.length < MIN_PASSWORD_LENGTH;
   const passwordTooLong = password.length > MAX_PASSWORD_LENGTH;
@@ -40,7 +45,11 @@ export function RegisterForm({ onSubmit, pending, errorMessage }: RegisterFormPr
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setPhoneTouched(true);
     setPasswordTouched(true);
+    if (!isValidPhone(phone)) {
+      return;
+    }
     if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
       return;
     }
@@ -75,6 +84,8 @@ export function RegisterForm({ onSubmit, pending, errorMessage }: RegisterFormPr
         placeholder={authCopy.register.phonePlaceholder}
         value={phone}
         onChange={(event) => setPhone(event.target.value)}
+        onBlur={() => setPhoneTouched(true)}
+        error={phoneError}
         required
       />
       <TextField

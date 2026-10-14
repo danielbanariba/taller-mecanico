@@ -149,6 +149,24 @@ export function NewWorkOrderPage() {
   const createVehicleErrorMessage =
     createVehicle.error instanceof ApiError ? getCustomersErrorMessage(createVehicle.error.code) : undefined;
 
+  // True when there is nothing cached to show AND the reason is connectivity
+  // (either the browser already knows it is offline, or the very first
+  // fetch already settled into a `network_error`). A cold load that starts
+  // offline resolves `customers.isPending`/`vehicles.isPending` to `false`
+  // almost immediately -- the query settles into its error state -- so
+  // branching on `isPending` alone (as this used to) fell through to
+  // `CustomerList`/`VehicleList`'s own empty state ("Todavía no hay
+  // clientes/vehículos"), which reads as "this workshop has none" instead
+  // of "you're offline" (a QA sweep finding). Cached data (`data !==
+  // undefined`) always wins over this, so a normal offline read with
+  // something already cached keeps showing it.
+  const customersUnavailable =
+    customers.data === undefined &&
+    (isOffline || (customers.error instanceof ApiError && customers.error.code === "network_error"));
+  const vehiclesUnavailable =
+    vehicles.data === undefined &&
+    (isOffline || (vehicles.error instanceof ApiError && vehicles.error.code === "network_error"));
+
   if (preselectedVehicleId !== "" && preselectedVehicle.isPending) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
@@ -194,7 +212,9 @@ export function NewWorkOrderPage() {
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
               />
-              {customers.isPending ? (
+              {customersUnavailable ? (
+                <Alert variant="info">{workOrdersCopy.offline.customerSearchDisabled}</Alert>
+              ) : customers.isPending ? (
                 <div className="flex justify-center py-8">
                   <Spinner />
                 </div>
@@ -248,7 +268,9 @@ export function NewWorkOrderPage() {
             </div>
           ) : (
             <>
-              {vehicles.isPending ? (
+              {vehiclesUnavailable ? (
+                <Alert variant="info">{workOrdersCopy.offline.vehicleListDisabled}</Alert>
+              ) : vehicles.isPending ? (
                 <div className="flex justify-center py-8">
                   <Spinner />
                 </div>
