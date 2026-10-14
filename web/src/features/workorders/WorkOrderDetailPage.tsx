@@ -13,7 +13,8 @@ import { InvoiceSection } from "../invoicing/issue/InvoiceSection";
 import { isReceiptEligible } from "./receipt/useReceiptOrder";
 import { ShareWhatsAppButton } from "./ShareWhatsAppButton";
 import { StatusActions } from "./StatusActions";
-import { getWorkOrdersErrorMessage, statusLabel, workOrdersCopy } from "./copy";
+import { StatusBadge } from "./StatusBadge";
+import { getWorkOrdersErrorMessage, workOrdersCopy } from "./copy";
 import { useAddLine, useRecordPayment, useRemoveLine, useUpdateLine, useWorkOrder } from "./hooks";
 import { LineEditorDialog, type LineEditorValues } from "./LineEditorDialog";
 import { PaymentForm, type PaymentFormValues } from "./payments/PaymentForm";
@@ -137,14 +138,14 @@ export function WorkOrderDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
+      <header className="flex flex-col items-start gap-1">
         <h1 className="text-2xl font-bold text-brand-primary">{workOrdersCopy.detail.orderTitle(data.number)}</h1>
         <p className="text-sm text-brand-muted-foreground">
           {[data.vehicle.make, data.vehicle.model].filter(Boolean).join(" ")}
           {data.vehicle.plate ? ` · ${data.vehicle.plate}` : ""}
         </p>
         <p className="text-base text-brand-foreground">{data.customer.full_name}</p>
-        <p className="text-base font-semibold text-brand-primary">{statusLabel(data.status)}</p>
+        <StatusBadge status={data.status} />
       </header>
 
       {data.complaint ? (
