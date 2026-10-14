@@ -113,6 +113,8 @@ Movements carry a client-generated UUID. If that id already exists with the exac
 
 Negative stock is allowed and flagged (`needs_review`/`is_low` on the item), never blocked: a mechanic mid-job must not be stopped by the app, and a queued offline movement must always apply once it reaches the server. Search is accent-insensitive via an `IMMUTABLE` plpgsql wrapper function, `taller_unaccent_lower`, used both for search filtering and for the name-uniqueness constraint.
 
+Archiving an item is not a one-way trip: `POST /api/inventory/items/{id}/unarchive` (idempotent, 409 `item_name_taken` if another active item has since taken its name) restores it to the default list, reachable from the web's "Ver archivados" screen and the "Restaurar" action on an archived item's own detail page.
+
 ### Offline
 
 `recordMovement` (`web/src/features/inventory/commands.ts`) never calls the API directly — it only enqueues the movement into an IndexedDB outbox, then triggers a flush. `flushOutboxOnce` → `withFlushLock` (`web/src/features/inventory/offlineSync.ts`) sends the outbox's entries to the server FIFO, one at a time, serialized by a Web Locks–based mutex (with an in-tab `Promise` chain fallback where Web Locks aren't available, e.g. the test runner) — responses can never be reconciled out of order. Reading items (`fetchItemsFolded` / the single-item fetch in `hooks.ts`) runs inside that *same* lock and folds any still-pending outbox entries onto the fetched data, so a read can never land in the gap between a flush's PUT succeeding and it removing the entry, and a queued tap is never invisible because a refetch happened to win a race.
