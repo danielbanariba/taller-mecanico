@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
 
+import { AppProviders } from "../../../app/providers";
 import { renderWithQueryClient } from "../../../test/render";
 import { server } from "../../../test/server";
 import { CaiRangePage } from "./CaiRangePage";
@@ -152,6 +153,27 @@ describe("CaiRangePage", () => {
     await user.click(screen.getByRole("button", { name: /guardar rango/i }));
 
     expect(await screen.findByText("La fecha límite no puede ser mayor a un año.")).toBeInTheDocument();
+  });
+
+  it("disables the form once a cold-load fetch reveals the device is offline", async () => {
+    server.use(
+      http.get("/api/auth/me", () => HttpResponse.json(SESSION)),
+      http.get("/api/invoicing/settings", () => HttpResponse.error()),
+    );
+    render(
+      <AppProviders>
+        <MemoryRouter initialEntries={["/ordenes/facturacion/rangos/nuevo"]}>
+          <Routes>
+            <Route path="/ordenes/facturacion/rangos/nuevo" element={<CaiRangePage />} />
+          </Routes>
+        </MemoryRouter>
+      </AppProviders>,
+    );
+
+    expect(
+      await screen.findByText("Conéctese a internet para registrar o editar un rango de CAI."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /guardar rango/i })).toBeDisabled();
   });
 
   it("disables every field when editing a range that already has documents issued", async () => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { onlineManager, useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 
 import { ApiError } from "../../shared/api/http";
 import { useWorkshopId, workshopQueryKey } from "../auth/hooks";
@@ -340,11 +340,28 @@ export function useOfflineSync(workshopId: string | undefined): OfflineSyncStatu
     const unsubscribe = subscribeOutboxChange(() => void refreshPendingCount());
     const handleOnline = () => void runFlush();
     window.addEventListener("online", handleOnline);
+    // Also reacts to `onlineManager` itself transitioning online, which the
+    // browser's own `online` event does not cover by itself:
+    // `reachability.ts`'s probe-driven recovery (`reportNetworkError`) only
+    // ever calls `onlineManager.setOnline(true)` directly, it never
+    // dispatches a window event. `setOnline` only notifies when the value
+    // actually changes, so this never double-fires with `handleOnline`
+    // above for a real browser event once `onlineManager` already agrees.
+    // Without this, a movement queued during an outage that the health
+    // probe (not the browser) detected as resolved would sit in the outbox
+    // until the next `FLUSH_INTERVAL_MS` tick instead of flushing the
+    // moment the app itself learns the connection is back.
+    const unsubscribeOnlineManager = onlineManager.subscribe(() => {
+      if (onlineManager.isOnline()) {
+        void runFlush();
+      }
+    });
     const interval = window.setInterval(() => void runFlush(), FLUSH_INTERVAL_MS);
 
     return () => {
       unsubscribe();
       window.removeEventListener("online", handleOnline);
+      unsubscribeOnlineManager();
       window.clearInterval(interval);
     };
   }, [workshopId, queryClient]);

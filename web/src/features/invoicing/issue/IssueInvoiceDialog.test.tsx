@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { useState } from "react";
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { MemoryRouter, Route, Routes, useParams } from "react-router";
 
+import { AppProviders } from "../../../app/providers";
 import { renderWithQueryClient } from "../../../test/render";
 import { server } from "../../../test/server";
 import type { CustomerOut } from "../../customers/api";
@@ -309,6 +310,37 @@ describe("IssueInvoiceDialog", () => {
     goOffline();
 
     expect(screen.getByText("Conéctese a internet para emitir una factura.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Emitir factura" })).toBeDisabled();
+  });
+
+  it("disables the issue action once a cold-load fetch reveals the device is offline", async () => {
+    // Defect this catches: on a cold load that is already offline, neither
+    // `onlineManager` (starts every page assuming online) nor
+    // `navigator.onLine` (can lag real connectivity) has any reason to be
+    // right yet -- `useOnlineStatus()` reads "online" and the dialog opens
+    // fully enabled with no offline message, until an unrelated browser
+    // event eventually fires (`providers.tsx`'s own comment). The customer
+    // prefill fetch failing with a real `network_error` must correct that
+    // for this dialog the same way it does for every other write screen.
+    server.use(
+      http.get("/api/auth/me", () =>
+        HttpResponse.json({
+          user: { id: "u1", full_name: "Ana Pérez", phone: "99998888", role: "owner" },
+          workshop: { id: "w1", name: "Taller Ana" },
+        }),
+      ),
+      http.get("/api/customers/c1", () => HttpResponse.error()),
+      http.get("/api/invoicing/settings", () => HttpResponse.json(READY_NO_WARNING_SETTINGS)),
+    );
+    render(
+      <AppProviders>
+        <MemoryRouter>
+          <IssueInvoiceDialog open order={ORDER} onClose={() => {}} />
+        </MemoryRouter>
+      </AppProviders>,
+    );
+
+    expect(await screen.findByText("Conéctese a internet para emitir una factura.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Emitir factura" })).toBeDisabled();
   });
 });

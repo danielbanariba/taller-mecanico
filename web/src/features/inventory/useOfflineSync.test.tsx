@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { server } from "../../test/server";
 import { useOfflineSync } from "./hooks";
@@ -20,6 +20,70 @@ function renderOfflineSync() {
 }
 
 describe("useOfflineSync", () => {
+  afterEach(() => {
+    onlineManager.setOnline(true);
+  });
+
+  it("flushes a queued movement when onlineManager reports online with no browser event at all", async () => {
+    // Defect this catches: a reachability probe (`reachability.ts`'s
+    // `reportNetworkError`) recovers by calling `onlineManager.setOnline(true)`
+    // directly -- it never dispatches a window `online` event. A flush
+    // wired only to `window.addEventListener("online", ...)` would leave a
+    // movement queued during an outage sitting in the outbox until the
+    // next periodic timer tick instead of flushing the moment the app
+    // itself learns the connection is back.
+    await defaultOutbox.add({
+      id: "online-manager-movement",
+      workshopId: WORKSHOP_ID,
+      itemId: "item-1",
+      kind: "in",
+      quantity: 1,
+      occurredAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    server.use(http.put("/api/inventory/movements/:id", () => HttpResponse.error()));
+
+    renderOfflineSync();
+    await waitFor(async () => {
+      expect(await defaultOutbox.listForWorkshop(WORKSHOP_ID)).toHaveLength(1);
+    });
+
+    onlineManager.setOnline(false);
+
+    let putCount = 0;
+    server.use(
+      http.put("/api/inventory/movements/:id", () => {
+        putCount += 1;
+        return HttpResponse.json(
+          {
+            movement: {
+              id: "online-manager-movement",
+              item_id: "item-1",
+              kind: "in",
+              quantity: 1,
+              delta: 1,
+              note: null,
+              occurred_at: "2026-01-01T00:00:00.000Z",
+              recorded_at: "2026-01-01T00:00:00.000Z",
+              created_by: "u1",
+            },
+            item: { id: "item-1", stock: 1, needs_review: false, is_low: false },
+          },
+          { status: 201 },
+        );
+      }),
+    );
+
+    act(() => {
+      onlineManager.setOnline(true);
+    });
+
+    await waitFor(() => expect(putCount).toBe(1));
+    await waitFor(async () => {
+      expect(await defaultOutbox.listForWorkshop(WORKSHOP_ID)).toHaveLength(0);
+    });
+  });
+
   it("sends a queued movement exactly once when the browser's online event fires", async () => {
     // Defect this catches: without an `online` listener, a movement queued
     // while offline would only reach the server on the next full reload or

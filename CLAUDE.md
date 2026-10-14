@@ -121,6 +121,8 @@ Creating or editing an item requires a live connection (disabled in the UI with 
 
 The service worker (`vite-plugin-pwa`, configured in `vite.config.ts`) precaches the app shell but routes every `/api/` request `NetworkOnly` — API responses are never served from the service worker's cache, because the persisted query cache above is the one offline data source, and a stale cached API response must never win a race against the real backend.
 
+A request that throws `ApiError("network_error")` marks the app offline (`providers.tsx`'s `QueryCache`/`MutationCache` `onError`, calling `reachability.ts`'s `reportNetworkError`), and a bounded `/api/health` probe every 10 s (also fired on window focus and `visibilitychange`) restores it once the server answers again, since the browser's own `online` event never fires when `navigator.onLine` stayed true the whole time.
+
 ## Public test deployment
 
 A shareable test instance runs at https://inventario-taller.danielbanariba.com from a detached worktree on the dev machine (its own Postgres container, two systemd user units, the `ceiba-demos` Cloudflare tunnel). `deploy/demo/README.md` is the runbook: what runs where, how to deploy an update, stop it, and read its logs.
