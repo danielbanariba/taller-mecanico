@@ -3,12 +3,17 @@
 """
 
 import uuid
-from datetime import date, timedelta
+from collections.abc import Generator
+from datetime import UTC, date, datetime, timedelta
 
+import pytest
 from fastapi.testclient import TestClient
 from httpx import Response
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+
+from taller.identity.adapters.dependencies import get_clock
+from taller.main import app
 
 _PROFILE_PAYLOAD = {
     "rtn": "0801-1990-123456",
@@ -116,6 +121,51 @@ def test_a_later_save_updates_only_the_fields_that_changed(authenticated_client:
     body = updated.json()
     assert body["phone"] == "22009900"
     assert body["legal_name"] == _PROFILE_PAYLOAD["legal_name"]
+
+
+class FakeClock:
+    """A clock that only moves when a test moves it. Mirrors
+    `test_issue_invoice_api.FakeClock`.
+    """
+
+    def __init__(self, start: datetime) -> None:
+        self._now = start
+
+    def now(self) -> datetime:
+        return self._now
+
+    def advance(self, delta: timedelta) -> None:
+        self._now += delta
+
+
+@pytest.fixture
+def clock() -> Generator[FakeClock]:
+    fake = FakeClock(datetime(2026, 1, 1, 12, 0, tzinfo=UTC))
+    app.dependency_overrides[get_clock] = lambda: fake
+    try:
+        yield fake
+    finally:
+        app.dependency_overrides.pop(get_clock, None)
+
+
+def test_an_identical_replay_does_not_bump_updated_at(
+    authenticated_client: TestClient, clock: FakeClock
+):
+    """Defect it catches: a byte-identical replay bumps `updated_at` even
+    though nothing changed, which would make every harmless retry look
+    like a real edit in the audit trail.
+    """
+    first = _save_profile(authenticated_client).json()
+    clock.advance(timedelta(minutes=5))
+
+    replayed = _save_profile(authenticated_client)
+    assert replayed.status_code == 200
+    assert replayed.json()["updated_at"] == first["updated_at"]
+
+    clock.advance(timedelta(minutes=5))
+    changed = _save_profile(authenticated_client, phone="2200-9900")
+    assert changed.status_code == 200
+    assert changed.json()["updated_at"] != first["updated_at"]
 
 
 def test_editing_the_codes_before_any_range_exists_succeeds(authenticated_client: TestClient):
